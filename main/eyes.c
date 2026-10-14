@@ -14,6 +14,8 @@
 #define EYE_SPACING 80
 #define GAZE_X 52
 #define GAZE_Y 38
+/* The hearts' distance from the middle. */
+#define HEART_X 160
 
 /* What a mood looks like. The lids: `top` cuts the eye from above (0..1 of
  * its height), `slope` tilts that cut (> 0: lower towards the nose, angry;
@@ -39,10 +41,14 @@ static const eye_shape_t s_moods[EYES_MOOD_COUNT] = {
     [EYES_MOOD_HOT] = {RGB(0xFF8A2A), 84, 105, 0.30f, -0.32f, 0, 0, 1, 1},
     [EYES_MOOD_SLEEPY] = {RGB(0x288CAF), 90, 116, 0.58f, 0, 0, 0, 1, 1},
     [EYES_MOOD_ASLEEP] = {RGB(0x1E6E8A), 90, 116, 0.88f, 0, 0, 0, 1, 1},
+    [EYES_MOOD_SAD] = {RGB(0x5C8DFF), 80, 110, 0.26f, -0.40f, 0, 0, 1, 1},
+    [EYES_MOOD_LOVING] = {RGB(0xFF7AB8), 93, 116, 0, 0, 1, 0, 1, 1},
+    [EYES_MOOD_SURPRISED] = {RGB(0x3EE6FF), 98, 140, 0, 0, 0, 0, 1.04f, 1.04f},
+    [EYES_MOOD_BORED] = {RGB(0x6FA0B4), 88, 112, 0.44f, 0, 0.2f, 0, 1, 1},
 };
 
 static const char *const s_mood_names[EYES_MOOD_COUNT] = {
-    "neutral", "happy", "curious", "thinking", "grumpy", "hot", "sleepy", "asleep",
+    "neutral", "happy", "curious", "thinking", "grumpy", "hot", "sleepy", "asleep", "sad", "loving", "surprised", "bored",
 };
 
 static struct {
@@ -75,7 +81,7 @@ static float frand(void)
 
 static bool has_overlay(eyes_mood_t mood)
 {
-    return mood == EYES_MOOD_THINKING || mood == EYES_MOOD_HOT || mood == EYES_MOOD_ASLEEP;
+    return mood == EYES_MOOD_THINKING || mood == EYES_MOOD_HOT || mood == EYES_MOOD_ASLEEP || mood == EYES_MOOD_LOVING;
 }
 
 /* Where an eye is this frame. */
@@ -163,6 +169,14 @@ static void draw_eye(lv_layer_t *layer, const eye_box_t *e)
     }
 }
 
+/* A small heart: two round tops and a point below, centred on (x, y). */
+static void draw_heart(lv_layer_t *layer, float x, float y, lv_color_t color)
+{
+    fill_rect(layer, x - 13, y - 7, x + 1, y + 7, color, LV_RADIUS_CIRCLE, LV_OPA_COVER);
+    fill_rect(layer, x - 1, y - 7, x + 13, y + 7, color, LV_RADIUS_CIRCLE, LV_OPA_COVER);
+    fill_triangle(layer, x - 13, y + 1, x + 13, y + 1, x, y + 16, color);
+}
+
 static void draw_overlays(lv_layer_t *layer, const eye_box_t eyes[2])
 {
     const float t = (float) s.t_ms / 1000.0f;
@@ -194,6 +208,13 @@ static void draw_overlays(lv_layer_t *layer, const eye_box_t eyes[2])
         float y = eyes[1].cy - eyes[1].h / 2 + dy;
         fill_triangle(layer, x, y - 16, x - 9, y + 2, x + 9, y + 2, blue);
         fill_rect(layer, x - 9, y - 5, x + 9, y + 13, blue, LV_RADIUS_CIRCLE, LV_OPA_COVER);
+    } else if (s.mood == EYES_MOOD_LOVING) {
+        // Two hearts float up beside the eyes and fade into the black.
+        for (int i = 0; i < 2; i++) {
+            float p = fmodf(t * 0.4f + (float) i * 0.5f, 1.0f);
+            float x = i == 0 ? CX - HEART_X : CX + HEART_X;
+            draw_heart(layer, x, CY - 40 - p * 90, cur_color(1 - p));
+        }
     }
 }
 
@@ -227,6 +248,10 @@ static lv_area_t frame_area(void)
     } else if (s.mood == EYES_MOOD_HOT) {
         a.x2 = LV_MAX(a.x2, (int32_t) (eyes[1].cx + eyes[1].w / 2 + 36));
         a.y2 = LV_MAX(a.y2, (int32_t) (eyes[1].cy - eyes[1].h / 2 + 80));
+    } else if (s.mood == EYES_MOOD_LOVING) {
+        a.x1 = LV_MIN(a.x1, CX - HEART_X - 16);
+        a.x2 = LV_MAX(a.x2, CX + HEART_X + 16);
+        a.y1 = LV_MIN(a.y1, CY - 140);
     }
     return a;
 }
@@ -252,9 +277,13 @@ static bool step(void)
             if (s.mood == EYES_MOOD_THINKING) {
                 s.tgx = 0.55f + frand() * 0.2f;
                 s.tgy = -0.8f;
-            } else if (s.mood == EYES_MOOD_SLEEPY || s.mood == EYES_MOOD_ASLEEP) {
+            } else if (s.mood == EYES_MOOD_SLEEPY || s.mood == EYES_MOOD_ASLEEP || s.mood == EYES_MOOD_SAD) {
                 s.tgx *= 0.3f;
                 s.tgy = 0.6f;
+            } else if (s.mood == EYES_MOOD_BORED) {
+                // Off to the side, as if anything else were more interesting.
+                s.tgx = s.tgx < 0 ? -0.75f : 0.75f;
+                s.tgy = 0.1f;
             }
         }
     }
@@ -343,7 +372,7 @@ lv_obj_t *eyes_create(lv_obj_t *parent)
 
 void eyes_set_mood(eyes_mood_t mood)
 {
-    if (mood >= EYES_MOOD_COUNT) {
+    if (mood >= EYES_MOOD_COUNT || mood == s.mood) {
         return;
     }
     s.mood = mood;

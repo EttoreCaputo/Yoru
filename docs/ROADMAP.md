@@ -27,8 +27,9 @@ Sources: Waveshare's BSP `waveshare/esp32_s3_touch_amoled_1_75c`, xiaozhi-esp32,
 | Area | Modules | How |
 |------|---------|-----|
 | Voice on the board | `voice.c`, `board_audio.c`, `playback.c`, `sounds.c`, `ears.c`, `audio_selftest.c` | Copy; change the pins and share the I2C bus |
-| Link | `link*.c`, `net.c`, `rpc.c`, `board_settings.c` | Copy; new protocol name and `hello` |
-| Mood | `pet.c` | Copy; feed the eye engine instead of `ui_eyes.c` |
+| Link | `link*.c`, `net.c`, `rpc.c` | Copy; new protocol name and `hello` |
+| Settings | `board_settings.c` | Copied in 0.2.0, rewritten as a table for the round menu |
+| Mood | `pet.c`, `ears.c`, `metrics_model.c` | Copied in 0.2.0: `pet.c` hands its scenes to `behaviour.c` instead of playing them on `ui_eyes.c`; `metrics_model` without the faces |
 | PC data | `metrics_*` | Copy; it drives moods, not faces |
 | Host | `dualeye-core` (link, flasher, firmware, wifi, stt, tts, llm, agent, voice, models, mcp, claude, timers, intents, diary, quips, sensors, snapshot) | Copy as `yoru-core` |
 | App | settings, onboarding, i18n, updates, title bar | Copy; replace the board view with Yoru's eyes |
@@ -76,11 +77,29 @@ To check on the hardware: rendering time per frame (`!lvgl stats`), and the flas
     - LVGL load;
     - restart;
     - factory reset, confirmed with a long press.
-- **Storage and sync.** Settings are kept in NVS, as `board_settings.c` does in DualEye. Once the link exists (M3/M4), the app shows and changes the same values, and the two stay in sync both ways.
+- **Storage and sync.** Settings are kept in NVS by `board_settings.c` (in since 0.2.0, as a table the menu walks: name, range, default). Once the link exists (M3/M4), the app shows and changes the same values, and the two stay in sync both ways.
 - **Language.** Labels in Italian and English, picked in the menu and from the app.
 
+**Mood (in since 0.2.0)**
+- `pet.c` from DualEye: energy, happiness and affection, kept in NVS. It picks the resting eyes, the whims and how often they come; pokes and strokes move it. `behaviour.c` turns its scenes into eye moods.
+- New eye moods for it: sad, loving (with hearts), surprised, bored.
+
+**Motion (QMI8658)**
+
+The accelerometer and gyroscope turn the whole case into an input: Yoru lives in a round badge that is picked up, turned and put down, so how it moves says a lot. A `motion.c` reads the IMU (0x6B on the shared I2C, INT1 on GPIO 21), recognises a few gestures and hands them to `pet.c` as events, the way `ears.c` does for sounds. Like touch, each gesture moves the mood a little and plays a reaction; the "touch and motion reactions" setting turns them off.
+- **Gravity for the gaze.** Tilted, the eyes slide towards the low side, as if they had weight; level again, they drift back. Small tilts only nudge the gaze, so the desk's slope doesn't matter.
+- **Lifted and put down.** Picking it up wakes it (curious, looking at you); putting it back down settles it with a blink. Lifting is also the gentlest way to wake it, without touching the screen.
+- **Shaken.** Spiral, dizzy eyes, then grumpy if it goes on. A new `dizzy` eye mood.
+- **Taps on the case.** A knock on the case or on the desk next to it is a poke without fingerprints. Two knocks call it, like the claps `ears.c` hears.
+- **Rocked.** A slow rocking back and forth makes it drowsy, a lullaby.
+- **Face down.** Turned over on the desk, it goes to sleep and mutes the mic: a privacy gesture that needs no menu. Turned back, it wakes.
+- **Dropped.** Free fall: scared eyes and a squeak, then relief.
+- **Spun.** Turning it fast on the desk (gyroscope): dizzy.
+- **Orientation.** The screen's rotation can follow how the badge is held or stood, as an "auto" choice next to the four fixed ones in the menu.
+- **Power.** The IMU's wake-on-motion interrupt lets the board sleep deeply on battery and wake when it is picked up.
+- **Later.** Gestures are sent to the host over the link (M3), so the app and MCP tools can use them; in M6 the gesture thresholds become data like the moods.
+
 **Senses**
-- IMU (QMI8658): tilt makes the gaze compensate, shaking makes it dizzy, lifting wakes it.
 - Sound direction from the two mics, so the gaze turns to the noise.
 - `ears.c` for bangs, claps and chatter.
 - AXP2101: battery, charging, PWR key, power-off; sleep with the panel and touch in standby.

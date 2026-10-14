@@ -3,8 +3,8 @@
 /* Yoru's face: two glowing eyes on black, nothing else (docs/CONCEPT.md).
  * A mood is a set of targets (shape, lids, tilt, colour) the eyes ease
  * towards; blinks, saccades, squash and the small overlays (thinking dots,
- * z's, a sweat drop) run on top. This module only draws: behaviour.c and,
- * later, the mood engine decide what Yoru feels. All calls with the LVGL
+ * z's, a sweat drop, hearts) run on top. This module only draws: pet.c
+ * decides what Yoru feels and behaviour.c turns it into moods here. All calls with the LVGL
  * lock held. */
 
 #include <stdbool.h>
@@ -24,6 +24,10 @@ typedef enum {
     EYES_MOOD_HOT,
     EYES_MOOD_SLEEPY,
     EYES_MOOD_ASLEEP,
+    EYES_MOOD_SAD,
+    EYES_MOOD_LOVING,
+    EYES_MOOD_SURPRISED,
+    EYES_MOOD_BORED,
     EYES_MOOD_COUNT,
 } eyes_mood_t;
 
@@ -31,6 +35,7 @@ typedef enum {
  * covers the screen, for touch events. The eyes open from closed. */
 lv_obj_t *eyes_create(lv_obj_t *parent);
 
+/** The same mood again changes nothing, so it can be set every tick. */
 void eyes_set_mood(eyes_mood_t mood);
 eyes_mood_t eyes_get_mood(void);
 const char *eyes_mood_name(eyes_mood_t mood);
