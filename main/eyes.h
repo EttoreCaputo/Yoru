@@ -28,6 +28,9 @@ typedef enum {
     EYES_MOOD_LOVING,
     EYES_MOOD_SURPRISED,
     EYES_MOOD_BORED,
+    /* A conversation: attentive while it hears you, warm while it talks. */
+    EYES_MOOD_LISTENING,
+    EYES_MOOD_SPEAKING,
     EYES_MOOD_COUNT,
 } eyes_mood_t;
 
@@ -45,6 +48,10 @@ const char *eyes_mood_name(eyes_mood_t mood);
 void eyes_look_at(float x, float y);
 /** Back to looking around on its own. */
 void eyes_look_around(void);
+
+/** The voice's level, 0..1 (the mic while listening, the speaker while
+ * speaking): the eyes swell a little with it. 0 when nobody talks. */
+void eyes_set_level(float level);
 
 /** A poke: the eyes squash and spring back. */
 void eyes_poke(void);

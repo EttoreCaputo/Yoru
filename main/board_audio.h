@@ -24,7 +24,9 @@ extern "C" {
 #define BOARD_AUDIO_SAMPLE_RATE 16000
 /** ES7210 TDM slots, read interleaved: MIC1, MIC3, MIC2, MIC4 (xiaozhi's
  * order for this board). MIC3 is the speaker loopback, the AEC reference;
- * MIC4 is not connected. To confirm on the board in M3. */
+ * MIC4 is not connected. Checked on the board (0.3.0, audio_selftest.py rec
+ * with a tone): slot 1 carries the tone with no room noise, slots 0 and 2
+ * hear the room, slot 3 is silent. */
 #define BOARD_AUDIO_IN_CHANNELS 4
 #define BOARD_AUDIO_MIC_SLOT 0
 #define BOARD_AUDIO_REF_SLOT 1

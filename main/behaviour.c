@@ -9,7 +9,9 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "eyes.h"
+#include "lvgl_port.h"
 #include "pet.h"
+#include "playback.h"
 
 #define TICK_MS 250
 #define BRIGHTNESS_ASLEEP 12
@@ -20,11 +22,14 @@
 /* A whim every 15-40 s, times pet_idle_pace(). */
 #define WHIM_MIN_MS 15000
 #define WHIM_SPAN_MS 25000
+/* The host's pointer is followed this long after its last move. */
+#define GAZE_HOLD_MS 6000
 
 static const char *TAG = "behaviour";
 
-/* How each of pet.c's scenes looks with these eyes: a mood for a while, and
- * a poke or a blink to start it. Names as in DualEye, so the host's scenes
+/* How each of pet.c's scenes looks with these eyes: a mood for a while, a
+ * poke or a blink to start it, and the pet's sound for it (SOUND_COUNT for
+ * none; playback.c drops them while pet sounds are off). Names as in DualEye, so the host's scenes
  * and the pet's reactions mean the same on both boards. */
 typedef enum { FX_NONE, FX_POKE, FX_BLINK } fx_t;
 
@@ -33,34 +38,35 @@ typedef struct {
     eyes_mood_t mood;
     uint16_t ms;
     fx_t fx;
+    sound_t sound;
 } scene_t;
 
 static const scene_t SCENES[] = {
-    {"happy", EYES_MOOD_HAPPY, 2000, FX_NONE},
-    {"excited", EYES_MOOD_HAPPY, 2500, FX_POKE},
-    {"wink", EYES_MOOD_HAPPY, 1200, FX_BLINK},
-    {"proud", EYES_MOOD_HAPPY, 2500, FX_NONE},
-    {"relieved", EYES_MOOD_HAPPY, 1800, FX_BLINK},
-    {"charged", EYES_MOOD_HAPPY, 1500, FX_POKE},
+    {"happy", EYES_MOOD_HAPPY, 2000, FX_NONE, SOUND_HAPPY},
+    {"excited", EYES_MOOD_HAPPY, 2500, FX_POKE, SOUND_EXCITED},
+    {"wink", EYES_MOOD_HAPPY, 1200, FX_BLINK, SOUND_WINK},
+    {"proud", EYES_MOOD_HAPPY, 2500, FX_NONE, SOUND_TADA},
+    {"relieved", EYES_MOOD_HAPPY, 1800, FX_BLINK, SOUND_PHEW},
+    {"charged", EYES_MOOD_HAPPY, 1500, FX_POKE, SOUND_CHARGE},
     // Bobbing to the beat comes with the music, in M5.
-    {"dance", EYES_MOOD_HAPPY, 3000, FX_POKE},
-    {"love", EYES_MOOD_LOVING, 3500, FX_NONE},
-    {"curious", EYES_MOOD_CURIOUS, 2500, FX_NONE},
-    {"thinking", EYES_MOOD_THINKING, 3000, FX_NONE},
-    {"focus", EYES_MOOD_THINKING, 3000, FX_BLINK},
-    {"angry", EYES_MOOD_GRUMPY, 2500, FX_POKE},
-    {"hot", EYES_MOOD_HOT, 4000, FX_NONE},
-    {"sleepy", EYES_MOOD_SLEEPY, 2500, FX_NONE},
-    {"yawn", EYES_MOOD_SLEEPY, 2000, FX_POKE},
-    {"tired", EYES_MOOD_SLEEPY, 2500, FX_BLINK},
+    {"dance", EYES_MOOD_HAPPY, 3000, FX_POKE, SOUND_BEAT},
+    {"love", EYES_MOOD_LOVING, 3500, FX_NONE, SOUND_AWW},
+    {"curious", EYES_MOOD_CURIOUS, 2500, FX_NONE, SOUND_HMM},
+    {"thinking", EYES_MOOD_THINKING, 3000, FX_NONE, SOUND_COUNT},
+    {"focus", EYES_MOOD_THINKING, 3000, FX_BLINK, SOUND_SCAN},
+    {"angry", EYES_MOOD_GRUMPY, 2500, FX_POKE, SOUND_GRUMBLE},
+    {"hot", EYES_MOOD_HOT, 4000, FX_NONE, SOUND_PANT},
+    {"sleepy", EYES_MOOD_SLEEPY, 2500, FX_NONE, SOUND_COUNT},
+    {"yawn", EYES_MOOD_SLEEPY, 2000, FX_POKE, SOUND_YAWN},
+    {"tired", EYES_MOOD_SLEEPY, 2500, FX_BLINK, SOUND_DRAIN},
     // A sigh: squash, then a slow, heavy-lidded moment.
-    {"sigh", EYES_MOOD_SLEEPY, 1200, FX_POKE},
-    {"sad", EYES_MOOD_SAD, 3500, FX_NONE},
-    {"surprised", EYES_MOOD_SURPRISED, 1500, FX_POKE},
-    {"scared", EYES_MOOD_SURPRISED, 2000, FX_POKE},
-    {"bored", EYES_MOOD_BORED, 3000, FX_NONE},
-    {"look_around", EYES_MOOD_NEUTRAL, 0, FX_NONE},
-    {"blink", EYES_MOOD_NEUTRAL, 0, FX_BLINK},
+    {"sigh", EYES_MOOD_SLEEPY, 1200, FX_POKE, SOUND_SIGH},
+    {"sad", EYES_MOOD_SAD, 3500, FX_NONE, SOUND_WHIMPER},
+    {"surprised", EYES_MOOD_SURPRISED, 1500, FX_POKE, SOUND_GASP},
+    {"scared", EYES_MOOD_SURPRISED, 2000, FX_POKE, SOUND_EEP},
+    {"bored", EYES_MOOD_BORED, 3000, FX_NONE, SOUND_COUNT},
+    {"look_around", EYES_MOOD_NEUTRAL, 0, FX_NONE, SOUND_COUNT},
+    {"blink", EYES_MOOD_NEUTRAL, 0, FX_BLINK, SOUND_COUNT},
 };
 
 /* Where the eyes rest in each of the pet's moods. The cheerful ones rest
@@ -85,7 +91,13 @@ static struct {
     int32_t stroke;
     bool stroked;
     int brightness;
+    voice_state_t voice;
+    /* The finger is on the screen; the host's pointer moved at gaze_ms. */
+    bool pressed;
+    uint32_t gaze_ms;
 } s;
+
+static void show_voice(voice_state_t state);
 
 static void set_brightness(int percent)
 {
@@ -115,10 +127,16 @@ static void react(eyes_mood_t mood, uint32_t for_ms)
 /* Show one of pet.c's scenes; false if it isn't one these eyes know. */
 static bool play(const char *name)
 {
+    if (name == NULL) {
+        return false;
+    }
     for (size_t i = 0; i < sizeof(SCENES) / sizeof(SCENES[0]); i++) {
         const scene_t *sc = &SCENES[i];
         if (strcmp(name, sc->name) != 0) {
             continue;
+        }
+        if (sc->sound != SOUND_COUNT) {
+            playback_sound(sc->sound);
         }
         if (sc->fx == FX_POKE) {
             eyes_poke();
@@ -167,9 +185,11 @@ static void watch_finger(lv_indev_t *indev)
     eyes_look_at((float) (p.x - BOARD_LCD_H_RES / 2) / 180.0f, (float) (p.y - BOARD_LCD_V_RES / 2) / 180.0f);
     s.stroke += abs(p.x - s.last_point.x) + abs(p.y - s.last_point.y);
     s.last_point = p;
-    if (!s.stroked && !s.asleep && s.stroke > STROKE_PX && board_settings_on(SETTING_TOUCH_REACTIONS)) {
+    if (!s.stroked && !s.asleep && s.voice == VOICE_IDLE && s.stroke > STROKE_PX
+        && board_settings_on(SETTING_TOUCH_REACTIONS)) {
         s.stroked = true;
         pet_event(PET_EVENT_STROKED);
+        playback_sound(SOUND_PURR);
         react(pet_mood() == PET_MOOD_LOVING ? EYES_MOOD_LOVING : EYES_MOOD_HAPPY, 2500);
     }
 }
@@ -181,9 +201,11 @@ static void poke(uint32_t now)
     eyes_poke();
     if (s.pokes >= 3) {
         pet_event(PET_EVENT_ANNOYED);
+        playback_sound(SOUND_GRUMBLE);
         react(EYES_MOOD_GRUMPY, 2500);
     } else {
         pet_event(PET_EVENT_POKED);
+        playback_sound(SOUND_BOOP);
         react(EYES_MOOD_HAPPY, 1800);
     }
 }
@@ -197,6 +219,7 @@ static void touch_cb(lv_event_t *e)
 
     switch (code) {
     case LV_EVENT_PRESSED:
+        s.pressed = true;
         lv_indev_get_point(indev, &s.last_point);
         s.stroke = 0;
         s.stroked = false;
@@ -210,17 +233,25 @@ static void touch_cb(lv_event_t *e)
         }
         break;
     case LV_EVENT_RELEASED:
-        eyes_look_around();
+        s.pressed = false;
+        if (s.voice == VOICE_IDLE) {
+            eyes_look_around();
+        } else {
+            show_voice(s.voice); // back to looking at you
+        }
         break;
     case LV_EVENT_SHORT_CLICKED:
         // Waking and sleeping work with reactions off too: they're the controls.
         if (s.asleep) {
             wake_up();
-        } else if (!s.stroked && board_settings_on(SETTING_TOUCH_REACTIONS)) {
+        } else if (!s.stroked && s.voice == VOICE_IDLE && board_settings_on(SETTING_TOUCH_REACTIONS)) {
             poke(now);
         }
         break;
     case LV_EVENT_LONG_PRESSED:
+        if (s.voice != VOICE_IDLE) {
+            break; // not in the middle of a conversation
+        }
         eyes_look_around();
         fall_asleep();
         break;
@@ -242,6 +273,17 @@ static void tick_cb(lv_timer_t *timer)
         return;
     }
     set_brightness(awake_brightness());
+    if (s.gaze_ms != 0 && now - s.gaze_ms >= GAZE_HOLD_MS) {
+        s.gaze_ms = 0;
+        if (!s.pressed && s.voice == VOICE_IDLE) {
+            eyes_look_around();
+        }
+    }
+    if (s.voice != VOICE_IDLE) {
+        // A conversation counts as company, and owns the eyes.
+        s.last_touch_ms = now;
+        return;
+    }
     if (idle >= (uint32_t) board_settings_get(SETTING_ASLEEP_AFTER_S) * 1000) {
         fall_asleep();
         return;
@@ -268,6 +310,94 @@ static void tick_cb(lv_timer_t *timer)
             play(pet_idle_scene());
         }
     }
+}
+
+/* How each voice state looks. */
+static void show_voice(voice_state_t state)
+{
+    switch (state) {
+    case VOICE_LISTENING:
+        eyes_set_mood(EYES_MOOD_LISTENING);
+        eyes_look_at(0, -0.15f); // at you
+        break;
+    case VOICE_THINKING:
+        eyes_set_mood(EYES_MOOD_THINKING);
+        eyes_look_around();
+        break;
+    case VOICE_SPEAKING:
+        eyes_set_mood(EYES_MOOD_SPEAKING);
+        eyes_look_at(0, 0);
+        break;
+    case VOICE_ERROR:
+        eyes_set_mood(EYES_MOOD_SAD);
+        eyes_look_around();
+        break;
+    default:
+        break;
+    }
+}
+
+void behaviour_voice(voice_state_t state)
+{
+    const voice_state_t was = s.voice;
+    s.voice = state;
+    s.last_touch_ms = lv_tick_get();
+    if (state == VOICE_IDLE) {
+        // Back to its own life; the next tick sets the resting mood.
+        s.until_ms = 0;
+        if (!s.pressed) {
+            eyes_look_around();
+        }
+        return;
+    }
+    if (s.asleep) {
+        // The wake word wakes it.
+        s.asleep = false;
+        set_brightness(awake_brightness());
+        ESP_LOGI(TAG, "awake: called");
+    }
+    if (was == VOICE_IDLE) {
+        eyes_blink();
+    }
+    show_voice(state);
+}
+
+bool behaviour_play(const char *name)
+{
+    bool known = false;
+    for (size_t i = 0; i < sizeof(SCENES) / sizeof(SCENES[0]) && !known; i++) {
+        known = strcmp(name, SCENES[i].name) == 0;
+    }
+    if (!known) {
+        return false;
+    }
+    s.last_touch_ms = lv_tick_get();
+    if (s.asleep) {
+        wake_up();
+    }
+    return play(name);
+}
+
+int behaviour_scenes(const char **names, int max)
+{
+    int n = 0;
+    for (size_t i = 0; i < sizeof(SCENES) / sizeof(SCENES[0]) && n < max; i++) {
+        names[n++] = SCENES[i].name;
+    }
+    return n;
+}
+
+void behaviour_gaze(float x, float y)
+{
+    lvgl_port_lock();
+    if (!s.asleep && !s.pressed && s.voice == VOICE_IDLE) {
+        s.gaze_ms = lv_tick_get();
+        if (s.gaze_ms == 0) {
+            s.gaze_ms = 1; // 0 means none
+        }
+        eyes_look_at(x, y);
+    }
+    lvgl_port_unlock();
 }
 
 void behaviour_start(lv_obj_t *face)

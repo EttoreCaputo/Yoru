@@ -5,3 +5,16 @@
 archive: liblvgl__lvgl.a
 entries:
     * (extram_bss)
+
+# ESP-SR links its neural noise suppressor and the esp-dl runtime with
+# static buffers (19 KB and 5 KB) even though the AFE doesn't run NSNet;
+# whatever they hold can wait on PSRAM (0.3.1).
+[mapping:nsnet3_extram]
+archive: libnsnet3.a
+entries:
+    * (extram_bss)
+
+[mapping:esp_dl_extram]
+archive: libespressif__esp-dl.a
+entries:
+    * (extram_bss)

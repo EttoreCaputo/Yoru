@@ -42,12 +42,14 @@ static const setting_info_t INFO[SETTING_COUNT] = {
     [SETTING_EYE_STYLE] = {"eye_style", 0, 15, 0},
     [SETTING_WAKE_WORD_ON] = {"wake_on", 0, 1, 1},
     [SETTING_LANGUAGE] = {"language", 0, 1, 0},
+    [SETTING_WAKE_SOUND] = {"wake_sound", 0, 1, 1},
 };
 
 static SemaphoreHandle_t s_lock;
 static int32_t s_values[SETTING_COUNT];
 static char s_wake_word[16];
 static bool s_nvs_ok;
+static board_settings_cb_t s_on_change;
 
 static void load(void)
 {
@@ -147,8 +149,16 @@ esp_err_t board_settings_set(setting_t id, int32_t value)
     xSemaphoreGive(s_lock);
     if (changed) {
         save(INFO[id].name, value, NULL);
+        if (s_on_change != NULL) {
+            s_on_change(id, value);
+        }
     }
     return ESP_OK;
+}
+
+void board_settings_on_change(board_settings_cb_t cb)
+{
+    s_on_change = cb;
 }
 
 const char *board_settings_name(setting_t id)

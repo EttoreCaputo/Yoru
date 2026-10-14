@@ -11,9 +11,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-/* Two buffers of 40 lines in internal DMA RAM: 37 KB each. They must fit
- * the panel's largest transfer (board_display.c). */
-#define LVGL_DRAW_BUF_LINES 40
+/* Two buffers of 20 lines in internal DMA RAM: 18 KB each. They must fit
+ * the panel's largest transfer (board_display.c). The eyes cover a small
+ * part of the screen, so 40 lines cost 37 KB more internal RAM for little
+ * speed (0.3.1). */
+#define LVGL_DRAW_BUF_LINES 20
 #define LVGL_TICK_PERIOD_MS 2
 #define LVGL_TASK_STACK_SIZE (8 * 1024)
 #define LVGL_TASK_PRIORITY 5

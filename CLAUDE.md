@@ -7,8 +7,17 @@ Desk companion on the Waveshare ESP32-S3-Touch-AMOLED-1.75C. Character: `docs/CO
 1. Bump `version.txt` (patch by default). Check `git log` first: if the current version is committed, it must go up. Bump once per piece of work.
 2. Add a `## <version>` section at the top of `FIRMWARE_CHANGELOG.md`, written for the person using the board.
 3. Build: `source ~/.espressif/tools/activate_idf_v6.1.sh && idf.py build merge-bin`. If it fails, fix it or report it clearly.
+4. Flash the board once the build passes: `idf.py -p <port> flash` (the port is `/dev/cu.usbmodem*`). If no board is connected or flashing fails, say so.
 
-Report the new version and the build result when done.
+Report the new version, the build result and the flash result when done.
+
+## Rule: the user makes the commits
+
+Never run `git commit`, `git push` or anything else that writes history. Leave the changes in the working tree; the user commits them.
+
+## Rule: everything in the code is in English
+
+Identifiers, comments, log messages, strings, file names and docs in the repo are written in English, even when the conversation is in another language. The only exception is text the user sees in another language on purpose (the Italian menu labels).
 
 ## Conventions
 

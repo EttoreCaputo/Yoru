@@ -16,7 +16,9 @@ static const char *TAG = "board_audio";
 #define AUDIO_DMA_DESC_NUM 6
 #define AUDIO_DMA_FRAME_NUM 240
 #define AUDIO_DEFAULT_VOLUME 60
-/* DualEye's values; to tune on this board's mics in M3. */
+/* DualEye's values. At 60% volume the mic next to the speaker already peaks
+ * at -1 dBFS on a 1 kHz tone (0.3.0): lower AUDIO_MIC_GAIN_DB if barge-in
+ * suffers at high volume. */
 #define AUDIO_MIC_GAIN_DB 37.5f
 #define AUDIO_REF_GAIN_DB 30.0f
 

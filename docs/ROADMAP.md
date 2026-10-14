@@ -26,11 +26,11 @@ Sources: Waveshare's BSP `waveshare/esp32_s3_touch_amoled_1_75c`, xiaozhi-esp32,
 
 | Area | Modules | How |
 |------|---------|-----|
-| Voice on the board | `voice.c`, `board_audio.c`, `playback.c`, `sounds.c`, `ears.c`, `audio_selftest.c` | Copy; change the pins and share the I2C bus |
-| Link | `link*.c`, `net.c`, `rpc.c` | Copy; new protocol name and `hello` |
+| Voice on the board | `voice.c`, `board_audio.c`, `playback.c`, `sounds.c`, `ears.c`, `audio_selftest.c` | Copied in 0.3.0; `ui_voice.c` hands the voice state to `behaviour.c` |
+| Link | `link*.c`, `net.c`, `rpc.c`, `board_tools.c` | Copied in 0.3.0, with Yoru's names on WiFi and `hello`, and tools for one screen |
 | Settings | `board_settings.c` | Copied in 0.2.0, rewritten as a table for the round menu |
 | Mood | `pet.c`, `ears.c`, `metrics_model.c` | Copied in 0.2.0: `pet.c` hands its scenes to `behaviour.c` instead of playing them on `ui_eyes.c`; `metrics_model` without the faces |
-| PC data | `metrics_*` | Copy; it drives moods, not faces |
+| PC data | `metrics_*` | Copied in 0.3.0; it drives moods, not faces |
 | Host | `dualeye-core` (link, flasher, firmware, wifi, stt, tts, llm, agent, voice, models, mcp, claude, timers, intents, diary, quips, sensors, snapshot) | Copy as `yoru-core` |
 | App | settings, onboarding, i18n, updates, title bar | Copy; replace the board view with Yoru's eyes |
 | New | display/touch/IMU/PMU drivers, the eye engine, behaviours | Write |
@@ -104,10 +104,12 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 - `ears.c` for bangs, claps and chatter.
 - AXP2101: battery, charging, PWR key, power-off; sleep with the panel and touch in standby.
 
-### M3: voice and link
-- Port the ESP-SR front end with AEC (reference on slot 1), the wake word and playback.
-- Port the link (USB and WiFi), `rpc`, and `hello` with `board: "yoru-amoled-1.75c"`.
-- Listening, thinking and speaking states in the eye engine.
+### M3: voice and link (in since 0.3.0)
+- ESP-SR front end with AEC, the wake word ("Alexa" or "Hi ESP" until M6), VAD, the utterance stream and playback, from DualEye. The TDM slots are checked on the board: slot 0 mic, slot 1 the speaker loopback (AEC reference), slot 2 the second mic, slot 3 empty.
+- The link over USB and WiFi, `rpc` and `hello` with `board: "yoru-amoled-1.75c"`; the board tools reworked for one screen and the settings table. What differs from DualEye's protocol: `docs/protocol.md`.
+- Listening, thinking and speaking in the eye engine, with the voice's level; the wake word wakes Yoru.
+- The pet's sounds (`sounds.c`) on touch, reactions and whims.
+- Still to do: tune the mic gain (the mic next to the speaker nearly clips at 60% volume), use the second mic (two-mic AFE, and the sound direction in M2), check internal RAM with the WiFi on (0.3.1: 135 KB free, 99 KB at the lowest, without it; it was 48 and 12 KB in 0.3.0). Asleep, the floating z's make LVGL redraw a large rectangle every frame (about 55% busy against 22% awake): invalidate the eyes and the overlay separately.
 
 ### M4: host and app
 - `yoru-core`, `yoru-cli` and `yoru-app` from DualEye's host. One screen, no faces: the app shows Yoru's eyes live, plus mood, settings and the voice set-up.

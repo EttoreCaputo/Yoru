@@ -3,8 +3,8 @@
 /* Yoru's settings, kept in NVS. They are a table, not a struct of fields,
  * because the round menu (M2) and the link (M3) both walk it: each setting
  * has a wire name, a range and a default. The setters check the range, save
- * and apply the few that need applying (the volume); the rest are read by
- * whoever uses them, when they need them. Safe from any task.
+ * and apply the volume; board_settings_on_change() tells the modules that
+ * keep their own copy, and the rest are read when they are needed. Safe from any task.
  * From DualEye's board_settings.c, without its two screens. */
 
 #include <stdbool.h>
@@ -31,7 +31,7 @@ typedef enum {
     /* Sound. Percent. */
     SETTING_VOLUME,
     SETTING_PET_SOUNDS,
-    /* The privacy switch: the mic isn't read (M3). */
+    /* The privacy switch: the mic isn't read. */
     SETTING_MIC_MUTED,
     /* Behaviour. Seconds without touch before sleepy and asleep. */
     SETTING_SLEEPY_AFTER_S,
@@ -48,10 +48,12 @@ typedef enum {
     /* Look: the resting eyes' colour as 0xRRGGBB, and the style (M5). */
     SETTING_EYE_COLOR,
     SETTING_EYE_STYLE,
-    /* Voice: the wake word is listened for (M3). */
+    /* Voice: the wake word is listened for (M2 menu; the mic mute does it now). */
     SETTING_WAKE_WORD_ON,
     /* 0 English, 1 Italian. */
     SETTING_LANGUAGE,
+    /* A short chime as it starts listening after the wake word. */
+    SETTING_WAKE_SOUND,
     SETTING_COUNT,
 } setting_t;
 
@@ -68,12 +70,17 @@ static inline bool board_settings_on(setting_t id)
  * range. */
 esp_err_t board_settings_set(setting_t id, int32_t value);
 
+/** Called after a setting changed, from the task that changed it, so the
+ * modules that keep their own copy (voice, playback, pet, ears) follow. */
+typedef void (*board_settings_cb_t)(setting_t id, int32_t value);
+void board_settings_on_change(board_settings_cb_t cb);
+
 /** Wire name (also the NVS key), or NULL. */
 const char *board_settings_name(setting_t id);
 bool board_settings_from_name(const char *name, setting_t *out);
 void board_settings_range(setting_t id, int32_t *min, int32_t *max);
 
-/** voice_wake_words() id (M3); empty for the default. */
+/** voice_wake_words() id; empty for the default. */
 void board_settings_wake_word(char *out, size_t len);
 esp_err_t board_settings_set_wake_word(const char *id);
 

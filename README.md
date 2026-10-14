@@ -7,10 +7,11 @@
 
 A desk companion that lives in the black of a round AMOLED: a pair of glowing eyes with a personality. It is a pet that reacts to you and to your computer, and an AI assistant you can talk to, running on your own computer's models or an API of your choice.
 
-Status: early development (firmware 0.1.0, milestone M1).
+Status: early development (firmware 0.3.0, milestone M3: voice and link).
 
 - [The character](docs/CONCEPT.md)
 - [Roadmap and hardware](docs/ROADMAP.md)
+- [Protocol](docs/protocol.md): what differs from DualEye's
 
 ## Hardware
 
@@ -23,10 +24,20 @@ ESP-IDF 6.1:
 ```bash
 source ~/.espressif/tools/activate_idf_v6.1.sh
 idf.py build merge-bin
-idf.py -p /dev/cu.usbmodem* flash monitor
+idf.py -p /dev/cu.usbmodem* flash
 ```
 
 If the board doesn't show up as a serial port, hold BOOT while plugging it in.
+
+Once it boots, the board talks protocol v2 on the USB port, so `idf.py monitor` only shows the boot messages and then frames. To read its logs and call its tools until the host app arrives (M4), use the test scripts (pyserial, in the ESP-IDF Python env):
+
+```bash
+python3 tools/audio_selftest.py tone
+```
+
+`tools/yoru_link.py` is the small library they share: `Link().hello()`, `call("tools/call", {"name": "get_state", "arguments": {}})`, and `frames()` for the log lines.
+
+Say "Alexa" (or "Hi ESP", with `set_wake_word`) and Yoru listens: its eyes open wide and look at you. Without a host nobody answers yet: if you said something it thinks for up to 30 s, then goes back to its own life.
 
 ## Credits
 

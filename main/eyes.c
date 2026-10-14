@@ -16,6 +16,8 @@
 #define GAZE_Y 38
 /* The hearts' distance from the middle. */
 #define HEART_X 160
+/* The most pieces an overlay has (three z's, three dots). */
+#define MAX_OVERLAY_RECTS 3
 
 /* What a mood looks like. The lids: `top` cuts the eye from above (0..1 of
  * its height), `slope` tilts that cut (> 0: lower towards the nose, angry;
@@ -45,10 +47,12 @@ static const eye_shape_t s_moods[EYES_MOOD_COUNT] = {
     [EYES_MOOD_LOVING] = {RGB(0xFF7AB8), 93, 116, 0, 0, 1, 0, 1, 1},
     [EYES_MOOD_SURPRISED] = {RGB(0x3EE6FF), 98, 140, 0, 0, 0, 0, 1.04f, 1.04f},
     [EYES_MOOD_BORED] = {RGB(0x6FA0B4), 88, 112, 0.44f, 0, 0.2f, 0, 1, 1},
+    [EYES_MOOD_LISTENING] = {RGB(0x8AF4FF), 92, 132, 0, 0, 0, -4, 1, 1},
+    [EYES_MOOD_SPEAKING] = {RGB(0xB8F0FF), 90, 118, 0, 0, 0.3f, 0, 1, 1},
 };
 
 static const char *const s_mood_names[EYES_MOOD_COUNT] = {
-    "neutral", "happy", "curious", "thinking", "grumpy", "hot", "sleepy", "asleep", "sad", "loving", "surprised", "bored",
+    "neutral", "happy", "curious", "thinking", "grumpy", "hot", "sleepy", "asleep", "sad", "loving", "surprised", "bored", "listening", "speaking",
 };
 
 static struct {
@@ -64,9 +68,15 @@ static struct {
     int32_t blink_ms;     // > 0 while closing
     int32_t next_blink_ms;
     float squash;
+    /* The voice's level, eased, and where it is going. */
+    float level, tlevel;
     uint32_t t_ms;        // animation clock for the overlays
-    lv_area_t drawn;      // what the last frame covered
-    bool drawn_valid;
+    /* What the last frame covered, eyes and overlay apart: the overlay keeps
+     * moving while the eyes are still (the z's of sleep). */
+    lv_area_t eyes_drawn;
+    bool eyes_valid;
+    lv_area_t over_drawn[MAX_OVERLAY_RECTS];
+    int over_count;
 } s;
 
 static float lerp(float a, float b, float k)
@@ -92,8 +102,9 @@ typedef struct {
 
 static void eye_boxes(eye_box_t out[2])
 {
-    const float w = s.cur.w * (1 + 0.3f * s.squash);
-    const float h = s.cur.h * (1 - 0.38f * s.squash) * s.lid;
+    const float swell = 1 + 0.14f * s.level;
+    const float w = s.cur.w * (1 + 0.3f * s.squash) * swell;
+    const float h = s.cur.h * (1 - 0.38f * s.squash) * s.lid * swell;
     const float lift = EYE_SPACING * sinf(s.cur.tilt * (float) M_PI / 180.0f);
     const float ox = s.gx * GAZE_X;
     const float oy = s.gy * GAZE_Y;
@@ -134,6 +145,23 @@ static void fill_triangle(lv_layer_t *layer, float x0, float y0, float x1, float
     lv_draw_triangle(layer, &dsc);
 }
 
+/* Where the top lid cuts the eye, at its outer left and right ends. */
+static void lid_edges(const eye_box_t *e, float *edge_l, float *edge_r)
+{
+    const float top = e->cy - e->h / 2;
+    const float h = e->h < 2 ? 2 : e->h;
+    *edge_l = top + s.cur.top * h - s.cur.slope * h * 0.6f * (float) e->inner;
+    *edge_r = top + s.cur.top * h + s.cur.slope * h * 0.6f * (float) e->inner;
+}
+
+/* The highest row of an eye the top lid leaves showing. */
+static float visible_top(const eye_box_t *e)
+{
+    float edge_l, edge_r;
+    lid_edges(e, &edge_l, &edge_r);
+    return fmaxf(e->cy - e->h / 2, fminf(edge_l, edge_r));
+}
+
 static void draw_eye(lv_layer_t *layer, const eye_box_t *e)
 {
     const lv_color_t black = lv_color_black();
@@ -144,8 +172,8 @@ static void draw_eye(lv_layer_t *layer, const eye_box_t *e)
     fill_rect(layer, x0, top, x1, top + h, cur_color(1), (int32_t) (fminf(e->w, h) * 0.38f), LV_OPA_COVER);
 
     // Top lid: everything above a line that can slope towards the nose.
-    const float edge_l = top + s.cur.top * h - s.cur.slope * h * 0.6f * (float) e->inner;
-    const float edge_r = top + s.cur.top * h + s.cur.slope * h * 0.6f * (float) e->inner;
+    float edge_l, edge_r;
+    lid_edges(e, &edge_l, &edge_r);
     if (fmaxf(edge_l, edge_r) > top + 0.5f) {
         const float flat = fminf(edge_l, edge_r);
         const float lx = x0 - 6;
@@ -228,32 +256,77 @@ static void draw_cb(lv_event_t *e)
     draw_overlays(layer, eyes);
 }
 
-/* The area this frame draws on: both eyes (lids included) and the mood's
- * overlay. */
-static lv_area_t frame_area(void)
+/* The area this frame's eyes show. Everything above the top lid is black on
+ * black, so it starts there: a sleeping eye is a thin slice. */
+static lv_area_t eyes_area(void)
 {
     eye_box_t eyes[2];
     eye_boxes(eyes);
-    lv_area_t a = {
+    return (lv_area_t) {
         (int32_t) (eyes[0].cx - eyes[0].w / 2 - 10),
-        (int32_t) (fminf(eyes[0].cy - eyes[0].h / 2, eyes[1].cy - eyes[1].h / 2) - 10),
+        (int32_t) (fminf(visible_top(&eyes[0]), visible_top(&eyes[1])) - 10),
         (int32_t) (eyes[1].cx + eyes[1].w / 2 + 10),
         (int32_t) (fmaxf(eyes[0].cy + eyes[0].h / 2, eyes[1].cy + eyes[1].h / 2) + 10),
     };
+}
+
+/* The pieces of the mood's overlay this frame, one box each (with a margin for
+ * antialiasing), so only what moves gets redrawn. Mirrors draw_overlays().
+ * Returns how many. */
+static int overlay_areas(lv_area_t out[MAX_OVERLAY_RECTS])
+{
+    const float t = (float) s.t_ms / 1000.0f;
+    eye_box_t eyes[2];
+    eye_boxes(eyes);
     if (s.mood == EYES_MOOD_THINKING) {
-        a.y2 = LV_MAX(a.y2, CY + 162);
-    } else if (s.mood == EYES_MOOD_ASLEEP) {
-        a.x2 = LV_MAX(a.x2, 440);
-        a.y1 = LV_MIN(a.y1, 60);
-    } else if (s.mood == EYES_MOOD_HOT) {
-        a.x2 = LV_MAX(a.x2, (int32_t) (eyes[1].cx + eyes[1].w / 2 + 36));
-        a.y2 = LV_MAX(a.y2, (int32_t) (eyes[1].cy - eyes[1].h / 2 + 80));
-    } else if (s.mood == EYES_MOOD_LOVING) {
-        a.x1 = LV_MIN(a.x1, CX - HEART_X - 16);
-        a.x2 = LV_MAX(a.x2, CX + HEART_X + 16);
-        a.y1 = LV_MIN(a.y1, CY - 140);
+        // The dots stay put and only fade: one box for the row.
+        out[0] = (lv_area_t) {CX - 40, CY + 140, CX + 40, CY + 160};
+        return 1;
     }
-    return a;
+    if (s.mood == EYES_MOOD_ASLEEP) {
+        for (int i = 0; i < 3; i++) {
+            float p = fmodf(t * 0.35f + (float) i / 3.0f, 1.0f);
+            int32_t x = (int32_t) (330 + p * 55 + (float) i * 6);
+            int32_t y = (int32_t) (170 - p * 100);
+            out[i] = (lv_area_t) {x - 2, y - 2, x + 42, y + 50};
+        }
+        return 3;
+    }
+    if (s.mood == EYES_MOOD_HOT) {
+        float dy = fmodf(t * 40, 60);
+        int32_t x = (int32_t) (eyes[1].cx + eyes[1].w / 2 + 22);
+        int32_t y = (int32_t) (eyes[1].cy - eyes[1].h / 2 + dy);
+        out[0] = (lv_area_t) {x - 12, y - 19, x + 12, y + 16};
+        return 1;
+    }
+    if (s.mood == EYES_MOOD_LOVING) {
+        for (int i = 0; i < 2; i++) {
+            float p = fmodf(t * 0.4f + (float) i * 0.5f, 1.0f);
+            int32_t x = i == 0 ? CX - HEART_X : CX + HEART_X;
+            int32_t y = (int32_t) (CY - 40 - p * 90);
+            out[i] = (lv_area_t) {x - 16, y - 10, x + 16, y + 19};
+        }
+        return 2;
+    }
+    return 0;
+}
+
+/* Redraws where something was and where it is now: one box if the two touch
+ * (a small step), two if it jumped (a z starting over at the bottom). */
+static void invalidate_move(const lv_area_t *was, const lv_area_t *now)
+{
+    bool touch = was->x1 <= now->x2 && now->x1 <= was->x2 && was->y1 <= now->y2 && now->y1 <= was->y2;
+    if (touch) {
+        lv_area_t both;
+        both.x1 = LV_MIN(was->x1, now->x1);
+        both.y1 = LV_MIN(was->y1, now->y1);
+        both.x2 = LV_MAX(was->x2, now->x2);
+        both.y2 = LV_MAX(was->y2, now->y2);
+        lv_obj_invalidate_area(s.obj, &both);
+    } else {
+        lv_obj_invalidate_area(s.obj, was);
+        lv_obj_invalidate_area(s.obj, now);
+    }
 }
 
 /* Ease every number towards the mood; true if anything visibly moved. */
@@ -306,9 +379,15 @@ static bool step(void)
         lid = lerp(s.lid, 1.0f, 0.35f);
     }
     float squash = s.squash * 0.85f;
+    // Quick to rise with a syllable, slower to fall: it reads as talking.
+    float level = lerp(s.level, s.tlevel, s.tlevel > s.level ? 0.5f : 0.2f);
+    if (level < 0.005f) {
+        level = 0;
+    }
 
     bool moved = fabsf(gx - s.gx) > 0.002f || fabsf(gy - s.gy) > 0.002f || fabsf(lid - s.lid) > 0.002f
-                 || squash > 0.002f || memcmp(&before, &s.cur, sizeof(before)) != 0;
+                 || squash > 0.002f || fabsf(level - s.level) > 0.002f || memcmp(&before, &s.cur, sizeof(before)) != 0;
+    s.level = level;
     s.gx = gx;
     s.gy = gy;
     s.lid = lid;
@@ -320,7 +399,7 @@ static void frame_cb(lv_timer_t *timer)
 {
     s.t_ms += EYES_FRAME_MS;
     bool moved = step();
-    if (!moved && !has_overlay(s.mood)) {
+    if (!moved && !has_overlay(s.mood) && s.over_count == 0) {
         return;
     }
     // Snap values that are close enough, so a still face stops redrawing.
@@ -332,17 +411,33 @@ static void frame_cb(lv_timer_t *timer)
             c[i] = w[i];
         }
     }
-    lv_area_t now = frame_area();
-    lv_area_t dirty = now;
-    if (s.drawn_valid) {
-        dirty.x1 = LV_MIN(now.x1, s.drawn.x1);
-        dirty.y1 = LV_MIN(now.y1, s.drawn.y1);
-        dirty.x2 = LV_MAX(now.x2, s.drawn.x2);
-        dirty.y2 = LV_MAX(now.y2, s.drawn.y2);
+    if (moved || !s.eyes_valid) {
+        lv_area_t now = eyes_area();
+        if (s.eyes_valid) {
+            invalidate_move(&s.eyes_drawn, &now);
+        } else {
+            lv_obj_invalidate_area(s.obj, &now);
+        }
+        s.eyes_drawn = now;
+        s.eyes_valid = true;
     }
-    lv_obj_invalidate_area(s.obj, &dirty);
-    s.drawn = now;
-    s.drawn_valid = true;
+    // Each overlay piece against its own last place; a piece the mood no
+    // longer has is cleared once.
+    lv_area_t over[MAX_OVERLAY_RECTS];
+    int n = overlay_areas(over);
+    for (int i = 0; i < LV_MAX(n, s.over_count); i++) {
+        if (i < n && i < s.over_count) {
+            invalidate_move(&s.over_drawn[i], &over[i]);
+        } else if (i < n) {
+            lv_obj_invalidate_area(s.obj, &over[i]);
+        } else {
+            lv_obj_invalidate_area(s.obj, &s.over_drawn[i]);
+        }
+        if (i < n) {
+            s.over_drawn[i] = over[i];
+        }
+    }
+    s.over_count = n;
 }
 
 lv_obj_t *eyes_create(lv_obj_t *parent)
@@ -400,6 +495,11 @@ void eyes_look_around(void)
 {
     s.held = false;
     s.next_look_ms = 600;
+}
+
+void eyes_set_level(float level)
+{
+    s.tlevel = fmaxf(0, fminf(1, level));
 }
 
 void eyes_poke(void)
