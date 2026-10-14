@@ -1,0 +1,7 @@
+# LVGL's heap (CONFIG_LV_MEM_SIZE_KILOBYTES) and state in PSRAM: internal RAM
+# goes to the draw buffers, and later to ESP-SR and the WiFi.
+# Draw buffers stay in internal DMA memory (lvgl_port.c).
+[mapping:lvgl_extram]
+archive: liblvgl__lvgl.a
+entries:
+    * (extram_bss)

@@ -1,0 +1,9 @@
+# Yoru flash layout (16 MB; the 1.75C may have 32 MB, the rest stays unused).
+# `model` holds ESP-SR's models (M3), `assets` the eye styles and sounds
+# that can be loaded from the app (M6).
+# Name,   Type, SubType,   Offset,   Size
+nvs,      data, nvs,       0x9000,   0x6000
+phy_init, data, phy,       0xf000,   0x1000
+factory,  app,  factory,   0x10000,  3M
+model,    data, spiffs,    0x310000, 2M
+assets,   data, undefined, 0x510000, 0x7F0000

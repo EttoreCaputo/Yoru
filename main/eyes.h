@@ -1,0 +1,50 @@
+#pragma once
+
+/* Yoru's face: two glowing eyes on black, nothing else (docs/CONCEPT.md).
+ * A mood is a set of targets (shape, lids, tilt, colour) the eyes ease
+ * towards; blinks, saccades, squash and the small overlays (thinking dots,
+ * z's, a sweat drop) run on top. This module only draws: behaviour.c and,
+ * later, the mood engine decide what Yoru feels. All calls with the LVGL
+ * lock held. */
+
+#include <stdbool.h>
+
+#include "lvgl.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef enum {
+    EYES_MOOD_NEUTRAL,
+    EYES_MOOD_HAPPY,
+    EYES_MOOD_CURIOUS,
+    EYES_MOOD_THINKING,
+    EYES_MOOD_GRUMPY,
+    EYES_MOOD_HOT,
+    EYES_MOOD_SLEEPY,
+    EYES_MOOD_ASLEEP,
+    EYES_MOOD_COUNT,
+} eyes_mood_t;
+
+/** Build the face on `parent` (a full screen). Returns the object that
+ * covers the screen, for touch events. The eyes open from closed. */
+lv_obj_t *eyes_create(lv_obj_t *parent);
+
+void eyes_set_mood(eyes_mood_t mood);
+eyes_mood_t eyes_get_mood(void);
+const char *eyes_mood_name(eyes_mood_t mood);
+
+/** Look at a point, -1..1 on each axis (0, 0 = straight ahead), until
+ * eyes_look_around(). */
+void eyes_look_at(float x, float y);
+/** Back to looking around on its own. */
+void eyes_look_around(void);
+
+/** A poke: the eyes squash and spring back. */
+void eyes_poke(void);
+void eyes_blink(void);
+
+#ifdef __cplusplus
+}
+#endif

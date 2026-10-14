@@ -1,0 +1,18 @@
+# Yoru
+
+Desk companion on the Waveshare ESP32-S3-Touch-AMOLED-1.75C. Character: `docs/CONCEPT.md`. Plan and pins: `docs/ROADMAP.md`. Sister project: `../esp32s3-dualeye-pcmonitor` (DualEye), where the voice, link, mood and host code come from. When copying from there, adapt the code; don't carry over DualEye's two-screen assumptions.
+
+## Rule: every firmware change bumps the version and gets built
+
+1. Bump `version.txt` (patch by default). Check `git log` first: if the current version is committed, it must go up. Bump once per piece of work.
+2. Add a `## <version>` section at the top of `FIRMWARE_CHANGELOG.md`, written for the person using the board.
+3. Build: `source ~/.espressif/tools/activate_idf_v6.1.sh && idf.py build merge-bin`. If it fails, fix it or report it clearly.
+
+Report the new version and the build result when done.
+
+## Conventions
+
+- ESP-IDF 6.1, LVGL 9.3.0, C. Match DualEye's style: short functions, comments that say why.
+- The eye engine (`main/eyes.c`) only draws; moods and behaviours set its targets.
+- Every area sent to the CO5300 must be even-aligned (the LVGL rounder in `lvgl_port.c`).
+- Internal RAM is scarce once WiFi and ESP-SR run: big buffers go to PSRAM.
