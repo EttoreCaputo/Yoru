@@ -43,6 +43,7 @@ static const setting_info_t INFO[SETTING_COUNT] = {
     [SETTING_WAKE_WORD_ON] = {"wake_on", 0, 1, 1},
     [SETTING_LANGUAGE] = {"language", 0, 1, 0},
     [SETTING_WAKE_SOUND] = {"wake_sound", 0, 1, 1},
+    [SETTING_LCD_FAST] = {"lcd_80mhz", 0, 1, 0},
 };
 
 static SemaphoreHandle_t s_lock;

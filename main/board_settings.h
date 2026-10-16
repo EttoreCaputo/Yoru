@@ -54,6 +54,9 @@ typedef enum {
     SETTING_LANGUAGE,
     /* A short chime as it starts listening after the wake word. */
     SETTING_WAKE_SOUND,
+    /* A test: the screen's bus at 80 MHz instead of 40, from the next boot.
+     * Over the CO5300's 50 MHz write limit (datasheet 6.4). */
+    SETTING_LCD_FAST,
     SETTING_COUNT,
 } setting_t;
 

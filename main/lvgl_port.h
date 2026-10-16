@@ -30,6 +30,9 @@ typedef struct {
 
 void lvgl_port_get_stats(lvgl_port_stats_t *out);
 
+/** How long the panel's refreshes take, from its TE pin; 0 without TE. */
+int32_t lvgl_port_te_period_us(void);
+
 #ifdef __cplusplus
 }
 #endif

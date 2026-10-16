@@ -148,6 +148,7 @@ static const item_t ABOUT_ITEMS[] = {
     INFO("Free memory", "Memoria libera", info_memory),
     INFO("Flash", "Flash", info_flash),
     INFO("Screen load", "Carico schermo", info_load),
+    SET("80 MHz bus (test)", "Bus 80 MHz (test)", K_SWITCH, SETTING_LCD_FAST, F_NONE),
     ACT("Restart", "Riavvia", K_TAP, act_restart, NULL),
     ACT("Factory reset", "Ripristino", K_HOLD, act_factory_reset, info_hold),
 };

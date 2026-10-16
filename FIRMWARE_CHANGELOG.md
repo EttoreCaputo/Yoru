@@ -1,5 +1,20 @@
 # Firmware changelog
 
+## 0.5.3
+
+A test switch for a faster screen.
+
+- **About → "80 MHz bus (test)".** Runs the link to the screen at 80 MHz instead of 40, which halves the time each picture takes to reach it. It's a test: the screen's chip is rated for 50 MHz at most, so it may work on your board, show wrong colours or garbage, or stay black. Flipping the switch restarts Yoru to apply it.
+- **If the screen becomes unreadable:** restart Yoru three times in a row (reset button or power), each within 20 seconds of the last start, and it goes back to 40 MHz. The host can also turn it off (`set_setting` `lcd_80mhz` to 0), and a factory reset does too.
+- The boot log says which speed the screen runs at.
+
+## 0.5.2
+
+No more tearing.
+
+- **Smoother screen.** Yoru used to be sent to the screen in thin strips while the next ones were still being drawn, and while the screen was busy showing the previous picture, so a moving Yoru could show half in one place and half in another for a moment. Now each picture is drawn whole first and sent right as the screen starts a new refresh (60 times a second), top to bottom the way the screen draws, so every movement shows in one piece. The same in every rotation.
+- Turning the screen no longer needs extra memory.
+
 ## 0.5.1
 
 The menu is easier to get out of.

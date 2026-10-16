@@ -36,7 +36,7 @@ static const co5300_lcd_init_cmd_t s_init_cmds[] = {
 
 static esp_lcd_panel_io_handle_t s_io;
 
-esp_err_t board_display_init(board_lcd_t *out)
+esp_err_t board_display_init(board_lcd_t *out, bool fast)
 {
     const spi_bus_config_t bus = CO5300_PANEL_BUS_QSPI_CONFIG(
         BOARD_LCD_CLK_GPIO, BOARD_LCD_D0_GPIO, BOARD_LCD_D1_GPIO, BOARD_LCD_D2_GPIO, BOARD_LCD_D3_GPIO,
@@ -44,7 +44,10 @@ esp_err_t board_display_init(board_lcd_t *out)
     ESP_RETURN_ON_ERROR(spi_bus_initialize(BOARD_LCD_SPI_HOST, &bus, SPI_DMA_CH_AUTO), TAG, "spi bus");
 
     // The flush-done callback is registered by lvgl_port.c.
-    const esp_lcd_panel_io_spi_config_t io_cfg = CO5300_PANEL_IO_QSPI_CONFIG(BOARD_LCD_CS_GPIO, NULL, NULL);
+    esp_lcd_panel_io_spi_config_t io_cfg = CO5300_PANEL_IO_QSPI_CONFIG(BOARD_LCD_CS_GPIO, NULL, NULL);
+    // 40 MHz is the fastest within the CO5300's limit (20 ns a write cycle):
+    // the S3's SPI clock only divides 80 MHz evenly. 80 is a test.
+    io_cfg.pclk_hz = (fast ? 80 : 40) * 1000 * 1000;
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t) BOARD_LCD_SPI_HOST, &io_cfg, &s_io),
                         TAG, "panel io");
 
@@ -71,7 +74,7 @@ esp_err_t board_display_init(board_lcd_t *out)
 
     out->panel = panel;
     out->io = s_io;
-    ESP_LOGI(TAG, "CO5300 %dx%d ready", BOARD_LCD_H_RES, BOARD_LCD_V_RES);
+    ESP_LOGI(TAG, "CO5300 %dx%d ready, bus at %d MHz", BOARD_LCD_H_RES, BOARD_LCD_V_RES, fast ? 80 : 40);
     return ESP_OK;
 }
 
