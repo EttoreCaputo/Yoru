@@ -1,5 +1,11 @@
 # Firmware changelog
 
+## 0.3.3
+
+A lighter touch.
+
+- Yoru no longer asks the touch screen for news 60 times a second: the screen now signals when a finger lands, and only then is it read, much faster than before. The chip spends far less time waiting, awake and asleep, and touch, strokes and pokes respond as before.
+
 ## 0.3.2
 
 A lighter sleep.
