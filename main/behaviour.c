@@ -24,13 +24,17 @@
 #define WHIM_SPAN_MS 25000
 /* The host's pointer is followed this long after its last move. */
 #define GAZE_HOLD_MS 6000
+/* How long "done" (green) and "error" (red) stay on the sphere. */
+#define STATUS_DONE_MS 2500
+#define STATUS_ERROR_MS 3500
 
 static const char *TAG = "behaviour";
 
-/* How each of pet.c's scenes looks with these eyes: a mood for a while, a
- * poke or a blink to start it, and the pet's sound for it (SOUND_COUNT for
- * none; playback.c drops them while pet sounds are off). Names as in DualEye, so the host's scenes
- * and the pet's reactions mean the same on both boards. */
+/* How each of pet.c's scenes looks: a mood for a while, a poke or a blink to
+ * start it, a gesture of the hands, and the pet's sound for it (SOUND_COUNT
+ * for none; playback.c drops them while pet sounds are off). Names as in
+ * DualEye, so the host's scenes and the pet's reactions mean the same on both
+ * boards; the gesture scenes are Yoru's own. */
 typedef enum { FX_NONE, FX_POKE, FX_BLINK } fx_t;
 
 typedef struct {
@@ -38,35 +42,43 @@ typedef struct {
     eyes_mood_t mood;
     uint16_t ms;
     fx_t fx;
+    eyes_gesture_t gesture;
     sound_t sound;
 } scene_t;
 
+#define G(name) EYES_GESTURE_##name
 static const scene_t SCENES[] = {
-    {"happy", EYES_MOOD_HAPPY, 2000, FX_NONE, SOUND_HAPPY},
-    {"excited", EYES_MOOD_HAPPY, 2500, FX_POKE, SOUND_EXCITED},
-    {"wink", EYES_MOOD_HAPPY, 1200, FX_BLINK, SOUND_WINK},
-    {"proud", EYES_MOOD_HAPPY, 2500, FX_NONE, SOUND_TADA},
-    {"relieved", EYES_MOOD_HAPPY, 1800, FX_BLINK, SOUND_PHEW},
-    {"charged", EYES_MOOD_HAPPY, 1500, FX_POKE, SOUND_CHARGE},
+    {"happy", EYES_MOOD_HAPPY, 2000, FX_NONE, G(NONE), SOUND_HAPPY},
+    {"excited", EYES_MOOD_HAPPY, 2500, FX_POKE, G(CLAP), SOUND_EXCITED},
+    {"wink", EYES_MOOD_HAPPY, 1200, FX_BLINK, G(NONE), SOUND_WINK},
+    {"proud", EYES_MOOD_HAPPY, 2500, FX_NONE, G(CLAP), SOUND_TADA},
+    {"relieved", EYES_MOOD_HAPPY, 1800, FX_BLINK, G(NONE), SOUND_PHEW},
+    {"charged", EYES_MOOD_HAPPY, 1500, FX_POKE, G(NONE), SOUND_CHARGE},
     // Bobbing to the beat comes with the music, in M5.
-    {"dance", EYES_MOOD_HAPPY, 3000, FX_POKE, SOUND_BEAT},
-    {"love", EYES_MOOD_LOVING, 3500, FX_NONE, SOUND_AWW},
-    {"curious", EYES_MOOD_CURIOUS, 2500, FX_NONE, SOUND_HMM},
-    {"thinking", EYES_MOOD_THINKING, 3000, FX_NONE, SOUND_COUNT},
-    {"focus", EYES_MOOD_THINKING, 3000, FX_BLINK, SOUND_SCAN},
-    {"angry", EYES_MOOD_GRUMPY, 2500, FX_POKE, SOUND_GRUMBLE},
-    {"hot", EYES_MOOD_HOT, 4000, FX_NONE, SOUND_PANT},
-    {"sleepy", EYES_MOOD_SLEEPY, 2500, FX_NONE, SOUND_COUNT},
-    {"yawn", EYES_MOOD_SLEEPY, 2000, FX_POKE, SOUND_YAWN},
-    {"tired", EYES_MOOD_SLEEPY, 2500, FX_BLINK, SOUND_DRAIN},
+    {"dance", EYES_MOOD_HAPPY, 3000, FX_POKE, G(CLAP), SOUND_BEAT},
+    {"love", EYES_MOOD_LOVING, 3500, FX_NONE, G(NONE), SOUND_AWW},
+    {"curious", EYES_MOOD_CURIOUS, 2500, FX_NONE, G(NONE), SOUND_HMM},
+    {"thinking", EYES_MOOD_THINKING, 3000, FX_NONE, G(THINK), SOUND_COUNT},
+    {"focus", EYES_MOOD_THINKING, 3000, FX_BLINK, G(NONE), SOUND_SCAN},
+    {"angry", EYES_MOOD_GRUMPY, 2500, FX_POKE, G(NONE), SOUND_GRUMBLE},
+    {"hot", EYES_MOOD_HOT, 4000, FX_NONE, G(NONE), SOUND_PANT},
+    {"sleepy", EYES_MOOD_SLEEPY, 2500, FX_NONE, G(NONE), SOUND_COUNT},
+    {"yawn", EYES_MOOD_SLEEPY, 2000, FX_NONE, G(STRETCH), SOUND_YAWN},
+    {"tired", EYES_MOOD_SLEEPY, 2500, FX_BLINK, G(NONE), SOUND_DRAIN},
     // A sigh: squash, then a slow, heavy-lidded moment.
-    {"sigh", EYES_MOOD_SLEEPY, 1200, FX_POKE, SOUND_SIGH},
-    {"sad", EYES_MOOD_SAD, 3500, FX_NONE, SOUND_WHIMPER},
-    {"surprised", EYES_MOOD_SURPRISED, 1500, FX_POKE, SOUND_GASP},
-    {"scared", EYES_MOOD_SURPRISED, 2000, FX_POKE, SOUND_EEP},
-    {"bored", EYES_MOOD_BORED, 3000, FX_NONE, SOUND_COUNT},
-    {"look_around", EYES_MOOD_NEUTRAL, 0, FX_NONE, SOUND_COUNT},
-    {"blink", EYES_MOOD_NEUTRAL, 0, FX_BLINK, SOUND_COUNT},
+    {"sigh", EYES_MOOD_SLEEPY, 1200, FX_POKE, G(NONE), SOUND_SIGH},
+    {"sad", EYES_MOOD_SAD, 3500, FX_NONE, G(NONE), SOUND_WHIMPER},
+    {"surprised", EYES_MOOD_SURPRISED, 1500, FX_POKE, G(NONE), SOUND_GASP},
+    {"scared", EYES_MOOD_SURPRISED, 3000, FX_POKE, G(COVER), SOUND_EEP},
+    {"bored", EYES_MOOD_BORED, 3000, FX_NONE, G(NONE), SOUND_COUNT},
+    {"look_around", EYES_MOOD_NEUTRAL, 0, FX_NONE, G(NONE), SOUND_COUNT},
+    {"blink", EYES_MOOD_NEUTRAL, 0, FX_BLINK, G(NONE), SOUND_COUNT},
+    // The hands on their own.
+    {"wave", EYES_MOOD_HAPPY, 1800, FX_NONE, G(WAVE), SOUND_HELLO},
+    {"point", EYES_MOOD_CURIOUS, 1800, FX_NONE, G(POINT), SOUND_HMM},
+    {"shy", EYES_MOOD_HAPPY, 3000, FX_NONE, G(COVER), SOUND_COUNT},
+    {"clap", EYES_MOOD_HAPPY, 1300, FX_NONE, G(CLAP), SOUND_COUNT},
+    {"stretch", EYES_MOOD_SLEEPY, 1800, FX_NONE, G(STRETCH), SOUND_YAWN},
 };
 
 /* Where the eyes rest in each of the pet's moods. The cheerful ones rest
@@ -95,6 +107,8 @@ static struct {
     /* The finger is on the screen; the host's pointer moved at gaze_ms. */
     bool pressed;
     uint32_t gaze_ms;
+    /* "done" or "error" on the sphere until then (0: none). */
+    uint32_t status_until_ms;
 } s;
 
 static void show_voice(voice_state_t state);
@@ -143,6 +157,9 @@ static bool play(const char *name)
         } else if (sc->fx == FX_BLINK) {
             eyes_blink();
         }
+        if (sc->gesture != EYES_GESTURE_NONE) {
+            eyes_gesture(sc->gesture);
+        }
         if (sc->ms > 0) {
             react(sc->mood, sc->ms);
         }
@@ -169,7 +186,18 @@ static void wake_up(void)
     s.asleep = false;
     set_brightness(awake_brightness());
     eyes_blink();
+    eyes_gesture(EYES_GESTURE_WAVE); // hello again
     react(EYES_MOOD_CURIOUS, 1500);
+}
+
+/* A status on the sphere for a while, then back to none. */
+static void show_status(eyes_status_t status, uint32_t for_ms)
+{
+    eyes_set_status(status);
+    s.status_until_ms = for_ms ? lv_tick_get() + for_ms : 0;
+    if (s.status_until_ms == 0 && for_ms) {
+        s.status_until_ms = 1; // 0 means none
+    }
 }
 
 static void schedule_whim(uint32_t now)
@@ -268,6 +296,11 @@ static void tick_cb(lv_timer_t *timer)
     // Taken even when it can't be shown, so an old one doesn't play later.
     const char *reaction = pet_take_reaction();
 
+    if (s.status_until_ms != 0 && (int32_t) (now - s.status_until_ms) >= 0) {
+        s.status_until_ms = 0;
+        eyes_set_status(EYES_STATUS_IDLE);
+    }
+
     if (s.asleep) {
         set_brightness(asleep_brightness()); // follows the menu's changes
         return;
@@ -317,18 +350,23 @@ static void show_voice(voice_state_t state)
 {
     switch (state) {
     case VOICE_LISTENING:
+        show_status(EYES_STATUS_IDLE, 0);
         eyes_set_mood(EYES_MOOD_LISTENING);
         eyes_look_at(0, -0.15f); // at you
         break;
     case VOICE_THINKING:
+        show_status(EYES_STATUS_THINKING, 0);
         eyes_set_mood(EYES_MOOD_THINKING);
+        eyes_gesture(EYES_GESTURE_THINK);
         eyes_look_around();
         break;
     case VOICE_SPEAKING:
+        show_status(EYES_STATUS_IDLE, 0);
         eyes_set_mood(EYES_MOOD_SPEAKING);
         eyes_look_at(0, 0);
         break;
     case VOICE_ERROR:
+        show_status(EYES_STATUS_ERROR, STATUS_ERROR_MS);
         eyes_set_mood(EYES_MOOD_SAD);
         eyes_look_around();
         break;
@@ -343,8 +381,14 @@ void behaviour_voice(voice_state_t state)
     s.voice = state;
     s.last_touch_ms = lv_tick_get();
     if (state == VOICE_IDLE) {
-        // Back to its own life; the next tick sets the resting mood.
+        // Back to its own life; the next tick sets the resting mood. An
+        // answer that was spoken to the end shows "done" for a moment.
         s.until_ms = 0;
+        if (was == VOICE_SPEAKING) {
+            show_status(EYES_STATUS_DONE, STATUS_DONE_MS);
+        } else if (eyes_get_status() == EYES_STATUS_THINKING) {
+            show_status(EYES_STATUS_IDLE, 0);
+        }
         if (!s.pressed) {
             eyes_look_around();
         }

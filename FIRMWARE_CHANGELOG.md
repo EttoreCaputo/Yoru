@@ -1,5 +1,39 @@
 # Firmware changelog
 
+## 0.4.3
+
+Smoother colours, a new way to sleep.
+
+- No more rings on the sphere: the screen can only show a limited number of shades, and the smooth pearl gradient came out in visible bands. The shading is now dithered with a pattern too fine to see, and so are the coloured tint and the halo.
+- Falling asleep, Yoru no longer turns into a dark moon. It closes its eyes and drifts away into the dark, until it is a small dim dot in the middle of the screen with little z's rising from it. When it wakes up it comes back, waving hello.
+
+## 0.4.2
+
+Smoother moves.
+
+- Pokes, surprises, stretches and yawns no longer play in slow motion. Squashing the sphere used to take the screen about 80 ms a frame, so everything else waited; the squashed shapes are now prepared in the background a few seconds after startup and simply swapped in.
+- Every animation now follows the clock instead of counting frames: if the board is briefly busy, Yoru skips ahead instead of slowing down.
+- The sphere and the hands are kept in the screen's own colour format, so even the gentle breathing costs less to draw.
+
+## 0.4.1
+
+Just Yoru.
+
+- Yami, the alter ego, is gone: Yoru no longer turns into the black cat mask. The BOOT button does nothing again, and the "yami" and "yoru" reactions from the computer are no longer recognised.
+- With the mask's pictures no longer prepared in the background after startup, a little more memory stays free for everything else.
+
+## 0.4.0
+
+Yoru has a body, two hands and an alter ego.
+
+- The new look: instead of two glowing eyes, Yoru is a small pearl-grey sphere floating in the black, lit from the top left, with two little dark eyes that slide over its surface (they narrow near the edge, so it seems to turn its head) and the same moods as before: happy, curious, grumpy, sleepy, sad, surprised and the rest. It breathes gently while it's awake.
+- Hands: two small floating hands pop out for gestures and tuck away again. It waves when it wakes up or says hello, claps when it's excited or proud, covers its eyes and then peeks when it's scared or shy, puts a hand under its chin while it thinks, points, and stretches with a yawn.
+- Status tint: while it's thinking about your question, the bottom of the sphere turns blue with a soft halo and a small breathing dot; after an answer it turns green for a moment, and red when something went wrong.
+- Asleep, the sphere goes dark like a new moon, with only a thin lit crescent, and its eyes become two dim dashes.
+- Yami, the alter ego: press the BOOT button (or ask from the computer with the "yami" reaction) and green cracks run over the ball, it breaks into pieces that fly apart and snap together into a black cat mask lit from behind, with its eyes as two glowing holes. Press again (or "yoru") to turn back. Yami has the same expressions as Yoru.
+- New reactions from the computer: wave, point, shy, clap, stretch, yami and yoru.
+- Yoru now takes about 40% of the screen, so it floats in the black with room around it, and startup is about a second longer while its pictures are prepared.
+
 ## 0.3.3
 
 A lighter touch.

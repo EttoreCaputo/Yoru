@@ -64,7 +64,7 @@ To check on the hardware: rendering time per frame (`!lvgl stats`), and the flas
     - how soon it gets sleepy and falls asleep;
     - do not disturb or focus mode (no sounds, no whims);
     - touch and motion reactions on or off.
-  - Look: eye colour and eye style (more styles unlock later, M5).
+  - Look: name, colour, eye shape and finish (more unlock later, M5).
   - Voice: wake word on or off; which wake word (M3).
   - Connection:
     - USB or WiFi status;
@@ -112,18 +112,20 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 - Still to do: tune the mic gain (the mic next to the speaker nearly clips at 60% volume), use the second mic (two-mic AFE, and the sound direction in M2), check internal RAM with the WiFi on (0.3.1: 135 KB free, 99 KB at the lowest, without it; it was 48 and 12 KB in 0.3.0). Asleep, the floating z's make LVGL redraw a large rectangle every frame (about 55% busy against 22% awake): invalidate the eyes and the overlay separately.
 
 ### M4: host and app
-- `yoru-core`, `yoru-cli` and `yoru-app` from DualEye's host. One screen, no faces: the app shows Yoru's eyes live, plus mood, settings and the voice set-up.
+- `yoru-core`, `yoru-cli` and `yoru-app` from DualEye's host. One screen, no faces: the app shows Yoru live, plus mood, settings and the voice set-up.
 - PC data and Claude Code usage drive moods.
 - MCP tools: react, say, show a message.
 
 ### M5: character
 - Behaviour scheduler: boredom, sighs, stretches, sleep at night, greeting on return, late-night notice.
 - Non-verbal sound language (chirps, sighs, trills) for the pet.
-- Progression: experience from real activity unlocks eye styles and rare animations.
+- The sphere look (see `docs/CONCEPT.md`): in since 0.4.0 (`look.c`, `eyes.c`), a matte sphere about 40% of the disc (`LOOK_SCALE`), shaded once into PSRAM; small dark eyes that slide over its surface; two floating hands that pop out for gestures (wave, point, cover the eyes, clap); state tint, halo and status badge; sleep as drifting away into the dark.
+- Progression: experience from real activity unlocks colours, eye shapes, finishes and rare animations.
+- Official mascot in Rive, driven by the same parameters as the eye engine. Started: `docs/mascot/yoru.riv` holds Yoru with a state machine whose inputs mirror the eye engine.
 - Music: bob to the beat.
 
 ### M6: hackability and integrations
-- Moods and eye styles as data (JSON) that can be loaded from the app.
+- Moods and looks as data (JSON) that can be loaded and shared from the app.
 - Skills for devices in the house, run by the host's agent and confirmed by the user.
 - Custom wake word "Yoru" (microWakeWord).
 - Simulator: the eye engine compiled for the desktop (SDL), so animations can be made without flashing.

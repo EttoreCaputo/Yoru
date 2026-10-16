@@ -5,7 +5,7 @@
 ![LVGL](https://img.shields.io/badge/LVGL-9.3.0-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-A desk companion that lives in the black of a round AMOLED: a pair of glowing eyes with a personality. It is a pet that reacts to you and to your computer, and an AI assistant you can talk to, running on your own computer's models or an API of your choice.
+A desk companion that lives in the black of a round AMOLED: a small matte sphere with two tiny eyes and two floating hands, in the dark, that you can make your own. It is a pet that reacts to you and to your computer, and an AI assistant you can talk to, running on your own computer's models or an API of your choice.
 
 Status: early development (firmware 0.3.0, milestone M3: voice and link).
 

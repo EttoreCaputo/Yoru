@@ -14,7 +14,8 @@
  * - in a conversation the eyes listen, think and speak, and nothing else
  *   plays; the wake word wakes it up;
  * - the host's mouse pointer, when it sends it, is followed;
- * - a long press puts it to sleep, a tap wakes it up. */
+ * - a long press puts it to sleep, a tap wakes it up;
+ * - its status (thinking, done, error) tints the sphere during a conversation. */
 
 #include "lvgl.h"
 #include "voice.h"

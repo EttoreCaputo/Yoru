@@ -4,56 +4,198 @@
 #include <string.h>
 
 #include "board.h"
+#include "esp_heap_caps.h"
 #include "esp_random.h"
+#include "look.h"
 
-/* One frame every 33 ms; when nothing moves, nothing is redrawn. */
+/* One frame every 33 ms; when nothing moves, nothing is redrawn. Motion
+ * follows the clock, not the frame count, so a slow frame doesn't slow it. */
 #define EYES_FRAME_MS 33
+/* A frame later than this is a stall (a flash write, a long log): the
+ * animation skips ahead at most this far. */
+#define EYES_MAX_STEP_MS 200
 #define CX (BOARD_LCD_H_RES / 2)
 #define CY (BOARD_LCD_V_RES / 2)
-/* Eye centres from the middle, and how far the gaze moves them. */
-#define EYE_SPACING 80
-#define GAZE_X 52
-#define GAZE_Y 38
-/* The hearts' distance from the middle. */
-#define HEART_X 160
+#define R LOOK_SPHERE_R
+/* Sizes below are at the Rive file's scale; K brings them to the screen's. */
+#define K LOOK_SCALE
+/* Yoru's eyes: half the gap between them, how far below the sphere's centre
+ * they sit, and how far the gaze slides them over the surface. */
+#define EYE_SPACING (32 * K)
+#define FACE_Y (16 * K)
+#define GAZE_X (62 * K)
+#define GAZE_Y (48 * K)
+#define HAND_Y 40
+#define BADGE_X (-98 * K)
+#define BADGE_Y (-98 * K)
+#define HEART_X (160 * K)
+/* Asleep, Yoru drifts away into the dark: this far, in sphere sizes, which
+ * leaves a dot a tenth of its size, dimmed. */
+#define SLEEP_FAR 9.0f
+#define SLEEP_DIM 0.55f
+/* The distance changes at a steady pace, which in perspective reads as
+ * slowing down as it goes and speeding up as it comes back. */
+#define SLEEP_AWAY_MS 2000
+#define SLEEP_BACK_MS 700
 /* The most pieces an overlay has (three z's, three dots). */
 #define MAX_OVERLAY_RECTS 3
+/* The eye sprites: the largest eye (surprised, swelling, stretched) fits
+ * in this. */
+#define EYE_BUF_W 40
+#define EYE_BUF_H 80
+#define EYE_MARGIN 2
 
 /* What a mood looks like. The lids: `top` cuts the eye from above (0..1 of
  * its height), `slope` tilts that cut (> 0: lower towards the nose, angry;
  * < 0: lower outside, worried), `bottom` raises a curve from below (the
  * ^ ^ of a smile). `tilt` turns the face, in degrees; `left`/`right` scale
- * each eye's height. */
+ * each eye's height. Sizes in pixels, for Yoru's small pill eyes. */
 typedef struct {
-    float r, g, b;
     float w, h;
     float top, slope, bottom;
     float tilt;
     float left, right;
 } eye_shape_t;
 
-#define RGB(hex) (float) (((hex) >> 16) & 0xFF), (float) (((hex) >> 8) & 0xFF), (float) ((hex) & 0xFF)
-
 static const eye_shape_t s_moods[EYES_MOOD_COUNT] = {
-    [EYES_MOOD_NEUTRAL] = {RGB(0x3EE6FF), 84, 122, 0, 0, 0, 0, 1, 1},
-    [EYES_MOOD_HAPPY] = {RGB(0x3EE6FF), 93, 116, 0, 0, 1, 0, 1, 1},
-    [EYES_MOOD_CURIOUS] = {RGB(0x3EE6FF), 87, 122, 0, 0, 0, -9, 1.15f, 0.72f},
-    [EYES_MOOD_THINKING] = {RGB(0xE8915F), 76, 102, 0.18f, -0.12f, 0, 5, 1, 1},
-    [EYES_MOOD_GRUMPY] = {RGB(0xFF5A3C), 87, 108, 0.32f, 0.38f, 0, 0, 1, 1},
-    [EYES_MOOD_HOT] = {RGB(0xFF8A2A), 84, 105, 0.30f, -0.32f, 0, 0, 1, 1},
-    [EYES_MOOD_SLEEPY] = {RGB(0x288CAF), 90, 116, 0.58f, 0, 0, 0, 1, 1},
-    [EYES_MOOD_ASLEEP] = {RGB(0x1E6E8A), 90, 116, 0.88f, 0, 0, 0, 1, 1},
-    [EYES_MOOD_SAD] = {RGB(0x5C8DFF), 80, 110, 0.26f, -0.40f, 0, 0, 1, 1},
-    [EYES_MOOD_LOVING] = {RGB(0xFF7AB8), 93, 116, 0, 0, 1, 0, 1, 1},
-    [EYES_MOOD_SURPRISED] = {RGB(0x3EE6FF), 98, 140, 0, 0, 0, 0, 1.04f, 1.04f},
-    [EYES_MOOD_BORED] = {RGB(0x6FA0B4), 88, 112, 0.44f, 0, 0.2f, 0, 1, 1},
-    [EYES_MOOD_LISTENING] = {RGB(0x8AF4FF), 92, 132, 0, 0, 0, -4, 1, 1},
-    [EYES_MOOD_SPEAKING] = {RGB(0xB8F0FF), 90, 118, 0, 0, 0.3f, 0, 1, 1},
+    [EYES_MOOD_NEUTRAL] = {26, 60, 0, 0, 0, 0, 1, 1},
+    [EYES_MOOD_HAPPY] = {29, 57, 0, 0, 1, 0, 1, 1},
+    [EYES_MOOD_CURIOUS] = {27, 60, 0, 0, 0, -9, 1.15f, 0.72f},
+    [EYES_MOOD_THINKING] = {24, 50, 0.18f, -0.12f, 0, 5, 1, 1},
+    [EYES_MOOD_GRUMPY] = {27, 53, 0.32f, 0.38f, 0, 0, 1, 1},
+    [EYES_MOOD_HOT] = {26, 51, 0.30f, -0.32f, 0, 0, 1, 1},
+    [EYES_MOOD_SLEEPY] = {28, 57, 0.58f, 0, 0, 0, 1, 1},
+    [EYES_MOOD_ASLEEP] = {28, 57, 0.90f, 0, 0, 0, 1, 1},
+    [EYES_MOOD_SAD] = {25, 54, 0.26f, -0.40f, 0, 0, 1, 1},
+    [EYES_MOOD_LOVING] = {29, 57, 0, 0, 1, 0, 1, 1},
+    [EYES_MOOD_SURPRISED] = {30, 69, 0, 0, 0, 0, 1.04f, 1.04f},
+    [EYES_MOOD_BORED] = {27, 55, 0.44f, 0, 0.2f, 0, 1, 1},
+    [EYES_MOOD_LISTENING] = {29, 65, 0, 0, 0, -4, 1, 1},
+    [EYES_MOOD_SPEAKING] = {28, 58, 0, 0, 0.3f, 0, 1, 1},
 };
 
 static const char *const s_mood_names[EYES_MOOD_COUNT] = {
     "neutral", "happy", "curious", "thinking", "grumpy", "hot", "sleepy", "asleep", "sad", "loving", "surprised", "bored", "listening", "speaking",
 };
+
+/* The status colours: blue thinking, green done, red error. */
+static const uint32_t s_status_rgb[] = {0x3D8BFF, 0x3D8BFF, 0x3DDC84, 0xFF4D5E};
+
+/* Where a hand floats, from the body's centre, and its size (0 = tucked
+ * away). */
+typedef struct {
+    float x, y, s;
+} hand_pose_t;
+
+typedef struct {
+    uint16_t ms;
+    hand_pose_t l, r;
+} hand_key_t;
+
+#define TUCK_L {-112, HAND_Y, 0}
+#define TUCK_R {112, HAND_Y, 0}
+#define OUT_L {-168, HAND_Y, 1}
+#define OUT_R {168, HAND_Y, 1}
+#define WAVE_A {150, -70, 1.05f}
+#define WAVE_B {156, -74, 1.05f}
+
+/* The gestures, as in the Rive file: short paths for the two hands that
+ * start and end tucked away. */
+static const hand_key_t WAVE[] = {
+    {0, TUCK_L, TUCK_R},       {250, OUT_L, WAVE_A},  {450, OUT_L, WAVE_B}, {650, OUT_L, WAVE_A},
+    {850, OUT_L, WAVE_B},      {1050, OUT_L, WAVE_A}, {1250, OUT_L, WAVE_B}, {1450, OUT_L, WAVE_A},
+    {1750, TUCK_L, TUCK_R},
+};
+static const hand_key_t POINT[] = {
+    {0, TUCK_L, TUCK_R},
+    {250, OUT_L, {180, -24, 1.1f}},
+    {420, OUT_L, {194, -30, 1.1f}},
+    {600, OUT_L, {180, -24, 1.1f}},
+    {1500, OUT_L, {180, -24, 1.1f}},
+    {1800, TUCK_L, TUCK_R},
+};
+static const hand_key_t COVER[] = {
+    {0, TUCK_L, TUCK_R},
+    {280, {-36, 20, 1.25f}, {36, 20, 1.25f}},
+    {1300, {-36, 20, 1.25f}, {36, 20, 1.25f}},
+    {1650, {-36, 20, 1.25f}, {46, 84, 1.15f}},
+    {2700, {-36, 20, 1.25f}, {46, 84, 1.15f}},
+    {3000, TUCK_L, TUCK_R},
+};
+static const hand_key_t THINK[] = {
+    {0, TUCK_L, TUCK_R},
+    {300, TUCK_L, {36, 136, 0.95f}},
+    {420, TUCK_L, {36, 130, 0.95f}},
+    {540, TUCK_L, {36, 136, 0.95f}},
+    {1700, TUCK_L, {36, 136, 0.95f}},
+    {1820, TUCK_L, {36, 130, 0.95f}},
+    {1940, TUCK_L, {36, 136, 0.95f}},
+    {3000, TUCK_L, {36, 136, 0.95f}},
+    {3300, TUCK_L, TUCK_R},
+};
+static const hand_key_t CLAP[] = {
+    {0, TUCK_L, TUCK_R},
+    {250, {-72, 92, 1}, {72, 92, 1}},
+    {380, {-25, 92, 1}, {25, 92, 1}},
+    {500, {-72, 92, 1}, {72, 92, 1}},
+    {630, {-25, 92, 1}, {25, 92, 1}},
+    {750, {-72, 92, 1}, {72, 92, 1}},
+    {880, {-25, 92, 1}, {25, 92, 1}},
+    {1000, {-72, 92, 1}, {72, 92, 1}},
+    {1300, TUCK_L, TUCK_R},
+};
+static const hand_key_t STRETCH[] = {
+    {0, TUCK_L, TUCK_R},
+    {500, {-206, -34, 1.1f}, {206, -34, 1.1f}},
+    {1100, {-206, -34, 1.1f}, {206, -34, 1.1f}},
+    {1500, OUT_L, OUT_R},
+    {1800, TUCK_L, TUCK_R},
+};
+
+typedef struct {
+    const char *name;
+    const hand_key_t *keys;
+    int n;
+    bool front; // in front of the body (over the eyes, under the chin)
+} gesture_t;
+
+#define GESTURE(name, keys, front) {name, keys, sizeof(keys) / sizeof(keys[0]), front}
+static const gesture_t s_gestures[EYES_GESTURE_COUNT] = {
+    [EYES_GESTURE_NONE] = {"none", NULL, 0, false},
+    [EYES_GESTURE_WAVE] = GESTURE("wave", WAVE, false),
+    [EYES_GESTURE_POINT] = GESTURE("point", POINT, false),
+    [EYES_GESTURE_COVER] = GESTURE("cover", COVER, true),
+    [EYES_GESTURE_THINK] = GESTURE("think", THINK, true),
+    [EYES_GESTURE_CLAP] = GESTURE("clap", CLAP, true),
+    [EYES_GESTURE_STRETCH] = GESTURE("stretch", STRETCH, false),
+};
+
+/* Everything one frame shows, worked out before drawing so the same numbers
+ * decide what to redraw. Positions are screen pixels. */
+typedef struct {
+    int32_t bx, by;      // the body's centre
+    float sx, sy;        // squash and stretch
+    int32_t day_level;   // the pre-rendered squashed sphere, or
+    int32_t day_scaled;  // 1: none yet, LVGL scales the round one
+    float near;          // 1 here .. 0 far away, asleep
+    float dist;          // how big that distance leaves it, 1 .. ~0.1
+    float tint;          // the status tint, halo and badge
+    float tint_rgb[3];   // floats, so the struct compares without padding
+} body_vis_t;
+
+typedef struct {
+    float x, y, w, h;      // centre and size in pixels
+    float top_l, top_r;    // where the top lid cuts, from the centre
+    float bottom;
+} eye_box_t;
+
+/* An eye's picture, redrawn only when its shape changes. */
+typedef struct {
+    look_sprite_t sp;
+    int32_t key[5];
+    lv_area_t drawn;
+    bool valid;
+} eye_sprite_t;
 
 static struct {
     lv_obj_t *obj;
@@ -70,11 +212,30 @@ static struct {
     float squash;
     /* The voice's level, eased, and where it is going. */
     float level, tlevel;
-    uint32_t t_ms;        // animation clock for the overlays
-    /* What the last frame covered, eyes and overlay apart: the overlay keeps
-     * moving while the eyes are still (the z's of sleep). */
-    lv_area_t eyes_drawn;
-    bool eyes_valid;
+    uint32_t t_ms;        // animation clock
+    uint32_t last_tick;   // when the last frame ran
+    int32_t dt_ms;        // how long since, for this frame's step
+    float frames;         // the same in 33 ms frames, for the easing
+    float near;
+    eyes_status_t status;
+    float tint;
+    float tint_rgb[3];
+    /* The gesture playing, how far in, and where the hands were when it
+     * started (so a new one picks up from there). */
+    eyes_gesture_t gesture;
+    int32_t gesture_ms;
+    hand_pose_t hand_from[2];
+    hand_pose_t hand[2];
+    bool hands_front;
+    /* This frame and what the last one covered. */
+    body_vis_t body;
+    lv_area_t body_drawn;
+    bool body_valid;
+    eye_box_t eye[2];
+    eye_sprite_t eye_sp[2];
+    lv_area_t hand_drawn[2];
+    lv_area_t badge_drawn;
+    float badge_scale;
     lv_area_t over_drawn[MAX_OVERLAY_RECTS];
     int over_count;
 } s;
@@ -84,9 +245,36 @@ static float lerp(float a, float b, float k)
     return a + (b - a) * k;
 }
 
+/* An easing step tuned per 33 ms frame, for however long this frame took. */
+static float ease(float k)
+{
+    return 1 - powf(1 - k, s.frames);
+}
+
+static float clampf(float v, float lo, float hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 static float frand(void)
 {
     return (float) (esp_random() & 0xFFFF) / 65535.0f;
+}
+
+/* 0..1 as t goes from a to b. */
+static float seg(float t, float a, float b)
+{
+    return clampf((t - a) / (b - a), 0, 1);
+}
+
+static float smooth(float k)
+{
+    return k * k * (3 - 2 * k);
+}
+
+static lv_color_t rgb_color(const float rgb[3])
+{
+    return lv_color_make((uint8_t) rgb[0], (uint8_t) rgb[1], (uint8_t) rgb[2]);
 }
 
 static bool has_overlay(eyes_mood_t mood)
@@ -94,27 +282,194 @@ static bool has_overlay(eyes_mood_t mood)
     return mood == EYES_MOOD_THINKING || mood == EYES_MOOD_HOT || mood == EYES_MOOD_ASLEEP || mood == EYES_MOOD_LOVING;
 }
 
-/* Where an eye is this frame. */
-typedef struct {
-    float cx, cy, w, h;
-    int inner; // +1 for the left eye (its inner side is to the right)
-} eye_box_t;
+/* ---- Hands ---------------------------------------------------------------- */
 
-static void eye_boxes(eye_box_t out[2])
+static hand_pose_t pose_lerp(hand_pose_t a, hand_pose_t b, float k)
 {
+    return (hand_pose_t) {lerp(a.x, b.x, k), lerp(a.y, b.y, k), lerp(a.s, b.s, k)};
+}
+
+/* Where the hands are `ms` into the gesture playing. */
+static void hands_step(void)
+{
+    const gesture_t *g = &s_gestures[s.gesture];
+    if (g->n == 0) {
+        s.hand[0] = (hand_pose_t) TUCK_L;
+        s.hand[1] = (hand_pose_t) TUCK_R;
+        return;
+    }
+    const int32_t was_ms = s.gesture_ms;
+    s.gesture_ms += s.dt_ms;
+    if (s.gesture_ms >= g->keys[g->n - 1].ms) {
+        s.gesture = EYES_GESTURE_NONE;
+        s.hand[0] = (hand_pose_t) TUCK_L;
+        s.hand[1] = (hand_pose_t) TUCK_R;
+        return;
+    }
+    int i = 0;
+    while (i < g->n - 2 && s.gesture_ms >= g->keys[i + 1].ms) {
+        i++;
+    }
+    const hand_key_t *a = &g->keys[i], *b = &g->keys[i + 1];
+    float k = smooth(seg((float) s.gesture_ms, a->ms, b->ms));
+    // The first stretch starts from wherever the hands were.
+    hand_pose_t al = i == 0 ? s.hand_from[0] : a->l;
+    hand_pose_t ar = i == 0 ? s.hand_from[1] : a->r;
+    s.hand[0] = pose_lerp(al, b->l, k);
+    s.hand[1] = pose_lerp(ar, b->r, k);
+    s.hands_front = g->front;
+    // The end of a stretch: a big blink.
+    if (s.gesture == EYES_GESTURE_STRETCH && was_ms < 1500 && s.gesture_ms >= 1500) {
+        eyes_blink();
+    }
+}
+
+/* The body stretches tall while the hands reach out. */
+static float stretch_amount(void)
+{
+    if (s.gesture != EYES_GESTURE_STRETCH) {
+        return 0;
+    }
+    return -0.9f * sinf((float) M_PI * seg((float) s.gesture_ms, 250, 1500));
+}
+
+/* ---- One frame's layout --------------------------------------------------- */
+
+static void body_layout(body_vis_t *v)
+{
+    memset(v, 0, sizeof(*v));
+    const float t = (float) s.t_ms / 1000.0f;
+    // Breathing: a slow bob of a few pixels. Not asleep (far away and
+    // still), not with the tint on (the halo covers the screen).
+    const bool still = s.near < 0.5f || s.tint > 0.01f;
+    const float bob = still ? 0 : 3 * sinf(t * 2.1f);
+    v->bx = CX;
+    v->by = CY + (int32_t) lroundf(bob);
+    // The squash snaps to the nearest pre-rendered sphere, the eyes with it.
+    float sq = clampf(s.squash + stretch_amount(), -1, 1);
+    const int32_t level = (int32_t) lroundf(sq * LOOK_SQUASH_STEPS);
+    // Going away is a perspective shrink: quick at first, slow in the
+    // distance (and the other way coming back), so the expensive large
+    // scaled frames are few.
+    v->dist = 1 / (1 + SLEEP_FAR * (1 - s.near));
+    if (v->dist > 0.999f && look_day(level) != NULL) {
+        sq = (float) level / LOOK_SQUASH_STEPS;
+        v->day_level = level;
+    } else {
+        v->day_scaled = 1;
+    }
+    v->sx = (1 + LOOK_SQUASH * sq) * v->dist;
+    v->sy = (1 - LOOK_SQUASH * sq) * v->dist;
+    v->near = s.near;
+    v->tint = s.tint;
+    memcpy(v->tint_rgb, s.tint_rgb, sizeof(v->tint_rgb));
+}
+
+static void eye_layout(void)
+{
+    // Near the edge of the ball the eyes get narrower: it seems to turn.
+    const float nx = 1 - 0.3f * s.gx * s.gx;
+    const float ny = 1 - 0.25f * s.gy * s.gy;
     const float swell = 1 + 0.14f * s.level;
-    const float w = s.cur.w * (1 + 0.3f * s.squash) * swell;
-    const float h = s.cur.h * (1 - 0.38f * s.squash) * s.lid * swell;
+    const float w = s.cur.w * K * nx * swell * s.body.sx;
+    const float h = s.cur.h * K * ny * swell * s.body.sy * s.lid;
     const float lift = EYE_SPACING * sinf(s.cur.tilt * (float) M_PI / 180.0f);
     const float ox = s.gx * GAZE_X;
     const float oy = s.gy * GAZE_Y;
-    out[0] = (eye_box_t) {CX - EYE_SPACING + ox, CY + oy + lift, w, h * s.cur.left, 1};
-    out[1] = (eye_box_t) {CX + EYE_SPACING + ox, CY + oy - lift, w, h * s.cur.right, -1};
+    for (int i = 0; i < 2; i++) {
+        const int side = i == 0 ? -1 : 1;
+        const int inner = -side; // the left eye's inner side is to the right
+        eye_box_t *e = &s.eye[i];
+        e->w = w;
+        e->h = h * (i == 0 ? s.cur.left : s.cur.right);
+        e->x = (float) s.body.bx + ((float) side * EYE_SPACING * nx + ox) * s.body.sx;
+        e->y = (float) s.body.by + (FACE_Y + oy) * s.body.sy - (float) side * lift * s.body.dist;
+        const float hh = e->h < 2 ? 2 : e->h;
+        const float cut = -hh / 2 + s.cur.top * hh;
+        e->top_l = cut - s.cur.slope * hh * 0.6f * (float) inner;
+        e->top_r = cut + s.cur.slope * hh * 0.6f * (float) inner;
+        e->bottom = s.cur.bottom;
+    }
 }
 
-static lv_color_t cur_color(float scale)
+/* ---- Eye sprites ---------------------------------------------------------- */
+
+static float sd_round_box(float px, float py, float hw, float hh, float r)
 {
-    return lv_color_make((uint8_t) (s.cur.r * scale), (uint8_t) (s.cur.g * scale), (uint8_t) (s.cur.b * scale));
+    float qx = fabsf(px) - hw + r, qy = fabsf(py) - hh + r;
+    float ox = fmaxf(qx, 0), oy = fmaxf(qy, 0);
+    return hypotf(ox, oy) + fminf(fmaxf(qx, qy), 0) - r;
+}
+
+static void eye_key(const eye_box_t *e, int32_t key[5])
+{
+    key[0] = (int32_t) lroundf(e->w * 4);
+    key[1] = (int32_t) lroundf(e->h * 4);
+    key[2] = (int32_t) lroundf(e->top_l * 4);
+    key[3] = (int32_t) lroundf(e->top_r * 4);
+    key[4] = (int32_t) lroundf(e->bottom * 64);
+}
+
+/* Draw one eye into its sprite: a dark pill, a rounded box cut from above by
+ * the top lid and from below by a circle (the smile). Antialiased from the
+ * signed distance to that shape. */
+static void eye_render(eye_sprite_t *es, const eye_box_t *e)
+{
+    const int margin = EYE_MARGIN;
+    const float hw = fmaxf(e->w / 2, 1), hh = fmaxf(e->h / 2, 1);
+    int w = (int) ceilf(2 * hw) + 2 * margin;
+    int h = (int) ceilf(2 * hh) + 2 * margin;
+    w = w > EYE_BUF_W ? EYE_BUF_W : w;
+    h = h > EYE_BUF_H ? EYE_BUF_H : h;
+    es->sp.img.header.w = w;
+    es->sp.img.header.h = h;
+    es->sp.img.header.stride = w * 4;
+    es->sp.img.data_size = (uint32_t) (w * h * 4);
+    es->sp.ax = w / 2;
+    es->sp.ay = h / 2;
+
+    const float rr = fminf(hw, hh);
+    const bool lid = fmaxf(e->top_l, e->top_r) > -hh + 0.5f;
+    const float lx0 = -hw - 6, lx1 = hw + 6;
+    const float slope = (e->top_r - e->top_l) / (lx1 - lx0);
+    const float lid_norm = 1 / sqrtf(1 + slope * slope);
+    const bool smile = e->bottom > 0.01f;
+    const float rb = 1.8f * hw;
+    const float smile_cy = hh + 2 - e->bottom * (0.6f * hh + 2) + rb;
+
+    const uint8_t r = 29, g = 27, b = 36;
+
+    lv_color32_t *px = (lv_color32_t *) es->sp.img.data;
+    for (int y = 0; y < h; y++) {
+        const float py = (float) y + 0.5f - (float) h / 2;
+        for (int x = 0; x < w; x++, px++) {
+            const float pxf = (float) x + 0.5f - (float) w / 2;
+            float d = sd_round_box(pxf, py, hw, hh, rr);
+            if (lid) {
+                d = fmaxf(d, (e->top_l + (pxf - lx0) * slope - py) * lid_norm);
+            }
+            if (smile) {
+                d = fmaxf(d, rb - hypotf(pxf, py - smile_cy));
+            }
+            px->red = r;
+            px->green = g;
+            px->blue = b;
+            px->alpha = (uint8_t) (clampf(0.5f - d, 0, 1) * 255);
+        }
+    }
+}
+
+/* ---- Drawing -------------------------------------------------------------- */
+
+static void draw_disc(lv_layer_t *layer, float x, float y, float r, lv_color_t color, lv_opa_t opa)
+{
+    lv_draw_rect_dsc_t dsc;
+    lv_draw_rect_dsc_init(&dsc);
+    dsc.bg_color = color;
+    dsc.bg_opa = opa;
+    dsc.radius = LV_RADIUS_CIRCLE;
+    const lv_area_t a = {(int32_t) (x - r), (int32_t) (y - r), (int32_t) (x + r), (int32_t) (y + r)};
+    lv_draw_rect(layer, &dsc, &a);
 }
 
 static void fill_rect(lv_layer_t *layer, float x1, float y1, float x2, float y2, lv_color_t color, int32_t radius,
@@ -130,12 +485,12 @@ static void fill_rect(lv_layer_t *layer, float x1, float y1, float x2, float y2,
 }
 
 static void fill_triangle(lv_layer_t *layer, float x0, float y0, float x1, float y1, float x2, float y2,
-                          lv_color_t color)
+                          lv_color_t color, lv_opa_t opa)
 {
     lv_draw_triangle_dsc_t dsc;
     lv_draw_triangle_dsc_init(&dsc);
     dsc.color = color;
-    dsc.opa = LV_OPA_COVER;
+    dsc.opa = opa;
     dsc.p[0].x = (int32_t) x0;
     dsc.p[0].y = (int32_t) y0;
     dsc.p[1].x = (int32_t) x1;
@@ -145,103 +500,80 @@ static void fill_triangle(lv_layer_t *layer, float x0, float y0, float x1, float
     lv_draw_triangle(layer, &dsc);
 }
 
-/* Where the top lid cuts the eye, at its outer left and right ends. */
-static void lid_edges(const eye_box_t *e, float *edge_l, float *edge_r)
+static void draw_hands(lv_layer_t *layer)
 {
-    const float top = e->cy - e->h / 2;
-    const float h = e->h < 2 ? 2 : e->h;
-    *edge_l = top + s.cur.top * h - s.cur.slope * h * 0.6f * (float) e->inner;
-    *edge_r = top + s.cur.top * h + s.cur.slope * h * 0.6f * (float) e->inner;
+    const look_t *lk = look_get();
+    const float d = s.body.dist; // they go away with the body
+    for (int i = 0; i < 2; i++) {
+        const hand_pose_t *h = &s.hand[i];
+        const int32_t x = s.body.bx + (int32_t) (h->x * K * d), y = s.body.by + (int32_t) (h->y * K * d);
+        look_draw(layer, &lk->hand, x, y, h->s * d, h->s * d, 0, (lv_opa_t) (255 * s.near), lv_color_black());
+    }
 }
 
-/* The highest row of an eye the top lid leaves showing. */
-static float visible_top(const eye_box_t *e)
+static void draw_badge(lv_layer_t *layer, const body_vis_t *v)
 {
-    float edge_l, edge_r;
-    lid_edges(e, &edge_l, &edge_r);
-    return fmaxf(e->cy - e->h / 2, fminf(edge_l, edge_r));
-}
-
-static void draw_eye(lv_layer_t *layer, const eye_box_t *e)
-{
-    const lv_color_t black = lv_color_black();
-    const float x0 = e->cx - e->w / 2;
-    const float x1 = e->cx + e->w / 2;
-    const float top = e->cy - e->h / 2;
-    const float h = e->h < 2 ? 2 : e->h;
-    fill_rect(layer, x0, top, x1, top + h, cur_color(1), (int32_t) (fminf(e->w, h) * 0.38f), LV_OPA_COVER);
-
-    // Top lid: everything above a line that can slope towards the nose.
-    float edge_l, edge_r;
-    lid_edges(e, &edge_l, &edge_r);
-    if (fmaxf(edge_l, edge_r) > top + 0.5f) {
-        const float flat = fminf(edge_l, edge_r);
-        const float lx = x0 - 6;
-        const float rx = x1 + 6;
-        if (flat > top) {
-            fill_rect(layer, lx, top - 4, rx, flat, black, 0, LV_OPA_COVER);
-        }
-        if (edge_l > edge_r) {
-            fill_triangle(layer, lx, flat, rx, flat, lx, edge_l, black);
-        } else if (edge_r > edge_l) {
-            fill_triangle(layer, lx, flat, rx, flat, rx, edge_r, black);
-        }
+    if (v->tint <= 0.01f) {
+        return;
     }
-
-    // Bottom lid: a big circle rising from below draws the smile's curve.
-    if (s.cur.bottom > 0.01f) {
-        const float radius = 0.9f * e->w;
-        const float lid_top = e->cy + h / 2 + 2 - s.cur.bottom * (0.3f * h + 2);
-        fill_rect(layer, e->cx - radius, lid_top, e->cx + radius, lid_top + 2 * radius, black, LV_RADIUS_CIRCLE,
-                  LV_OPA_COVER);
-    }
+    const lv_opa_t opa = (lv_opa_t) (255 * v->tint);
+    const float x = (float) v->bx + BADGE_X * v->sx, y = (float) v->by + BADGE_Y * v->sy;
+    draw_disc(layer, x, y, 17.5f * K, lv_color_black(), opa);
+    draw_disc(layer, x, y, 15 * K * s.badge_scale, rgb_color(v->tint_rgb), opa);
 }
 
 /* A small heart: two round tops and a point below, centred on (x, y). */
-static void draw_heart(lv_layer_t *layer, float x, float y, lv_color_t color)
+static void draw_heart(lv_layer_t *layer, float x, float y, lv_color_t color, lv_opa_t opa)
 {
-    fill_rect(layer, x - 13, y - 7, x + 1, y + 7, color, LV_RADIUS_CIRCLE, LV_OPA_COVER);
-    fill_rect(layer, x - 1, y - 7, x + 13, y + 7, color, LV_RADIUS_CIRCLE, LV_OPA_COVER);
-    fill_triangle(layer, x - 13, y + 1, x + 13, y + 1, x, y + 16, color);
+    fill_rect(layer, x - 13, y - 7, x + 1, y + 7, color, LV_RADIUS_CIRCLE, opa);
+    fill_rect(layer, x - 1, y - 7, x + 13, y + 7, color, LV_RADIUS_CIRCLE, opa);
+    fill_triangle(layer, x - 13, y + 1, x + 13, y + 1, x, y + 16, color, opa);
 }
 
-static void draw_overlays(lv_layer_t *layer, const eye_box_t eyes[2])
+/* Where the overlays sit: next to the sphere, never over the eyes. */
+#define DOTS_Y (CY + (int32_t) (176 * K))
+#define SWEAT_X (CX + (int32_t) (128 * K))
+#define SWEAT_Y (CY - (int32_t) (120 * K))
+/* The z's rise from the small, far-away Yoru. */
+#define Z_X (CX + 14)
+#define Z_Y (CY - 40)
+
+static void draw_overlays(lv_layer_t *layer)
 {
     const float t = (float) s.t_ms / 1000.0f;
     if (s.mood == EYES_MOOD_THINKING) {
         for (int i = 0; i < 3; i++) {
             float a = (sinf(t * 5 - (float) i * 0.9f) + 1) / 2;
             float x = CX - 30 + 30 * (float) i;
-            fill_rect(layer, x - 8, CY + 142, x + 8, CY + 158, cur_color(1), LV_RADIUS_CIRCLE,
+            fill_rect(layer, x - 8, DOTS_Y - 8, x + 8, DOTS_Y + 8, lv_color_hex(0x3D8BFF), LV_RADIUS_CIRCLE,
                       (lv_opa_t) (70 + 185 * a));
         }
     } else if (s.mood == EYES_MOOD_ASLEEP) {
         lv_draw_label_dsc_t dsc;
         lv_draw_label_dsc_init(&dsc);
-        dsc.color = lv_color_hex(0x5FB4D2);
+        dsc.color = lv_color_hex(0x8C90A6);
         for (int i = 0; i < 3; i++) {
             float p = fmodf(t * 0.35f + (float) i / 3.0f, 1.0f);
-            dsc.font = i == 1 ? &lv_font_montserrat_40 : &lv_font_montserrat_28;
-            dsc.opa = (lv_opa_t) (255 * (1 - p));
+            dsc.font = i == 1 ? &lv_font_montserrat_28 : &lv_font_montserrat_14;
+            // They only show once it is far away.
+            dsc.opa = (lv_opa_t) (255 * (1 - p) * (1 - s.near));
             dsc.text = "z";
-            int32_t x = (int32_t) (330 + p * 55 + (float) i * 6);
-            int32_t y = (int32_t) (170 - p * 100);
+            int32_t x = (int32_t) (Z_X + p * 30 + (float) i * 4);
+            int32_t y = (int32_t) (Z_Y - p * 60);
             const lv_area_t a = {x, y, x + 40, y + 48};
             lv_draw_label(layer, &dsc, &a);
         }
     } else if (s.mood == EYES_MOOD_HOT) {
         const lv_color_t blue = lv_color_hex(0x6FD3FF);
-        float dy = fmodf(t * 40, 60);
-        float x = eyes[1].cx + eyes[1].w / 2 + 22;
-        float y = eyes[1].cy - eyes[1].h / 2 + dy;
-        fill_triangle(layer, x, y - 16, x - 9, y + 2, x + 9, y + 2, blue);
-        fill_rect(layer, x - 9, y - 5, x + 9, y + 13, blue, LV_RADIUS_CIRCLE, LV_OPA_COVER);
+        float y = SWEAT_Y + fmodf(t * 40, 60);
+        fill_triangle(layer, SWEAT_X, y - 16, SWEAT_X - 9, y + 2, SWEAT_X + 9, y + 2, blue, LV_OPA_COVER);
+        fill_rect(layer, SWEAT_X - 9, y - 5, SWEAT_X + 9, y + 13, blue, LV_RADIUS_CIRCLE, LV_OPA_COVER);
     } else if (s.mood == EYES_MOOD_LOVING) {
-        // Two hearts float up beside the eyes and fade into the black.
+        // Two hearts float up beside the body and fade into the black.
         for (int i = 0; i < 2; i++) {
             float p = fmodf(t * 0.4f + (float) i * 0.5f, 1.0f);
             float x = i == 0 ? CX - HEART_X : CX + HEART_X;
-            draw_heart(layer, x, CY - 40 - p * 90, cur_color(1 - p));
+            draw_heart(layer, x, CY - 40 * K - p * 90, lv_color_hex(0xFF7AB8), (lv_opa_t) (255 * (1 - p)));
         }
     }
 }
@@ -249,25 +581,66 @@ static void draw_overlays(lv_layer_t *layer, const eye_box_t eyes[2])
 static void draw_cb(lv_event_t *e)
 {
     lv_layer_t *layer = lv_event_get_layer(e);
-    eye_box_t eyes[2];
-    eye_boxes(eyes);
-    draw_eye(layer, &eyes[0]);
-    draw_eye(layer, &eyes[1]);
-    draw_overlays(layer, eyes);
+    const look_t *lk = look_get();
+    const body_vis_t *v = &s.body;
+    const lv_color_t black = lv_color_black();
+
+    if (v->tint > 0.01f) {
+        look_draw(layer, &lk->halo, v->bx, v->by, 1, 1, 0, (lv_opa_t) (90 * v->tint), rgb_color(v->tint_rgb));
+    }
+    if (!s.hands_front) {
+        draw_hands(layer);
+    }
+    const lv_opa_t body_opa = (lv_opa_t) (255 * lerp(SLEEP_DIM, 1, v->near));
+    if (v->day_scaled) {
+        look_draw(layer, &lk->day, v->bx, v->by, v->sx, v->sy, 0, body_opa, black);
+    } else {
+        look_draw(layer, look_day(v->day_level), v->bx, v->by, 1, 1, 0, body_opa, black);
+    }
+    if (v->tint > 0.01f) {
+        look_draw(layer, &lk->tint, v->bx, v->by, v->sx, v->sy, 0, (lv_opa_t) (217 * v->tint), rgb_color(v->tint_rgb));
+    }
+    draw_badge(layer, v);
+    for (int i = 0; i < 2; i++) {
+        look_draw(layer, &s.eye_sp[i].sp, (int32_t) lroundf(s.eye[i].x), (int32_t) lroundf(s.eye[i].y), 1, 1, 0,
+                  LV_OPA_COVER, black);
+    }
+    if (s.hands_front) {
+        draw_hands(layer);
+    }
+    draw_overlays(layer);
 }
 
-/* The area this frame's eyes show. Everything above the top lid is black on
- * black, so it starts there: a sleeping eye is a thin slice. */
-static lv_area_t eyes_area(void)
+/* ---- What to redraw ------------------------------------------------------- */
+
+static lv_area_t body_area(const body_vis_t *v)
 {
-    eye_box_t eyes[2];
-    eye_boxes(eyes);
-    return (lv_area_t) {
-        (int32_t) (eyes[0].cx - eyes[0].w / 2 - 10),
-        (int32_t) (fminf(visible_top(&eyes[0]), visible_top(&eyes[1])) - 10),
-        (int32_t) (eyes[1].cx + eyes[1].w / 2 + 10),
-        (int32_t) (fmaxf(eyes[0].cy + eyes[0].h / 2, eyes[1].cy + eyes[1].h / 2) + 10),
-    };
+    // The halo reaches most of the screen.
+    if (v->tint > 0.01f) {
+        return (lv_area_t) {0, 0, BOARD_LCD_H_RES - 1, BOARD_LCD_V_RES - 1};
+    }
+    const int32_t rx = (int32_t) (R * v->sx) + 4, ry = (int32_t) (R * v->sy) + 4;
+    return (lv_area_t) {v->bx - rx, v->by - ry, v->bx + rx, v->by + ry};
+}
+
+static lv_area_t eye_area(int i)
+{
+    const look_sprite_t *sp = &s.eye_sp[i].sp;
+    return look_area(sp, (int32_t) lroundf(s.eye[i].x), (int32_t) lroundf(s.eye[i].y), 1, 1, false);
+}
+
+static lv_area_t hand_area(int i)
+{
+    const hand_pose_t *h = &s.hand[i];
+    const float d = s.body.dist;
+    return look_area(&look_get()->hand, s.body.bx + (int32_t) (h->x * K * d), s.body.by + (int32_t) (h->y * K * d),
+                     fmaxf(h->s * d, 0.02f), fmaxf(h->s * d, 0.02f), false);
+}
+
+static lv_area_t badge_area(void)
+{
+    const int32_t x = s.body.bx + (int32_t) (BADGE_X * s.body.sx), y = s.body.by + (int32_t) (BADGE_Y * s.body.sy);
+    return (lv_area_t) {x - 16, y - 16, x + 16, y + 16};
 }
 
 /* The pieces of the mood's overlay this frame, one box each (with a margin for
@@ -276,39 +649,40 @@ static lv_area_t eyes_area(void)
 static int overlay_areas(lv_area_t out[MAX_OVERLAY_RECTS])
 {
     const float t = (float) s.t_ms / 1000.0f;
-    eye_box_t eyes[2];
-    eye_boxes(eyes);
     if (s.mood == EYES_MOOD_THINKING) {
         // The dots stay put and only fade: one box for the row.
-        out[0] = (lv_area_t) {CX - 40, CY + 140, CX + 40, CY + 160};
+        out[0] = (lv_area_t) {CX - 40, DOTS_Y - 10, CX + 40, DOTS_Y + 10};
         return 1;
     }
     if (s.mood == EYES_MOOD_ASLEEP) {
         for (int i = 0; i < 3; i++) {
             float p = fmodf(t * 0.35f + (float) i / 3.0f, 1.0f);
-            int32_t x = (int32_t) (330 + p * 55 + (float) i * 6);
-            int32_t y = (int32_t) (170 - p * 100);
-            out[i] = (lv_area_t) {x - 2, y - 2, x + 42, y + 50};
+            int32_t x = (int32_t) (Z_X + p * 30 + (float) i * 4);
+            int32_t y = (int32_t) (Z_Y - p * 60);
+            out[i] = (lv_area_t) {x - 2, y - 2, x + 30, y + 36};
         }
         return 3;
     }
     if (s.mood == EYES_MOOD_HOT) {
-        float dy = fmodf(t * 40, 60);
-        int32_t x = (int32_t) (eyes[1].cx + eyes[1].w / 2 + 22);
-        int32_t y = (int32_t) (eyes[1].cy - eyes[1].h / 2 + dy);
-        out[0] = (lv_area_t) {x - 12, y - 19, x + 12, y + 16};
+        int32_t y = (int32_t) (SWEAT_Y + fmodf(t * 40, 60));
+        out[0] = (lv_area_t) {SWEAT_X - 12, y - 19, SWEAT_X + 12, y + 16};
         return 1;
     }
     if (s.mood == EYES_MOOD_LOVING) {
         for (int i = 0; i < 2; i++) {
             float p = fmodf(t * 0.4f + (float) i * 0.5f, 1.0f);
             int32_t x = i == 0 ? CX - HEART_X : CX + HEART_X;
-            int32_t y = (int32_t) (CY - 40 - p * 90);
+            int32_t y = (int32_t) (CY - 40 * K - p * 90);
             out[i] = (lv_area_t) {x - 16, y - 10, x + 16, y + 19};
         }
         return 2;
     }
     return 0;
+}
+
+static bool areas_equal(const lv_area_t *a, const lv_area_t *b)
+{
+    return memcmp(a, b, sizeof(*a)) == 0;
 }
 
 /* Redraws where something was and where it is now: one box if the two touch
@@ -329,7 +703,10 @@ static void invalidate_move(const lv_area_t *was, const lv_area_t *now)
     }
 }
 
-/* Ease every number towards the mood; true if anything visibly moved. */
+/* ---- Easing --------------------------------------------------------------- */
+
+/* Ease every number towards the mood and the state; true if any of the
+ * eye's numbers visibly moved. */
 static bool step(void)
 {
     const eye_shape_t *want = &s_moods[s.mood];
@@ -337,12 +714,15 @@ static bool step(void)
     float *c = (float *) &s.cur;
     const float *w = (const float *) want;
     for (size_t i = 0; i < sizeof(eye_shape_t) / sizeof(float); i++) {
-        c[i] = lerp(c[i], w[i], i < 3 ? 0.10f : 0.16f);
+        c[i] = lerp(c[i], w[i], ease(0.16f));
+        if (fabsf(c[i] - w[i]) < 0.05f) {
+            c[i] = w[i]; // close enough: a still face stops redrawing
+        }
     }
 
     // Saccades: a new place to look every 1.2-3.6 s, unless held.
     if (!s.held) {
-        s.next_look_ms -= EYES_FRAME_MS;
+        s.next_look_ms -= s.dt_ms;
         if (s.next_look_ms <= 0) {
             s.next_look_ms = 1200 + (int32_t) (frand() * 2400);
             s.tgx = (frand() * 2 - 1) * 0.8f;
@@ -361,26 +741,26 @@ static bool step(void)
         }
     }
     const float gk = s.held ? 0.3f : 0.2f;
-    float gx = lerp(s.gx, s.tgx, gk);
-    float gy = lerp(s.gy, s.tgy, gk);
+    float gx = lerp(s.gx, s.tgx, ease(gk));
+    float gy = lerp(s.gy, s.tgy, ease(gk));
 
     // Blinks every 2.2-5.2 s, one in five doubled; none while asleep.
     if (s.mood != EYES_MOOD_ASLEEP) {
-        s.next_blink_ms -= EYES_FRAME_MS;
+        s.next_blink_ms -= s.dt_ms;
         if (s.next_blink_ms <= 0) {
             eyes_blink();
         }
     }
     float lid;
     if (s.blink_ms > 0) {
-        s.blink_ms -= EYES_FRAME_MS;
-        lid = lerp(s.lid, 0.06f, 0.55f);
+        s.blink_ms -= s.dt_ms;
+        lid = lerp(s.lid, 0.06f, ease(0.55f));
     } else {
-        lid = lerp(s.lid, 1.0f, 0.35f);
+        lid = lerp(s.lid, 1.0f, ease(0.35f));
     }
-    float squash = s.squash * 0.85f;
+    float squash = s.squash * powf(0.85f, s.frames);
     // Quick to rise with a syllable, slower to fall: it reads as talking.
-    float level = lerp(s.level, s.tlevel, s.tlevel > s.level ? 0.5f : 0.2f);
+    float level = lerp(s.level, s.tlevel, ease(s.tlevel > s.level ? 0.5f : 0.2f));
     if (level < 0.005f) {
         level = 0;
     }
@@ -392,52 +772,112 @@ static bool step(void)
     s.gy = gy;
     s.lid = lid;
     s.squash = squash < 0.002f ? 0 : squash;
+
+    // Here or far away, the tint and its colour.
+    if (s.mood == EYES_MOOD_ASLEEP) {
+        s.near = fmaxf(0, s.near - (float) s.dt_ms / SLEEP_AWAY_MS);
+    } else {
+        s.near = fminf(1, s.near + (float) s.dt_ms / SLEEP_BACK_MS);
+    }
+    const float want_tint = s.status == EYES_STATUS_IDLE ? 0 : 1;
+    s.tint = fabsf(want_tint - s.tint) < 0.01f ? want_tint : lerp(s.tint, want_tint, ease(0.12f));
+    if (s.status != EYES_STATUS_IDLE) {
+        const uint32_t rgb = s_status_rgb[s.status];
+        const float to[3] = {(float) (rgb >> 16), (float) ((rgb >> 8) & 0xFF), (float) (rgb & 0xFF)};
+        for (int i = 0; i < 3; i++) {
+            s.tint_rgb[i] = fabsf(to[i] - s.tint_rgb[i]) < 2 ? to[i] : lerp(s.tint_rgb[i], to[i], ease(0.15f));
+        }
+    }
+    // While working, the badge breathes.
+    s.badge_scale = s.status == EYES_STATUS_THINKING ? 0.89f + 0.11f * cosf((float) s.t_ms / 1000.0f * 5.2f) : 1;
+
+    hands_step();
     return moved;
 }
 
 static void frame_cb(lv_timer_t *timer)
 {
-    s.t_ms += EYES_FRAME_MS;
-    bool moved = step();
-    if (!moved && !has_overlay(s.mood) && s.over_count == 0) {
-        return;
-    }
-    // Snap values that are close enough, so a still face stops redrawing.
-    const eye_shape_t *want = &s_moods[s.mood];
-    float *c = (float *) &s.cur;
-    const float *w = (const float *) want;
-    for (size_t i = 0; i < sizeof(eye_shape_t) / sizeof(float); i++) {
-        if (fabsf(c[i] - w[i]) < 0.05f) {
-            c[i] = w[i];
-        }
-    }
-    if (moved || !s.eyes_valid) {
-        lv_area_t now = eyes_area();
-        if (s.eyes_valid) {
-            invalidate_move(&s.eyes_drawn, &now);
+    const uint32_t elapsed = lv_tick_elaps(s.last_tick);
+    s.last_tick = lv_tick_get();
+    s.dt_ms = (int32_t) LV_CLAMP(1, elapsed, EYES_MAX_STEP_MS);
+    s.frames = (float) s.dt_ms / EYES_FRAME_MS;
+    s.t_ms += (uint32_t) s.dt_ms;
+    const bool eyes_moved = step();
+
+    const body_vis_t was = s.body;
+    body_layout(&s.body);
+    eye_layout();
+
+    // The body: the sphere, the tint, the halo.
+    const bool body_changed = !s.body_valid || memcmp(&was, &s.body, sizeof(was)) != 0;
+    if (body_changed) {
+        lv_area_t now = body_area(&s.body);
+        if (s.body_valid) {
+            invalidate_move(&s.body_drawn, &now);
         } else {
             lv_obj_invalidate_area(s.obj, &now);
         }
-        s.eyes_drawn = now;
-        s.eyes_valid = true;
+        s.body_drawn = now;
+        s.body_valid = true;
     }
+
+    // The eyes: a new picture only when their shape changed.
+    for (int i = 0; i < 2; i++) {
+        eye_sprite_t *es = &s.eye_sp[i];
+        int32_t key[5];
+        eye_key(&s.eye[i], key);
+        const bool reshaped = memcmp(key, es->key, sizeof(key)) != 0;
+        if (reshaped) {
+            memcpy(es->key, key, sizeof(key));
+            eye_render(es, &s.eye[i]);
+        }
+        lv_area_t now = eye_area(i);
+        if (!es->valid || reshaped || eyes_moved || !areas_equal(&now, &es->drawn)) {
+            if (es->valid) {
+                invalidate_move(&es->drawn, &now);
+            } else {
+                lv_obj_invalidate_area(s.obj, &now);
+            }
+            es->drawn = now;
+            es->valid = true;
+        }
+    }
+
+    // The hands, each on its own.
+    for (int i = 0; i < 2; i++) {
+        lv_area_t now = hand_area(i);
+        if (!areas_equal(&now, &s.hand_drawn[i]) || s.gesture != EYES_GESTURE_NONE) {
+            invalidate_move(&s.hand_drawn[i], &now);
+            s.hand_drawn[i] = now;
+        }
+    }
+
+    // The badge breathes without redrawing the whole sphere.
+    if (s.status == EYES_STATUS_THINKING && s.tint > 0.01f) {
+        lv_area_t now = badge_area();
+        invalidate_move(&s.badge_drawn, &now);
+        s.badge_drawn = now;
+    }
+
     // Each overlay piece against its own last place; a piece the mood no
     // longer has is cleared once.
-    lv_area_t over[MAX_OVERLAY_RECTS];
-    int n = overlay_areas(over);
-    for (int i = 0; i < LV_MAX(n, s.over_count); i++) {
-        if (i < n && i < s.over_count) {
-            invalidate_move(&s.over_drawn[i], &over[i]);
-        } else if (i < n) {
-            lv_obj_invalidate_area(s.obj, &over[i]);
-        } else {
-            lv_obj_invalidate_area(s.obj, &s.over_drawn[i]);
+    if (has_overlay(s.mood) || s.over_count > 0) {
+        lv_area_t over[MAX_OVERLAY_RECTS];
+        int n = overlay_areas(over);
+        for (int i = 0; i < LV_MAX(n, s.over_count); i++) {
+            if (i < n && i < s.over_count) {
+                invalidate_move(&s.over_drawn[i], &over[i]);
+            } else if (i < n) {
+                lv_obj_invalidate_area(s.obj, &over[i]);
+            } else {
+                lv_obj_invalidate_area(s.obj, &s.over_drawn[i]);
+            }
+            if (i < n) {
+                s.over_drawn[i] = over[i];
+            }
         }
-        if (i < n) {
-            s.over_drawn[i] = over[i];
-        }
+        s.over_count = n;
     }
-    s.over_count = n;
 }
 
 lv_obj_t *eyes_create(lv_obj_t *parent)
@@ -448,6 +888,19 @@ lv_obj_t *eyes_create(lv_obj_t *parent)
     s.lid = 0.02f; // opens on the first frames
     s.next_blink_ms = 2500;
     s.next_look_ms = 1500;
+    s.near = 1;
+    s.badge_scale = 1;
+    s.last_tick = lv_tick_get();
+    s.hand[0] = (hand_pose_t) TUCK_L;
+    s.hand[1] = (hand_pose_t) TUCK_R;
+    for (int i = 0; i < 2; i++) {
+        look_sprite_t *sp = &s.eye_sp[i].sp;
+        sp->img.header.magic = LV_IMAGE_HEADER_MAGIC;
+        sp->img.header.cf = LV_COLOR_FORMAT_ARGB8888;
+        sp->img.data = heap_caps_calloc(1, EYE_BUF_W * EYE_BUF_H * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s.eye_sp[i].key[0] = -1; // drawn on the first frame
+        s.hand_drawn[i] = hand_area(i);
+    }
 
     lv_obj_set_style_bg_color(parent, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
@@ -511,4 +964,39 @@ void eyes_blink(void)
 {
     s.blink_ms = 120;
     s.next_blink_ms = frand() < 0.2f ? 300 : 2200 + (int32_t) (frand() * 3000);
+}
+
+void eyes_set_status(eyes_status_t status)
+{
+    if (status <= EYES_STATUS_ERROR) {
+        if (s.status == EYES_STATUS_IDLE && s.tint < 0.05f && status != EYES_STATUS_IDLE) {
+            // From nothing: start in the new colour rather than fade from the old one.
+            const uint32_t rgb = s_status_rgb[status];
+            s.tint_rgb[0] = (float) (rgb >> 16);
+            s.tint_rgb[1] = (float) ((rgb >> 8) & 0xFF);
+            s.tint_rgb[2] = (float) (rgb & 0xFF);
+        }
+        s.status = status;
+    }
+}
+
+eyes_status_t eyes_get_status(void)
+{
+    return s.status;
+}
+
+void eyes_gesture(eyes_gesture_t gesture)
+{
+    if (gesture >= EYES_GESTURE_COUNT) {
+        return;
+    }
+    s.hand_from[0] = s.hand[0];
+    s.hand_from[1] = s.hand[1];
+    s.gesture = gesture;
+    s.gesture_ms = 0;
+}
+
+const char *eyes_gesture_name(eyes_gesture_t gesture)
+{
+    return gesture < EYES_GESTURE_COUNT ? s_gestures[gesture].name : "?";
 }

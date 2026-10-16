@@ -1,11 +1,12 @@
 #pragma once
 
-/* Yoru's face: two glowing eyes on black, nothing else (docs/CONCEPT.md).
- * A mood is a set of targets (shape, lids, tilt, colour) the eyes ease
- * towards; blinks, saccades, squash and the small overlays (thinking dots,
- * z's, a sweat drop, hearts) run on top. This module only draws: pet.c
- * decides what Yoru feels and behaviour.c turns it into moods here. All calls with the LVGL
- * lock held. */
+/* Yoru on screen (docs/CONCEPT.md): a matte sphere with two small dark eyes
+ * and two floating hands, in the middle of the black disc. A mood is a set
+ * of targets (eye shape, lids, tilt) the eyes ease towards; blinks, saccades,
+ * squash, gestures, the state tint, drifting away to sleep and the overlays
+ * (thinking dots, z's, a sweat drop, hearts) run on top. The pictures come
+ * from look.c; this module only places and moves them. pet.c decides what Yoru feels and
+ * behaviour.c turns it into calls here. All calls with the LVGL lock held. */
 
 #include <stdbool.h>
 
@@ -34,8 +35,30 @@ typedef enum {
     EYES_MOOD_COUNT,
 } eyes_mood_t;
 
+/* What the tint, the halo and the badge say. */
+typedef enum {
+    EYES_STATUS_IDLE,
+    EYES_STATUS_THINKING, // blue
+    EYES_STATUS_DONE,     // green
+    EYES_STATUS_ERROR,    // red
+} eyes_status_t;
+
+/* The hands' gestures. Each plays once: the hands pop out, do it and tuck
+ * back behind the body. */
+typedef enum {
+    EYES_GESTURE_NONE,
+    EYES_GESTURE_WAVE,
+    EYES_GESTURE_POINT,
+    EYES_GESTURE_COVER,   // both hands over the eyes, then one slides down to peek
+    EYES_GESTURE_THINK,   // a hand under the chin
+    EYES_GESTURE_CLAP,
+    EYES_GESTURE_STRETCH, // hands far out, the body stretched tall
+    EYES_GESTURE_COUNT,
+} eyes_gesture_t;
+
 /** Build the face on `parent` (a full screen). Returns the object that
- * covers the screen, for touch events. The eyes open from closed. */
+ * covers the screen, for touch events. The eyes open from closed. Needs
+ * look_init() first. */
 lv_obj_t *eyes_create(lv_obj_t *parent);
 
 /** The same mood again changes nothing, so it can be set every tick. */
@@ -53,9 +76,17 @@ void eyes_look_around(void);
  * speaking): the eyes swell a little with it. 0 when nobody talks. */
 void eyes_set_level(float level);
 
-/** A poke: the eyes squash and spring back. */
+/** A poke: the body squashes and springs back. */
 void eyes_poke(void);
 void eyes_blink(void);
+
+/** Fade the tint, halo and badge to a status. */
+void eyes_set_status(eyes_status_t status);
+eyes_status_t eyes_get_status(void);
+
+/** Play a gesture now, replacing the one playing. */
+void eyes_gesture(eyes_gesture_t gesture);
+const char *eyes_gesture_name(eyes_gesture_t gesture);
 
 #ifdef __cplusplus
 }

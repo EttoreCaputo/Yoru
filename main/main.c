@@ -15,6 +15,7 @@
 #include "freertos/idf_additions.h"
 #include "freertos/task.h"
 #include "link.h"
+#include "look.h"
 #include "lvgl_port.h"
 #include "metrics_io.h"
 #include "metrics_model.h"
@@ -128,6 +129,8 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(lvgl_port_init(&s_lcd, &s_display));
 
+    // The sphere and the hands, rendered once into PSRAM.
+    ESP_ERROR_CHECK(look_init());
     lvgl_port_lock();
     lv_obj_t *face = eyes_create(lv_display_get_screen_active(s_display));
     lvgl_port_unlock();
