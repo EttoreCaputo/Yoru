@@ -108,6 +108,8 @@ static cJSON *identity(void)
     // Eyes that follow the host's pointer.
     cJSON_AddItemToArray(caps, cJSON_CreateString("gaze"));
     cJSON_AddItemToArray(caps, cJSON_CreateString("wifi"));
+    // The coding agents' tools and notifications (docs/protocol.md, Agents).
+    cJSON_AddItemToArray(caps, cJSON_CreateString("agents"));
     if (voice_available()) {
         cJSON_AddItemToArray(channels, cJSON_CreateString("audio_up"));
         cJSON_AddItemToArray(caps, cJSON_CreateString("voice"));

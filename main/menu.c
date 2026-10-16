@@ -5,6 +5,8 @@
 #include <string.h>
 #include <strings.h>
 
+#include "agents.h"
+#include "agents_ui.h"
 #include "board.h"
 #include "board_pmu.h"
 #include "board_settings.h"
@@ -103,6 +105,10 @@ static void info_company(char *out, size_t len);
 static void info_curiosity(char *out, size_t len);
 static void info_doing(char *out, size_t len);
 static void act_snack(void);
+static void info_agents(char *out, size_t len);
+static void info_quiet(char *out, size_t len);
+static void act_agents(void);
+static void act_quiet(void);
 static void act_power_off(void);
 static void act_restart(void);
 static void act_factory_reset(void);
@@ -121,6 +127,15 @@ static const item_t YORU_ITEMS[] = {
     INFO("Company", "Compagnia", info_company),
     INFO("Curiosity", "Curiosita", info_curiosity),
     ACT("Give a firefly", "Dai una lucciola", K_TAP, act_snack, NULL),
+};
+/* What the coding agents on the computer do, on Yoru (agents_ui.c). */
+static const item_t AGENTS_ITEMS[] = {
+    ACT("Open the agents", "Apri gli agenti", K_TAP, act_agents, info_agents),
+    ACT("Quiet for 1 hour", "Silenzio per 1 ora", K_TAP, act_quiet, info_quiet),
+    SET("Dots on the rim", "Puntini sul bordo", K_SWITCH, SETTING_AGENTS_RING, F_NONE),
+    SET("Steps at the bottom", "Passi in basso", K_SWITCH, SETTING_AGENTS_TICKER, F_NONE),
+    SET("Agent sounds", "Suoni degli agenti", K_SWITCH, SETTING_AGENTS_SOUNDS, F_NONE),
+    SET("BOOT button", "Tasto BOOT", K_SWITCH, SETTING_BOOT_KEY, F_NONE),
 };
 static const item_t DISPLAY_ITEMS[] = {
     SET("Brightness", "Luce", K_ARC, SETTING_BRIGHTNESS, F_PCT),
@@ -175,6 +190,7 @@ static const item_t ABOUT_ITEMS[] = {
 #define CAT(en, it, icon, items) {en, it, icon, items, sizeof(items) / sizeof(items[0])}
 static const category_t CATEGORIES[] = {
     CAT("Yoru", "Yoru", LV_SYMBOL_HOME, YORU_ITEMS),
+    CAT("Agents", "Agenti", LV_SYMBOL_KEYBOARD, AGENTS_ITEMS),
     CAT("Display", "Schermo", LV_SYMBOL_IMAGE, DISPLAY_ITEMS),
     CAT("Sound", "Suono", LV_SYMBOL_VOLUME_MAX, SOUND_ITEMS),
     CAT("Behaviour", "Carattere", LV_SYMBOL_EYE_OPEN, BEHAVIOUR_ITEMS),
@@ -441,6 +457,41 @@ static void snack_cb(lv_timer_t *t)
     // Out of the menu first: the firefly is for Yoru to chase.
     menu_close();
     life_feed();
+}
+
+static void info_agents(char *out, size_t len)
+{
+    agents_summary_t sum;
+    agents_summary(&sum);
+    if (sum.n == 0) {
+        snprintf(out, len, "%s", tr("None running", "Nessuno al lavoro"));
+    } else if (sum.waiting > 0) {
+        snprintf(out, len, tr("%d, %d waiting for you", "%d, %d ti aspettano"), sum.n, sum.waiting);
+    } else {
+        snprintf(out, len, tr("%d, %d working", "%d, %d al lavoro"), sum.n, sum.working);
+    }
+}
+
+static void info_quiet(char *out, size_t len)
+{
+    agents_summary_t sum;
+    agents_summary(&sum);
+    if (sum.quiet_min > 0) {
+        snprintf(out, len, tr("On, %d min left: tap to end", "Attivo, %d min: tocca per finire"), sum.quiet_min);
+    } else {
+        out[0] = '\0';
+    }
+}
+
+static void act_agents(void)
+{
+    // The menu goes as the view comes (agents_ui_open closes it).
+    agents_ui_open();
+}
+
+static void act_quiet(void)
+{
+    agents_ui_shortcut("quiet", NULL);
 }
 
 static void act_snack(void)
@@ -898,6 +949,7 @@ void menu_open(void)
     if (s.open) {
         return;
     }
+    agents_ui_close(); // one thing over the eyes at a time
     s.open = true;
     lv_display_trigger_activity(NULL);
     build_ring();

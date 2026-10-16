@@ -119,6 +119,15 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 - PC data and Claude Code usage drive moods.
 - MCP tools: react, say, show a message.
 
+### M4b: the agents' companion (in since 0.7.0)
+
+Yoru is the physical side of the coding agents on the computer, the way the coucou notch app is on the screen: it shows what they are doing, lets them be answered without going back to the terminal, and gets you to the right terminal. Nothing else (no chat, no service pills): the host does the agents' bookkeeping, Yoru shows it.
+- On the board: a dot per session on the rim (`agents_ui.c`), coloured by its state; the step ticker over the bottom rim and the host's toasts; the agents view (swipe up from the bottom edge, BOOT, the menu) with each session's task and last steps, tap for its terminal, hold to interrupt, quiet for an hour, and the plan's limits.
+- Cards: permission requests with Always, refusing blind allows of a request cut to fit (`approval.c`); questions with their choices (`question.c`); both on `card.c`.
+- Yoru reacts: blue while an agent works, a nod when it finishes, a wince when it fails, a knock on the glass while one waits for you (`life_call`).
+- The host side (Companion Hub): hooks for Claude Code, Codex, Gemini CLI, Cursor and OpenCode; `set_agents`, `show_question`, the `shortcut` notification. The protocol is in `docs/protocol.md` (Agents, Questions, Shortcuts).
+- Next: Anthropic's Hardware Buddy BLE protocol, so Yoru also works with Claude Desktop and Cowork without the hub (Bluetooth next to WiFi and ESP-SR needs its internal RAM measured first).
+
 ### M5: character
 - Behaviour scheduler: in since 0.6.0 (`needs.c`, `life.c`). Five needs (rest, food, fun, company, curiosity) and acts chosen by how well they meet them: floating about, exploring, hunting fireflies, asking for you, three kinds of play, daydreaming, sulking, dancing, naps and waking up rested. Still to do: the late-night notice, and acts made from data (M6).
 - Depth: in since 0.6.0. Yoru moves through a space in perspective (`eyes_move`, `eyes_follow`), the sphere rendered at any size on demand (`look_ball`).

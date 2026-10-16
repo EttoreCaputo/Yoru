@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "agents.h"
 #include "audio_selftest.h"
 #include "behaviour.h"
 #include "board_audio.h"
@@ -189,6 +190,7 @@ void app_main(void)
     board_settings_init();
     board_settings_on_change(on_setting);
     metrics_model_init();
+    agents_init();
     pet_init();
     pet_set_reactions(board_settings_on(SETTING_PET_REACTIONS));
     ears_set_on(board_settings_on(SETTING_PET_HEARING));

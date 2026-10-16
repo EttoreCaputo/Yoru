@@ -95,6 +95,8 @@ static struct {
     int ignored;
     bool answered;
     need_t ask_for;
+    /* This ask is for a coding agent waiting on you, not for a need. */
+    bool agent;
     uint32_t next_wake_check;
 } L;
 
@@ -203,6 +205,7 @@ static void start(act_t act)
     L.act = act;
     L.phase = 0;
     L.count = 0;
+    L.agent = false;
     L.act_ms = L.now;
     L.wait_until = L.now;
     L.base = resting();
@@ -591,6 +594,9 @@ static void ask(void)
         const float u_fun = 1 - needs_get(NEED_FUN) - 0.5f;
         L.ask_for = u_food >= u_company && u_food >= u_fun ? NEED_FOOD : u_company >= u_fun ? NEED_COMPANY : NEED_FUN;
         L.base = L.ask_for == NEED_FOOD ? EYES_MOOD_SAD : L.ask_for == NEED_FUN ? EYES_MOOD_BORED : EYES_MOOD_NEUTRAL;
+        if (L.agent) {
+            L.base = EYES_MOOD_CURIOUS; // not for itself: someone on the computer asks
+        }
         L.answered = false;
         // Up to the glass, its face filling the screen.
         eyes_move_to(0, 22 * ASK_Z, ASK_Z, 1400, EYES_PATH_GLIDE);
@@ -607,7 +613,13 @@ static void ask(void)
             const eyes_pos_t taps[] = {at(0, 22, 0.54f), at(0, 22, ASK_Z), at(0, 22, 0.54f), at(0, 22, ASK_Z)};
             eyes_move(taps, 4, 700, EYES_PATH_GLIDE);
         }
-        if (L.ask_for == NEED_FOOD) {
+        if (L.agent) {
+            // Pointing back at the computer: something there needs you.
+            eyes_gesture(EYES_GESTURE_POINT);
+            if (L.ctx.agent_sounds) {
+                say(SOUND_HMM);
+            }
+        } else if (L.ask_for == NEED_FOOD) {
             say(SOUND_WHIMPER);
         } else if (L.ask_for == NEED_COMPANY) {
             eyes_gesture(EYES_GESTURE_WAVE);
@@ -633,12 +645,19 @@ static void ask(void)
         if (waiting()) {
             // Hungry, it keeps glancing down at the black beside it: a
             // firefly would go there.
-            if (L.ask_for == NEED_FOOD && ((L.now - L.act_ms) / 2500) % 2 == 1) {
+            if (!L.agent && L.ask_for == NEED_FOOD && ((L.now - L.act_ms) / 2500) % 2 == 1) {
                 eyes_look_at(0.7f, 0.8f);
             } else {
                 eyes_look_at(0, -0.12f);
             }
             return;
+        }
+        if (L.agent) {
+            // Not its own need: no hard feelings, back to waiting.
+            eyes_look_around();
+            eyes_move_to(0, 0, 1, 1800, EYES_PATH_GLIDE);
+            next(3);
+            break;
         }
         // Nobody came.
         L.ignored++;
@@ -1148,6 +1167,24 @@ bool life_feed(void)
     start(ACT_SNACK);
     wait_ms(1500);
     return true;
+}
+
+bool life_call(void)
+{
+    L.now = lv_tick_get();
+    if (L.act == ACT_SLEEP || L.act == ACT_SNACK || (L.act == ACT_ASK && L.phase < 3)
+        || (L.act == ACT_NAP && L.phase >= 2)) {
+        return false;
+    }
+    eyes_mote_hide();
+    start(ACT_ASK);
+    L.agent = true;
+    return true;
+}
+
+bool life_calling(void)
+{
+    return L.act == ACT_ASK && L.agent && L.phase >= 1 && L.phase < 3;
 }
 
 const char *life_activity(void)

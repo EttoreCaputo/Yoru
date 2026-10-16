@@ -9,10 +9,11 @@ Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main
 `hello` and `ready` answer:
 
 ```json
-{"protocol":2,"firmware":"0.3.0","idf":"v6.1","board":"yoru-amoled-1.75c","id":"7c0c5f4233e4","transport":"usb","max_payload":4096,"channels":["ctrl","metrics","log","audio_up","audio_down"],"capabilities":["tools","gaze","wifi","voice","speaker"]}
+{"protocol":2,"firmware":"0.3.0","idf":"v6.1","board":"yoru-amoled-1.75c","id":"7c0c5f4233e4","transport":"usb","max_payload":4096,"channels":["ctrl","metrics","log","audio_up","audio_down"],"capabilities":["tools","gaze","wifi","voice","speaker","agents"]}
 ```
 
 - `board` is `yoru-amoled-1.75c`; a host tells Yoru from DualEye by it.
+- `agents` (0.7.0 and later): the board has the agent tools and notifications below (`set_agents`, `show_toast`, `show_question`, `hide_question`, `show_approval` with `always` and `full`, the `answer` and `shortcut` notifications). A host sends them only to boards that list it; older ones get approvals only.
 - There is no `media` or `music` capability: Yoru has no image or music face, so `media/...` and `music/...` answer `-32601`.
 - `eyes/gaze` turns Yoru's eyes towards the host's pointer for 6 s after the last one, unless a finger is on the screen, a conversation is on or it is asleep.
 - `voice/state` drives the eyes: `listening` (wide, looking at you), `thinking` (dots), `speaking` (warm, swelling with the speaker's level), `error` (sad). The wake word wakes Yoru up if it was asleep.
@@ -56,25 +57,96 @@ Settings are kept in NVS and survive a reboot.
 | `show_menu` | `open`: boolean, `page`: `yoru` (its needs, since 0.6.0) · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the settings menu on the ring or on a page, or close it |
 | `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Show a Claude Code permission request over the eyes with Allow and Deny (see below). A second call replaces it |
 | `hide_approval` | `id`: string | Take that request away: it was answered in the app or the terminal, or gave up. An `id` that isn't shown is fine |
+| `set_agents` | `sessions`: array, `quiet_min`: integer, `focus`: boolean | Since 0.7.0. What every coding agent session on the computer is doing (see Agents) |
+| `show_toast` | `text`: string, `seconds`: integer, `tone`?: `info` · `done` · `wait` · `error` | Since 0.7.0. One line above the bottom rim for a few seconds: an agent finished, needs you, the plan's limits. A second call replaces it |
+| `show_question` | `id`, `project`?, `seconds`, `questions` | Since 0.7.0. An agent's question with its choices (see Questions). A second call replaces it |
+| `hide_question` | `id`: string | Since 0.7.0. Take that question away. An `id` that isn't shown is fine |
+
+The agent tools (`show_approval`, `hide_approval`, `set_agents`, `show_toast`, `show_question`, `hide_question`) are for the host only: Companion Hub keeps them out of its MCP server.
 
 ## Approvals
 
-Companion Hub holds Claude Code's permission requests (its `PermissionRequest` hook) while the user turns on "Answer permissions in the app and on Yoru". Each one goes to every connected Yoru with `show_approval`:
+Companion Hub holds Claude Code's (and Codex's) permission requests (the `PermissionRequest` hook) while the user turns on "Answer permissions in the app and on Yoru". Each one goes to every connected Yoru with `show_approval`:
 
 ```json
-{"id":"p3","tool":"Bash","text":"cargo test --workspace","project":"companion-hub","seconds":120}
+{"id":"p3","tool":"Bash","text":"cargo test --workspace","project":"companion-hub","seconds":120,"always":true,"full":true}
 ```
 
 - `text` is what the tool would do: a command's first line, a file name, a pattern; at most 72 characters, UTF-8.
-- `seconds` is how long the host waits before Claude Code asks in its own terminal; the board can show it running down, and drops the card by itself once it's over.
-- The card offers Allow and Deny. A tap sends the `approval` notification and closes the card:
+- `seconds` is how long the host waits before the agent asks in its own terminal; the board shows it running down, and drops the card by itself once it's over.
+- `always` (0.7.0, default false): the agent offered rules to remember the choice (Claude Code's `permission_suggestions`). The card then has Always besides Allow and Deny.
+- `full` (0.7.0, default true): `text` is the whole request. When it isn't (a long or multi-line command, cut to fit), the board doesn't let it be allowed blind: it shows Deny and "Answer on the computer" instead of Allow and Always.
+- A tap sends the `approval` notification and closes the card:
 
 ```json
-{"jsonrpc":"2.0","method":"approval","params":{"id":"p3","allow":true}}
+{"jsonrpc":"2.0","method":"approval","params":{"id":"p3","decision":"always","allow":true}}
 ```
 
+- `decision` is `allow`, `deny` or `always` (0.7.0). `allow` is still sent for hosts that predate it: true for allow and always.
 - The first answer wins, from the app, the board or the terminal; the host sends `hide_approval` to every board once the request is over, whoever answered.
 - Firmware without the tools answers with an error (`-32602`, unknown tool); the host ignores it and the request is still answered in the app.
-- On the board (0.5.4 and later): the tool's name and `text` above Yoru, Deny and Allow below it with the project and the seconds left, and a ring along the rim running them down. The fonts are ASCII: accented letters lose their accents and other characters show as `?`. An `id` is at most 47 bytes. While a card is up the screen takes no pokes, `show_menu` is refused and PWR doesn't put Yoru to sleep; Yoru wakes up, shrinks and glances between the request and the buttons.
+- On the board (0.5.4 and later): the tool's name and `text` above Yoru, Deny and Allow below it (Always under them since 0.7.0) with the project and the seconds left, and a ring along the rim running them down. The fonts are ASCII: accented letters lose their accents and other characters show as `?`. An `id` is at most 47 bytes. While a card is up the screen takes no pokes, `show_menu` is refused and PWR doesn't put Yoru to sleep; Yoru wakes up, shrinks and glances between the request and the buttons.
 
-DualEye's `set_face`, `set_rotation` (here the `rotation` setting), `show_text` and `set_eyes` are not there: one screen, no faces. Showing a message comes back in M4.
+## Questions
+
+Since 0.7.0. When an agent asks the user to choose (Claude Code's `AskUserQuestion`), the host holds it (a waiting `PreToolUse` hook) and sends it to every Yoru:
+
+```json
+{"id":"q4","project":"yoru","seconds":120,"questions":[
+  {"header":"Auth","question":"Which login method should we use?","multi":false,"options":["OAuth","Magic link","Password"]},
+  {"header":"Extras","question":"What else do you want?","multi":true,"options":["Remember me","2FA"]}]}
+```
+
+- 1 to 4 questions, each with 2 to 4 `options`. `header` is at most 12 characters, an option at most 40, a question at most 120. The host sends a question it can't fit (too many, too long) to the terminal instead of the board.
+- The card shows one question at a time with its options; `multi` ones toggle and have Send. A small "Terminal" link gives up and lets the agent ask in its terminal.
+- The answer is the indexes picked for each question, in order:
+
+```json
+{"jsonrpc":"2.0","method":"answer","params":{"id":"q4","answers":[[0],[0,1]]}}
+{"jsonrpc":"2.0","method":"answer","params":{"id":"q4","terminal":true}}
+```
+
+- As with approvals, the first answer wins and the host sends `hide_question` once it's over. The card goes by itself when `seconds` run out.
+
+## Agents
+
+Since 0.7.0. The host follows every coding agent session it has hooks for (Claude Code, Codex, Gemini CLI, Cursor, OpenCode) and keeps Yoru up to date with `set_agents`: on every change (at most 4 times a second), on connect, and every 10 s even when nothing changed. Without one for 30 s the board forgets the sessions.
+
+```json
+{"quiet_min":0,"focus":true,"sessions":[
+  {"id":"s1","agent":"claude","project":"yoru","state":"wait","task":"Add the agents view","since_s":312,
+   "steps":[{"kind":"edit","text":"main/agents.c","add":42,"del":3,"ok":true},{"kind":"run","text":"idf.py build"}]},
+  {"id":"s2","agent":"codex","project":"companion-hub","state":"work","task":"Fix the hooks","since_s":40,"steps":[]}]}
+```
+
+- `sessions`: at most 6, the most urgent first (`wait`, `error`, `work`, `done`, `idle`), then the most recent.
+  - `id`: the host's short id for the session, at most 15 bytes. The board sends it back in `shortcut`.
+  - `agent`: `claude`, `codex`, `gemini`, `cursor`, `opencode`, or another short name.
+  - `project`: the folder's name, at most 40 characters.
+  - `state`: `work` (a turn is running), `wait` (it needs you: a permission or a question), `error` (the last turn failed), `done` (the turn ended), `idle` (started, nothing asked yet).
+  - `task`: the prompt that started the turn, at most 72 characters.
+  - `since_s`: seconds since the state began.
+  - `steps`: the last 3, oldest first. `kind` is `read`, `edit`, `write`, `run`, `search`, `web`, `agent`, `ask` or `other`; `text` at most 48 characters; `add` and `del` the lines added and removed by an edit; `ok` false when the step failed.
+- `quiet_min`: minutes left of "do not disturb agents", 0 when off. While quiet the board plays no agent sounds and doesn't knock; cards still come.
+- `focus`: the host can bring a session's terminal to the front (and interrupt it).
+- The whole call stays under the 4096-byte payload.
+
+The board shows them on the rim (one segment per session, coloured by state), in a ticker over the bottom rim, and in the agents view (swipe up from the bottom edge, or the BOOT button).
+
+### Shortcuts
+
+The board asks the host for an action with the `shortcut` notification:
+
+```json
+{"jsonrpc":"2.0","method":"shortcut","params":{"name":"focus","session":"s1"}}
+```
+
+| `name` | `session` | The host |
+|---|---|---|
+| `focus` | optional | Brings that session's terminal to the front; without one, the session waiting the longest, else the latest |
+| `interrupt` | required | Brings the terminal to the front and presses Esc in it, which stops the agent's turn |
+| `quiet` | none | Turns "do not disturb agents" on for 60 minutes, or off when it's on; the next `set_agents` carries the new `quiet_min` |
+
+The host answers nothing; what changes shows in the next `set_agents`. A host that can't do it (no terminal recorded, no permission to press keys) says so with `show_toast` (`tone` `error`).
+
+DualEye's `set_face`, `set_rotation` (here the `rotation` setting), `show_text` and `set_eyes` are not there: one screen, no faces. Short messages go through `show_toast`.

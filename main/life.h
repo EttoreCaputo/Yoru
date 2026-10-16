@@ -38,6 +38,8 @@ typedef struct {
     /* Night by the host's clock. */
     bool night;
     bool music;
+    /* Its sounds for the coding agents are on (and not quiet). */
+    bool agent_sounds;
 } life_ctx_t;
 
 typedef enum {
@@ -66,6 +68,14 @@ bool life_tap(int32_t x, int32_t y);
 /** A snack from the menu or the host: a firefly comes in from the edge.
  * False if it can't now (asleep, busy). */
 bool life_feed(void);
+
+/** A coding agent waits for you: it comes up to the glass, knocks and
+ * points, as when it asks for itself. False if it can't now (asleep,
+ * eating, already asking). */
+bool life_call(void);
+
+/** It is at the glass for an agent right now: a touch means "I'm coming". */
+bool life_calling(void);
 
 /** What it is doing, for get_pet. */
 const char *life_activity(void);

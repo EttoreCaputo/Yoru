@@ -44,6 +44,10 @@ static const setting_info_t INFO[SETTING_COUNT] = {
     [SETTING_LANGUAGE] = {"language", 0, 1, 0},
     [SETTING_WAKE_SOUND] = {"wake_sound", 0, 1, 1},
     [SETTING_LCD_FAST] = {"lcd_80mhz", 0, 1, 0},
+    [SETTING_AGENTS_RING] = {"agents_ring", 0, 1, 1},
+    [SETTING_AGENTS_TICKER] = {"agents_ticker", 0, 1, 1},
+    [SETTING_AGENTS_SOUNDS] = {"agents_sounds", 0, 1, 1},
+    [SETTING_BOOT_KEY] = {"boot_key", 0, 1, 1},
 };
 
 static SemaphoreHandle_t s_lock;

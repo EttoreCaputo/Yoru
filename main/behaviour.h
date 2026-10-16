@@ -25,7 +25,13 @@
  *   shaken or spun it gets dizzy, knocked it's poked, two knocks call it,
  *   rocked it gets drowsy, dropped it panics, face down it sleeps with the
  *   mic off; it leans with the case, and turns to a sudden sound;
- * - PWR puts it to sleep and wakes it; at night the screen is dimmer. */
+ * - PWR puts it to sleep and wakes it; at night the screen is dimmer;
+ * - the coding agents on the computer (agents.c): a nod when a turn ends, a
+ *   wince when one fails, a blue tint while one works; while one waits for
+ *   you it knocks on the glass, and a touch then brings its terminal up;
+ *   their permission requests and questions (approval.c, question.c) wake it
+ *   and it waits with you; a swipe up from the bottom edge, or BOOT, opens
+ *   the agents view (agents_ui.c). */
 
 #include "lvgl.h"
 #include "motion.h"
@@ -66,6 +72,11 @@ bool behaviour_feed(void);
 /** A short press of PWR (board_pmu.c's callback): to sleep and back, or
  * out of the menu. Takes the LVGL lock. */
 void behaviour_power_key(void);
+
+/** BOOT pressed (board_button.c): the terminal of the agent waiting on you,
+ * else the agents view; held, the host's "do not disturb agents". With the
+ * LVGL lock held. */
+void behaviour_boot_key(bool long_press);
 
 /** Where the host's pointer is, -1..1 each way (rpc.c's eyes/gaze). Safe
  * from any task. */

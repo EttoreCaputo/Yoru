@@ -1,5 +1,19 @@
 # Firmware changelog
 
+## 0.7.0
+
+Yoru keeps an eye on your coding agents: Claude Code, Codex, Gemini CLI, Cursor and OpenCode, through Companion Hub.
+
+- **A dot for each agent.** Along the top of the rim, one dot per session on the computer: blue and breathing while it works, amber and pulsing when it needs you, green when it's done, red when something failed.
+- **What it's doing, at the bottom.** While an agent works, the step it's on shows over the bottom rim ("edit agents.c +42 -3", "run idf.py build"), in red if it failed. Companion Hub's messages (it finished, it needs you, the plan's limits are running out) show there too.
+- **The agents view.** Swipe up from the bottom edge, press BOOT, or open Agents in the menu: every session with its project, what you asked it, its last step and how long ago. Tap one and its terminal comes to the front on the computer. Hold it, then tap again, and the agent is interrupted (as pressing Esc there). "Quiet for 1 hour" stops the agents' sounds, alerts and knocks for an hour; tap it again to end it. Below, the Claude plan's 5-hour and weekly limits. Swipe right or down, or tap the title, to close it.
+- **BOOT is a shortcut.** A press brings up the terminal of the agent waiting for you, or the agents view when none is waiting. Held for a second, it turns "quiet" on or off. It can be switched off in Agents.
+- **Always.** When Claude Code offers to remember a permission, the card has Always under Deny and Allow. A request too long to show in full (a long or multi-line command) can only be denied on Yoru: "On computer" means you read all of it there before allowing it.
+- **Questions.** When an agent asks you to choose (Claude Code's questions with options), Yoru shows the question and its choices: tap one, or tick several and Send. With more than one question it goes through them in turn. "Terminal" lets you answer there instead.
+- **Yoru reacts to them.** Tinted blue while an agent works, it claps when a turn ends and winces when one fails. When an agent waits for you and no card is up, it comes to the glass, knocks and points at the computer, every minute until you answer; touching it then brings that terminal to the front. While an agent waits, Yoru's own whims step back.
+- **Agents in the menu,** second on the ring: open the view, quiet for an hour, and switches for the dots, the steps at the bottom, the agents' sounds and the BOOT button.
+- For Companion Hub: the `agents` capability, the `set_agents`, `show_toast`, `show_question` and `hide_question` tools, `always` and `full` on `show_approval`, and the `answer` and `shortcut` notifications (`docs/protocol.md`). `get_state` reports the agents. Older Companion Hub versions keep working with Allow and Deny only.
+
 ## 0.6.0
 
 Yoru has a life of its own, and the whole screen to live it in.
