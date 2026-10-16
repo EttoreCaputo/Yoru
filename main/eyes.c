@@ -37,8 +37,8 @@
  * slowing down as it goes and speeding up as it comes back. */
 #define SLEEP_AWAY_MS 2000
 #define SLEEP_BACK_MS 700
-/* With the menu open Yoru shrinks to this, clear of the ring of icons, in
- * this long. */
+/* With the menu or an approval card open Yoru shrinks to this, clear of
+ * the icons or the card, in this long. */
 #define MENU_SIZE 0.62f
 #define MENU_SIZE_MS 220
 /* The most pieces an overlay has (three z's, three dots). */
@@ -81,10 +81,11 @@ static const eye_shape_t s_moods[EYES_MOOD_COUNT] = {
     [EYES_MOOD_DIZZY] = {36, 36, 0, 0, 0, 0, 1, 1, 1},
     [EYES_MOOD_SCARED] = {22, 70, 0.12f, -0.45f, 0, 0, 1, 1},
     [EYES_MOOD_PEEK] = {20, 44, 0, 0, 0, 0, 1, 1},
+    [EYES_MOOD_WAITING] = {24, 54, 0, 0, 0, 7, 1.08f, 0.92f},
 };
 
 static const char *const s_mood_names[EYES_MOOD_COUNT] = {
-    "neutral", "happy", "curious", "thinking", "grumpy", "hot", "sleepy", "asleep", "sad", "loving", "surprised", "bored", "listening", "speaking", "dizzy", "scared", "peek",
+    "neutral", "happy", "curious", "thinking", "grumpy", "hot", "sleepy", "asleep", "sad", "loving", "surprised", "bored", "listening", "speaking", "dizzy", "scared", "peek", "waiting",
 };
 
 /* The status colours: blue thinking, green done, red error. */
@@ -918,7 +919,7 @@ static bool step(void)
     } else {
         s.near = fminf(1, s.near + (float) s.dt_ms / SLEEP_BACK_MS);
     }
-    const float want_size = s.mood == EYES_MOOD_PEEK ? MENU_SIZE : 1;
+    const float want_size = s.mood == EYES_MOOD_PEEK || s.mood == EYES_MOOD_WAITING ? MENU_SIZE : 1;
     const float size_step = (float) s.dt_ms * (1 - MENU_SIZE) / MENU_SIZE_MS;
     s.size = want_size < s.size ? fmaxf(want_size, s.size - size_step) : fminf(want_size, s.size + size_step);
     const float want_tint = s.status == EYES_STATUS_IDLE ? 0 : 1;

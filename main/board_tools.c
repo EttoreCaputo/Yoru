@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "approval.h"
 #include "behaviour.h"
 #include "board_pmu.h"
 #include "board_settings.h"
@@ -473,6 +474,11 @@ static bool tool_show_menu(const cJSON *args, char *text, cJSON **structured)
     const cJSON *page = cJSON_GetObjectItemCaseSensitive(args, "page");
     bool ok = true;
     lvgl_port_lock();
+    if (approval_is_open() && !cJSON_IsFalse(open)) {
+        lvgl_port_unlock();
+        snprintf(text, TEXT_MAX, "a permission request is on the screen");
+        return false;
+    }
     if (cJSON_IsFalse(open)) {
         menu_close();
     } else if (cJSON_IsString(page)) {
@@ -485,6 +491,52 @@ static bool tool_show_menu(const cJSON *args, char *text, cJSON **structured)
     return ok;
 }
 
+static bool tool_show_approval(const cJSON *args, char *text, cJSON **structured)
+{
+    const cJSON *id = cJSON_GetObjectItemCaseSensitive(args, "id");
+    const cJSON *tool = cJSON_GetObjectItemCaseSensitive(args, "tool");
+    const cJSON *what = cJSON_GetObjectItemCaseSensitive(args, "text");
+    const cJSON *project = cJSON_GetObjectItemCaseSensitive(args, "project");
+    int seconds = 0;
+    if (!cJSON_IsString(id) || !cJSON_IsString(tool) || !cJSON_IsString(what)
+        || (project != NULL && !cJSON_IsNull(project) && !cJSON_IsString(project))) {
+        snprintf(text, TEXT_MAX, "id, tool and text must be strings, project a string if given");
+        return false;
+    }
+    if (id->valuestring[0] == '\0' || strlen(id->valuestring) > APPROVAL_ID_MAX) {
+        snprintf(text, TEXT_MAX, "id must be 1 to %d bytes", APPROVAL_ID_MAX);
+        return false;
+    }
+    if (!get_int(args, "seconds", &seconds, text)) {
+        return false;
+    }
+    if (seconds < 1) {
+        snprintf(text, TEXT_MAX, "seconds must be 1 or more");
+        return false;
+    }
+    lvgl_port_lock();
+    approval_show(id->valuestring, tool->valuestring, what->valuestring,
+                  cJSON_IsString(project) ? project->valuestring : NULL, seconds);
+    lvgl_port_unlock();
+    snprintf(text, TEXT_MAX, "showing %s", id->valuestring);
+    return true;
+}
+
+static bool tool_hide_approval(const cJSON *args, char *text, cJSON **structured)
+{
+    const cJSON *id = cJSON_GetObjectItemCaseSensitive(args, "id");
+    if (!cJSON_IsString(id)) {
+        snprintf(text, TEXT_MAX, "id must be a string");
+        return false;
+    }
+    lvgl_port_lock();
+    const bool shown = approval_hide(id->valuestring);
+    lvgl_port_unlock();
+    // Not shown is fine: answered here already, timed out, or replaced.
+    snprintf(text, TEXT_MAX, shown ? "hidden" : "not shown");
+    return true;
+}
+
 static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
@@ -493,6 +545,24 @@ static const tool_t TOOLS[] = {
         .schema = "{\"type\":\"object\",\"properties\":{\"open\":{\"type\":\"boolean\"},"
                   "\"page\":{\"type\":\"string\"}}}",
         .fn = tool_show_menu,
+    },
+    {
+        .name = "show_approval",
+        .description = "Show a Claude Code permission request on Yoru's screen with Allow and Deny, counting "
+                       "down `seconds`; a tap sends the `approval` notification. A second call replaces it. "
+                       "Companion Hub sends these itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
+                  "\"tool\":{\"type\":\"string\"},\"text\":{\"type\":\"string\",\"maxLength\":72},"
+                  "\"project\":{\"type\":\"string\"},\"seconds\":{\"type\":\"integer\",\"minimum\":1}},"
+                  "\"required\":[\"id\",\"tool\",\"text\",\"seconds\"]}",
+        .fn = tool_show_approval,
+    },
+    {
+        .name = "hide_approval",
+        .description = "Take a permission request off Yoru's screen, if that id is shown.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},"
+                  "\"required\":[\"id\"]}",
+        .fn = tool_hide_approval,
     },
     {
         .name = "set_brightness",

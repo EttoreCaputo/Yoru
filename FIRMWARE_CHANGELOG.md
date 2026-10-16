@@ -1,5 +1,14 @@
 # Firmware changelog
 
+## 0.5.4
+
+Answer Claude Code's permission requests on Yoru.
+
+- **Allow or Deny on the screen.** With "Answer permissions in the app and on Yoru" on in Companion Hub, when Claude Code asks to run something, Yoru shows a card: the tool on top, what it wants to do (a command, a file), and Deny and Allow below, with the project and the seconds left. A ring along the edge of the screen runs down the time and turns red for the last ten seconds.
+- **Tap to answer.** Yoru nods when you allow and shakes its head when you deny. If you answer in the app or in the terminal first, the card goes away by itself; it also goes when the time is up, and Claude Code then asks in the terminal.
+- **Yoru waits with you.** While a request is up it wakes if it was asleep, shrinks to the middle and glances between the question and the buttons. Pokes, the menu and the power key's sleep wait until it's answered.
+- Accented letters are shown without accents; characters the screen's font doesn't have show as `?`.
+
 ## 0.5.3
 
 A test switch for a faster screen.

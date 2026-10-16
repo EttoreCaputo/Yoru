@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "approval.h"
 #include "board.h"
 #include "board_display.h"
 #include "board_settings.h"
@@ -44,6 +45,9 @@
 /* How long "done" (green) and "error" (red) stay on the sphere. */
 #define STATUS_DONE_MS 2500
 #define STATUS_ERROR_MS 3500
+/* Waiting on an answer, the eyes go between the request and the buttons. */
+#define GLANCE_MIN_MS 1800
+#define GLANCE_SPAN_MS 1600
 
 static const char *TAG = "behaviour";
 
@@ -142,6 +146,11 @@ static struct {
     const char *later;
     uint32_t later_ms;
     bool menu;
+    /* A permission request is up (approval.c); the glances between its
+     * words and its buttons. */
+    bool approval;
+    uint32_t next_glance_ms;
+    bool glance_up;
     /* Turned face down: asleep, and the mic is off until it's turned back. */
     bool face_down;
     uint32_t rocked_ms;
@@ -149,6 +158,7 @@ static struct {
 
 static void show_voice(voice_state_t state);
 static void apply_rotation(void);
+static void wait_for_answer(uint32_t now);
 
 static void set_brightness(int percent)
 {
@@ -395,6 +405,10 @@ static void tick_cb(lv_timer_t *timer)
         eyes_set_status(EYES_STATUS_IDLE);
     }
     apply_rotation();
+    if (s.approval) {
+        wait_for_answer(now);
+        return;
+    }
     if (s.menu) {
         // The menu is company, and Yoru only watches it.
         s.last_touch_ms = now;
@@ -545,7 +559,7 @@ static void on_motion(motion_event_t ev)
         }
         return;
     }
-    if (s.menu || s.voice != VOICE_IDLE || s.face_down) {
+    if (s.menu || s.approval || s.voice != VOICE_IDLE || s.face_down) {
         return;
     }
     // Picking it up is the gentlest way to wake it.
@@ -706,7 +720,7 @@ int behaviour_scenes(const char **names, int max)
 void behaviour_gaze(float x, float y)
 {
     lvgl_port_lock();
-    if (!s.asleep && !s.pressed && s.voice == VOICE_IDLE) {
+    if (!s.asleep && !s.pressed && !s.approval && s.voice == VOICE_IDLE) {
         s.gaze_ms = lv_tick_get();
         if (s.gaze_ms == 0) {
             s.gaze_ms = 1; // 0 means none
@@ -726,7 +740,8 @@ void behaviour_motion(motion_event_t event)
 void behaviour_heard_from(float x)
 {
     lvgl_port_lock();
-    if (!s.asleep && !s.pressed && !s.menu && s.voice == VOICE_IDLE && board_settings_on(SETTING_PET_HEARING)) {
+    if (!s.asleep && !s.pressed && !s.menu && !s.approval && s.voice == VOICE_IDLE
+        && board_settings_on(SETTING_PET_HEARING)) {
         // The gaze turns to the noise, and drifts back on its own.
         hold_gaze(x * 0.9f, 0, HEARD_LOOK_MS);
     }
@@ -737,7 +752,9 @@ void behaviour_power_key(void)
 {
     lvgl_port_lock();
     s.last_touch_ms = lv_tick_get();
-    if (s.menu) {
+    if (s.approval) {
+        // Not to sleep with a question waiting: the buttons answer it.
+    } else if (s.menu) {
         menu_close();
     } else if (s.asleep) {
         wake_up();
@@ -762,6 +779,60 @@ static void on_menu(bool open)
     }
 }
 
+/* With a request up: awake, small and expectant, glancing from the
+ * question to the buttons. A conversation keeps the eyes it has. */
+static void wait_for_answer(uint32_t now)
+{
+    s.last_touch_ms = now;
+    if (s.asleep) {
+        set_brightness(asleep_brightness()); // face down: it stays there
+        return;
+    }
+    set_brightness(awake_brightness());
+    if (s.voice != VOICE_IDLE) {
+        return;
+    }
+    eyes_set_mood(EYES_MOOD_WAITING);
+    if ((int32_t) (now - s.next_glance_ms) >= 0) {
+        s.next_glance_ms = now + GLANCE_MIN_MS + esp_random() % GLANCE_SPAN_MS;
+        s.glance_up = !s.glance_up;
+        eyes_look_at(0, s.glance_up ? -1 : 1);
+    }
+}
+
+static void on_approval(bool open, int allow)
+{
+    const uint32_t now = lv_tick_get();
+    s.approval = open;
+    s.last_touch_ms = now;
+    s.until_ms = 0;
+    s.gaze_ms = 0;
+    if (open) {
+        if (s.asleep && !s.face_down) {
+            // A question wakes it, quietly.
+            s.asleep = false;
+            ESP_LOGI(TAG, "awake: a permission request");
+        }
+        playback_sound(SOUND_HMM);
+        eyes_blink();
+        s.glance_up = false; // first at the question
+        s.next_glance_ms = now;
+        wait_for_answer(now);
+        return;
+    }
+    // Answered here: a nod or a shake of the head. Otherwise just back.
+    if (allow > 0) {
+        playback_sound(SOUND_YES);
+        react(EYES_MOOD_HAPPY, 1200);
+    } else if (allow == 0) {
+        playback_sound(SOUND_NOPE);
+        eyes_knock(0.25f, 0);
+    } else {
+        eyes_blink();
+    }
+    eyes_look_around();
+}
+
 void behaviour_start(lv_obj_t *face)
 {
     const uint32_t now = lv_tick_get();
@@ -778,4 +849,5 @@ void behaviour_start(lv_obj_t *face)
     lv_timer_create(tick_cb, TICK_MS, NULL);
     lv_timer_create(lean_cb, LEAN_MS, NULL);
     menu_init(face, on_menu);
+    approval_init(on_approval);
 }

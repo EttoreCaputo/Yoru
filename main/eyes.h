@@ -38,6 +38,8 @@ typedef enum {
     EYES_MOOD_SCARED,
     /* The menu is open: small eyes, up at its edge. */
     EYES_MOOD_PEEK,
+    /* A permission request is up: small, head tilted, waiting for an answer. */
+    EYES_MOOD_WAITING,
     EYES_MOOD_COUNT,
 } eyes_mood_t;
 

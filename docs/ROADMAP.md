@@ -4,7 +4,7 @@ Yoru reuses what the [DualEye PC Monitor](../../esp32s3-dualeye-pcmonitor) alrea
 - on the board: the voice front end, the encrypted USB/WiFi link and the pet's mood;
 - on the computer: the Rust host with local or API models, the flasher and the app shell.
 
-What is new is the character, the UI and the hardware. The parts the two projects share will later move to a repository of their own. Until then they are copied, and fixes go to both.
+What is new is the character, the UI and the hardware. The computer side is not copied: it is [Companion Hub](https://github.com/EttoreCaputo/companion-hub) (`../companion-hub`), the host program DualEye's `host/` became, shared by both boards and able to drive several at once. The firmware parts are still copied, and fixes go to both.
 
 ## Hardware
 
@@ -31,8 +31,8 @@ Sources: Waveshare's BSP `waveshare/esp32_s3_touch_amoled_1_75c`, xiaozhi-esp32,
 | Settings | `board_settings.c` | Copied in 0.2.0, rewritten as a table for the round menu |
 | Mood | `pet.c`, `ears.c`, `metrics_model.c` | Copied in 0.2.0: `pet.c` hands its scenes to `behaviour.c` instead of playing them on `ui_eyes.c`; `metrics_model` without the faces |
 | PC data | `metrics_*` | Copied in 0.3.0; it drives moods, not faces |
-| Host | `dualeye-core` (link, flasher, firmware, wifi, stt, tts, llm, agent, voice, models, mcp, claude, timers, intents, diary, quips, sensors, snapshot) | Copy as `yoru-core` |
-| App | settings, onboarding, i18n, updates, title bar | Copy; replace the board view with Yoru's eyes |
+| Host | `companion-core` in Companion Hub (link, flasher, firmware, wifi, stt, tts, llm, agent, voice, models, mcp, claude, timers, intents, diary, quips, sensors, snapshot) | Shared: Yoru is a board profile there (`docs/multiboard.md` in that repository) |
+| App | Companion Hub's app: settings, onboarding, i18n, updates, title bar | Shared; it adds a Yoru view next to DualEye's |
 | New | display/touch/IMU/PMU drivers, the eye engine, behaviours | Write |
 
 ## Milestones
@@ -115,7 +115,7 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 - Still to do: tune the mic gain (the mic next to the speaker nearly clips at 60% volume), use the second mic (two-mic AFE, and the sound direction in M2), check internal RAM with the WiFi on (0.3.1: 135 KB free, 99 KB at the lowest, without it; it was 48 and 12 KB in 0.3.0).
 
 ### M4: host and app
-- `yoru-core`, `yoru-cli` and `yoru-app` from DualEye's host. One screen, no faces: the app shows Yoru live, plus mood, settings and the voice set-up.
+- In [Companion Hub](https://github.com/EttoreCaputo/companion-hub), which drives DualEye and Yoru together: a Yoru profile in its core, CLI and MCP, and a Yoru view in its app. One screen, no faces: the app shows Yoru live, plus mood, settings and the voice set-up. The steps are in that repository's `docs/multiboard.md`.
 - PC data and Claude Code usage drive moods.
 - MCP tools: react, say, show a message.
 

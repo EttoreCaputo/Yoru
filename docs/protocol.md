@@ -2,7 +2,7 @@
 
 Yoru speaks DualEye's protocol v2, copied from [DualEye's protocol](../../esp32s3-dualeye-pcmonitor/docs/protocol.md): the same frames, channels, JSON-RPC methods, audio streams and WiFi pairing. This page lists only what is different on Yoru; read DualEye's for the rest. When the two diverge, fix both until the shared parts move to a repository of their own.
 
-Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main/net.c`, `main/rpc.c` (board); `tools/yoru_link.py` (test scripts); `host/yoru-core` from M4.
+Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main/net.c`, `main/rpc.c` (board); `tools/yoru_link.py` (test scripts); `core/src/link.rs` and `wifi.rs` in [Companion Hub](https://github.com/EttoreCaputo/companion-hub) (host).
 
 ## Identity
 
@@ -53,5 +53,27 @@ Settings are kept in NVS and survive a reboot.
 | `set_setting` | `name`, `value`: integer | Change one setting within its range (switches are 0 or 1); it applies at once |
 | `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, the pet, audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging`) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) |
 | `show_menu` | `open`: boolean, `page`: `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the settings menu on the ring or on a page, or close it |
+| `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Show a Claude Code permission request over the eyes with Allow and Deny (see below). A second call replaces it |
+| `hide_approval` | `id`: string | Take that request away: it was answered in the app or the terminal, or gave up. An `id` that isn't shown is fine |
+
+## Approvals
+
+Companion Hub holds Claude Code's permission requests (its `PermissionRequest` hook) while the user turns on "Answer permissions in the app and on Yoru". Each one goes to every connected Yoru with `show_approval`:
+
+```json
+{"id":"p3","tool":"Bash","text":"cargo test --workspace","project":"companion-hub","seconds":120}
+```
+
+- `text` is what the tool would do: a command's first line, a file name, a pattern; at most 72 characters, UTF-8.
+- `seconds` is how long the host waits before Claude Code asks in its own terminal; the board can show it running down, and drops the card by itself once it's over.
+- The card offers Allow and Deny. A tap sends the `approval` notification and closes the card:
+
+```json
+{"jsonrpc":"2.0","method":"approval","params":{"id":"p3","allow":true}}
+```
+
+- The first answer wins, from the app, the board or the terminal; the host sends `hide_approval` to every board once the request is over, whoever answered.
+- Firmware without the tools answers with an error (`-32602`, unknown tool); the host ignores it and the request is still answered in the app.
+- On the board (0.5.4 and later): the tool's name and `text` above Yoru, Deny and Allow below it with the project and the seconds left, and a ring along the rim running them down. The fonts are ASCII: accented letters lose their accents and other characters show as `?`. An `id` is at most 47 bytes. While a card is up the screen takes no pokes, `show_menu` is refused and PWR doesn't put Yoru to sleep; Yoru wakes up, shrinks and glances between the request and the buttons.
 
 DualEye's `set_face`, `set_rotation` (here the `rotation` setting), `show_text` and `set_eyes` are not there: one screen, no faces. Showing a message comes back in M4.
