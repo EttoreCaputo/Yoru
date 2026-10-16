@@ -1,13 +1,14 @@
 #pragma once
 
-/* The bridge between what Yoru feels (pet.c) and its eyes (eyes.c), and
- * how it answers touch, until the senses arrive (M2):
- * - the eyes rest in a look that suits the pet's mood (bored, grumpy, sad,
- *   sleepy, hot, or neutral when it's fine) and play its reactions;
- * - now and then a whim that suits the mood, more often when it's lively;
- * - left alone it gets sleepy, then falls asleep and dims the screen (the
- *   times and the brightness are settings);
- * - a tap pokes it: happy once or twice, grumpy at the third in a row;
+/* The bridge between what Yoru feels (pet.c), its own life (life.c) and its
+ * eyes (eyes.c), and how it answers touch and the senses:
+ * - when nothing else has its attention, life.c runs it: what it does comes
+ *   from what it needs; behaviour.c plays the pet's reactions over it;
+ * - left alone (nobody touching, talking or at the computer) it gets
+ *   sleepy, then naps and dims the screen (the times and the brightness are
+ *   settings); it also sleeps when it is tired, and wakes when rested;
+ * - a tap on Yoru pokes it: happy once or twice, grumpy at the third in a
+ *   row; a tap on the black drops a firefly there for it;
  * - a finger on the screen is watched, and stroking it makes it happy;
  * - pokes and strokes move the pet's mood, so it remembers being petted;
  * - focus mode: no whims and no reactions;
@@ -52,6 +53,15 @@ void behaviour_motion(motion_event_t event);
 /** A sudden sound from one side, -1 left .. 1 right (ears_dir.c's
  * callback): the eyes turn there for a moment. Takes the LVGL lock. */
 void behaviour_heard_from(float x);
+
+/** One of the scenes, from life.c's whims (not in focus mode). With the
+ * LVGL lock held. */
+void behaviour_whim(const char *name);
+
+/** A snack from the host: a firefly comes in from the edge. False when
+ * Yoru can't now (asleep, the menu, a request, a conversation, busy).
+ * Takes the LVGL lock. */
+bool behaviour_feed(void);
 
 /** A short press of PWR (board_pmu.c's callback): to sleep and back, or
  * out of the menu. Takes the LVGL lock. */

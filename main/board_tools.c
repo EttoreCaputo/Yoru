@@ -13,11 +13,13 @@
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "eyes.h"
+#include "life.h"
 #include "link.h"
 #include "lvgl_port.h"
 #include "menu.h"
 #include "metrics_model.h"
 #include "motion.h"
+#include "needs.h"
 #include "net.h"
 #include "pet.h"
 #include "playback.h"
@@ -297,6 +299,12 @@ static bool tool_get_pet(const cJSON *args, char *text, cJSON **structured)
         cJSON_AddNumberToObject(p, "idle_s", pet.idle_s);
     }
     cJSON_AddNumberToObject(p, "lonely_s", pet.lonely_s);
+    cJSON_AddNumberToObject(p, "alone_s", pet.alone_s);
+    cJSON_AddStringToObject(p, "activity", life_activity());
+    cJSON *needs = cJSON_AddObjectToObject(p, "needs");
+    for (int i = 0; i < NEED_COUNT; i++) {
+        cJSON_AddNumberToObject(needs, needs_name((need_t) i), round2(needs_get((need_t) i)));
+    }
     cJSON_AddNumberToObject(p, "pitch", round2(pet.pitch));
     cJSON_AddNumberToObject(p, "pace", round2(pet.pace));
     cJSON *recent = cJSON_AddArrayToObject(p, "recent");
@@ -421,6 +429,7 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
     cJSON_AddNumberToObject(p, "happiness", round2(pet.happiness));
     cJSON_AddNumberToObject(p, "affection", round2(pet.affection));
     cJSON_AddBoolToObject(p, "away", pet.away);
+    cJSON_AddStringToObject(p, "activity", life_activity());
     cJSON *audio = cJSON_AddObjectToObject(st, "audio");
     cJSON_AddBoolToObject(audio, "speaker", playback_available());
     cJSON_AddNumberToObject(audio, "volume", board_settings_get(SETTING_VOLUME));
@@ -537,11 +546,21 @@ static bool tool_hide_approval(const cJSON *args, char *text, cJSON **structured
     return true;
 }
 
+static bool tool_feed(const cJSON *args, char *text, cJSON **structured)
+{
+    if (!behaviour_feed()) {
+        snprintf(text, TEXT_MAX, "Yoru can't eat now (asleep, busy or the menu is open)");
+        return false;
+    }
+    snprintf(text, TEXT_MAX, "a firefly drifts in for Yoru (food %.0f%%)", needs_get(NEED_FOOD) * 100);
+    return true;
+}
+
 static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
         .description = "Open or close the settings menu on Yoru's screen, on the ring of icons or straight on a page "
-                       "(display, sound, behaviour, voice, connection, battery, about).",
+                       "(yoru, display, sound, behaviour, voice, connection, battery, about).",
         .schema = "{\"type\":\"object\",\"properties\":{\"open\":{\"type\":\"boolean\"},"
                   "\"page\":{\"type\":\"string\"}}}",
         .fn = tool_show_menu,
@@ -619,10 +638,18 @@ static const tool_t TOOLS[] = {
         .fn = tool_set_pet,
     },
     {
+        .name = "feed",
+        .description = "Give Yoru a snack: a firefly drifts in from the edge of the screen and Yoru chases it "
+                       "and eats it (or bats it away if it isn't hungry). Fails while it sleeps or is busy.",
+        .schema = "{\"type\":\"object\",\"properties\":{}}",
+        .fn = tool_feed,
+    },
+    {
         .name = "get_pet",
-        .description = "Read Yoru's mood (content, happy, excited, loving, bored, grumpy, sad, sleepy, hot), its "
-                       "energy, happiness and affection (0 to 1), what's affecting it now, what the room sounds "
-                       "like and its last reactions.",
+        .description = "Read Yoru's mood (content, happy, excited, loving, bored, grumpy, sad, sleepy, hot, "
+                       "hungry), its energy, happiness and affection (0 to 1), its needs (rest, food, fun, "
+                       "company, curiosity, 0 to 1), what it is doing, what's affecting it now, what the room "
+                       "sounds like and its last reactions.",
         .schema = "{\"type\":\"object\",\"properties\":{}}",
         .fn = tool_get_pet,
     },

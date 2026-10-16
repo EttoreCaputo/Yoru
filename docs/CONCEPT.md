@@ -61,9 +61,33 @@ There are no dashboard screens that turn Yoru into gauges. PC data changes how Y
 
 ## Behaviour
 
+### A life of its own
+Yoru doesn't play random animations. Like a Tamagotchi, a Sims character or Cozmo, it has needs, and what it does comes from them (`main/needs.c`, `main/life.c`):
+
+| Need | Runs down | Met by |
+|------|-----------|--------|
+| Rest | while awake, faster when busy or awake at night | sleeping |
+| Food | slowly, over hours | fireflies: it hunts them in the dark, or you drop one with a tap on the black |
+| Fun | when nothing happens | playing, music, you |
+| Company | while nobody is around | touch, talk, being picked up, you at the computer |
+| Curiosity | over time | exploring, sounds, what happens on the computer |
+
+Each thing it can do scores by how well it meets the needs that press most, as the Sims pick; it does it for a while, then picks again, and the same thing never comes twice in a row:
+- **Floating about** near you, the calm default.
+- **Exploring:** off into the distance, to the rim of the screen to peek past it, and back.
+- **Hunting:** a firefly lights up far away; it notices, creeps up, chases it as it flits, pounces and gulps it down.
+- **Asking for you:** it comes up to the glass, its face filling the screen, and knocks twice: whimpering when hungry, waving when lonely. If nobody answers it sighs and goes back, and asks less often next time.
+- **Playing:** hopping along the bottom of the disc as if it had a floor; hiding past the edge and peeking back from another; a loop through the space, far behind and right up to the glass.
+- **Daydreaming**, **sulking** by the edge when it's unhappy, **dancing** to music.
+- **Tired**, it yawns, stretches, finds a corner and drifts off; it wakes by itself once rested (not alone in the middle of the night), stretching.
+
+Well cared for, it is happier; neglected, it gets hungry, sad or grumpy, but it never starves: it feeds and amuses itself, only less happily.
+
+### Depth
+Yoru floats in a space seen in perspective, not on a flat screen. Going away it gets smaller, dimmer and drawn towards the middle, as things do in the distance; coming close it fills the disc. Moves follow smooth curves through that space, with a wind-up and an overshoot for a dash, a squash for each landing; it stretches along the way it goes and its eyes lead the way.
+
 ### Alive when ignored
-- It looks around, blinks, and now and then sighs or stretches (hands out, squash, then a big blink).
-- If nothing happens for a long time it gets bored, then drowsy, then falls asleep.
+- Left alone (nobody touching, talking or at the computer) it gets drowsy, then naps (Behaviour: "Sleepy after", "Asleep after").
 - At night it sleeps for real: it drifts away to a small dot, which costs almost no power.
 
 ### Directed attention
@@ -138,7 +162,8 @@ The moods, knocks, slaps, lean, greeting and pointer-follow added with firmware 
 
 ## On the board
 
-- The sphere's shading for the current colour and finish is rendered once into PSRAM, and so is a smaller one for the hands; each frame only redraws the eyes, the tint, the hands and whatever moved. A new colour or finish re-renders the shading.
+- The sphere's shading for the current colour and finish is rendered into PSRAM, and so is a smaller one for the hands; each frame only redraws the eyes, the tint, the hands and whatever moved. A new colour or finish re-renders the shading.
+- Scaling a picture costs LVGL about 80 ms a frame on this chip, so the sphere is never scaled: each size it takes on the way near or far is rendered once, in a few milliseconds (a table for the shading, no square roots), and the sizes in use are kept within about 3 MB of PSRAM.
 - Everything around the sphere stays true black, as before.
 - Asleep, the far-away dot keeps almost every pixel off.
 - The sphere's gradients are dithered as they are rendered, so the panel's 16-bit colour shows no rings.

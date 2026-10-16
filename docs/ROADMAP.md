@@ -120,7 +120,8 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 - MCP tools: react, say, show a message.
 
 ### M5: character
-- Behaviour scheduler: boredom, sighs, stretches, sleep at night, greeting on return, late-night notice.
+- Behaviour scheduler: in since 0.6.0 (`needs.c`, `life.c`). Five needs (rest, food, fun, company, curiosity) and acts chosen by how well they meet them: floating about, exploring, hunting fireflies, asking for you, three kinds of play, daydreaming, sulking, dancing, naps and waking up rested. Still to do: the late-night notice, and acts made from data (M6).
+- Depth: in since 0.6.0. Yoru moves through a space in perspective (`eyes_move`, `eyes_follow`), the sphere rendered at any size on demand (`look_ball`).
 - Non-verbal sound language (chirps, sighs, trills) for the pet.
 - The sphere look (see `docs/CONCEPT.md`): in since 0.4.0 (`look.c`, `eyes.c`), a matte sphere about 40% of the disc (`LOOK_SCALE`), shaded once into PSRAM; small dark eyes that slide over its surface; two floating hands that pop out for gestures (wave, point, cover the eyes, clap); state tint, halo and status badge; sleep as drifting away into the dark.
 - Progression: experience from real activity unlocks colours, eye shapes, finishes and rare animations.

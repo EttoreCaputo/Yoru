@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ears.h"
+#include "needs.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_timer.h"
@@ -60,6 +61,11 @@ static const char *TAG = "pet";
 /* A room this quiet for this long makes it drowsy. */
 #define QUIET_DROWSY_S 1800
 #define QUIET_ENERGY 0.12f
+/* Input on the host this recent, or a touch or a voice, means someone is
+ * around. */
+#define PRESENT_S 300
+/* Hungry under this much food (needs.c). */
+#define HUNGRY 0.25f
 
 typedef enum {
     R_HOT,
@@ -106,6 +112,7 @@ static const char *const MOOD_NAMES[PET_MOOD_COUNT] = {
     [PET_MOOD_CONTENT] = "content", [PET_MOOD_HAPPY] = "happy",   [PET_MOOD_EXCITED] = "excited",
     [PET_MOOD_LOVING] = "loving",   [PET_MOOD_BORED] = "bored",   [PET_MOOD_GRUMPY] = "grumpy",
     [PET_MOOD_SAD] = "sad",         [PET_MOOD_SLEEPY] = "sleepy", [PET_MOOD_HOT] = "hot",
+    [PET_MOOD_HUNGRY] = "hungry",
 };
 
 /* The whims each mood has; behaviour.c knows how each looks. */
@@ -118,6 +125,7 @@ static const char *const POOL_GRUMPY[] = {"angry", "sigh", "curious"};
 static const char *const POOL_SAD[] = {"sad", "sigh", "thinking"};
 static const char *const POOL_SLEEPY[] = {"yawn", "sleepy", "sigh"};
 static const char *const POOL_HOT[] = {"hot", "sigh"};
+static const char *const POOL_HUNGRY[] = {"sad", "sigh", "look_around"};
 
 typedef struct {
     const char *const *names;
@@ -129,6 +137,7 @@ static const pool_t POOLS[PET_MOOD_COUNT] = {
     [PET_MOOD_CONTENT] = POOL(POOL_CONTENT), [PET_MOOD_HAPPY] = POOL(POOL_HAPPY), [PET_MOOD_EXCITED] = POOL(POOL_EXCITED),
     [PET_MOOD_LOVING] = POOL(POOL_LOVING),   [PET_MOOD_BORED] = POOL(POOL_BORED), [PET_MOOD_GRUMPY] = POOL(POOL_GRUMPY),
     [PET_MOOD_SAD] = POOL(POOL_SAD),         [PET_MOOD_SLEEPY] = POOL(POOL_SLEEPY), [PET_MOOD_HOT] = POOL(POOL_HOT),
+    [PET_MOOD_HUNGRY] = POOL(POOL_HUNGRY),
 };
 
 static SemaphoreHandle_t s_lock;
@@ -219,6 +228,7 @@ void pet_init(void)
 {
     s_lock = xSemaphoreCreateMutex();
     load();
+    needs_init();
     s_saved[0] = s_energy;
     s_saved[1] = s_happy;
     s_saved[2] = s_affection;
@@ -248,6 +258,8 @@ void pet_event(pet_event_t event)
     switch (event) {
     case PET_EVENT_TALKED:
         nudge(0.04f, 0.05f, 0.04f);
+        needs_meet(NEED_COMPANY, 0.15f);
+        needs_meet(NEED_CURIOSITY, 0.05f);
         s_interacted_us = now;
         break;
     case PET_EVENT_ERROR:
@@ -260,14 +272,19 @@ void pet_event(pet_event_t event)
         break;
     case PET_EVENT_PLAYED:
         nudge(0.01f, 0.02f, 0.02f);
+        needs_meet(NEED_FUN, 0.04f);
+        needs_meet(NEED_CURIOSITY, 0.03f);
         s_interacted_us = now;
         break;
     case PET_EVENT_POKED:
         nudge(0.02f, 0.01f, 0.01f);
+        needs_meet(NEED_COMPANY, 0.03f);
+        needs_meet(NEED_FUN, 0.02f);
         s_interacted_us = now;
         break;
     case PET_EVENT_STROKED:
         nudge(0, 0.04f, 0.05f);
+        needs_meet(NEED_COMPANY, 0.08f);
         s_interacted_us = now;
         break;
     case PET_EVENT_ANNOYED:
@@ -277,18 +294,28 @@ void pet_event(pet_event_t event)
     case PET_EVENT_LIFTED:
         // Company, and a little attention.
         nudge(0.04f, 0.02f, 0.03f);
+        needs_meet(NEED_COMPANY, 0.05f);
+        needs_meet(NEED_CURIOSITY, 0.04f);
         s_interacted_us = now;
         break;
     case PET_EVENT_SHAKEN:
         nudge(0.05f, -0.03f, -0.01f);
+        needs_meet(NEED_FUN, 0.02f);
         s_interacted_us = now;
         break;
     case PET_EVENT_ROCKED:
         nudge(-0.05f, 0.02f, 0.04f);
+        needs_meet(NEED_COMPANY, 0.05f);
         s_interacted_us = now;
         break;
     case PET_EVENT_DROPPED:
         nudge(0.04f, -0.06f, -0.02f);
+        s_interacted_us = now;
+        break;
+    case PET_EVENT_FED:
+        // Fed by you: it likes you for it.
+        nudge(0.02f, 0.05f, 0.04f);
+        needs_meet(NEED_COMPANY, 0.05f);
         s_interacted_us = now;
         break;
     }
@@ -310,6 +337,7 @@ void pet_heard(pet_heard_t what, int count)
             break;
         }
         nudge(0.06f, -0.03f, 0);
+        needs_meet(NEED_CURIOSITY, 0.04f);
         if (s_bangs == 0 || now - s_first_bang_us > (int64_t) BANGS_WINDOW_S * 1000000) {
             s_bangs = 0;
             s_first_bang_us = now;
@@ -328,6 +356,8 @@ void pet_heard(pet_heard_t what, int count)
         }
         // Someone's calling it.
         nudge(0.05f, 0.04f, 0.03f);
+        needs_meet(NEED_COMPANY, 0.06f);
+        needs_meet(NEED_FUN, 0.03f);
         s_interacted_us = now;
         react(R_CLAPS,
               count >= CLAPS_DANCE && s_energy > 0.3f ? "dance"
@@ -339,6 +369,7 @@ void pet_heard(pet_heard_t what, int count)
     case PET_HEARD_CHATTER:
         // Company: not bored, a bit livelier. No scene: they aren't talking to it.
         nudge(0.03f, 0.01f, 0);
+        needs_meet(NEED_COMPANY, 0.02f);
         s_interacted_us = now;
         break;
     }
@@ -393,6 +424,7 @@ void pet_get(pet_state_t *out)
     out->minute = s_minute;
     out->idle_s = s_idle_s;
     out->lonely_s = (uint32_t) ((now - s_interacted_us) / 1000000);
+    out->alone_s = pet_alone_s();
     out->pitch = s_pitch;
     out->pace = 1.6f - s_energy;
     out->now = (s_hot ? PET_NOW_HOT : 0) | (s_music_s > 0 ? PET_NOW_MUSIC : 0) | (s_claude_working ? PET_NOW_CLAUDE : 0)
@@ -449,6 +481,9 @@ static pet_mood_t mood_now(int64_t now)
     }
     if (s_energy < 0.3f) {
         return PET_MOOD_SLEEPY;
+    }
+    if (needs_get(NEED_FOOD) < HUNGRY) {
+        return PET_MOOD_HUNGRY;
     }
     if (s_happy < 0.35f) {
         return s_affection > 0.6f ? PET_MOOD_SAD : PET_MOOD_GRUMPY;
@@ -558,6 +593,7 @@ static void notice(const metrics_snapshot_t *snap, int64_t now)
         metrics_claude_state_t state = snap->claude.state;
         if (s_seen && state != s_claude) {
             if (state == METRICS_CLAUDE_WORK) {
+                needs_meet(NEED_CURIOSITY, 0.02f);
                 if (now - s_claude_off_us >= (int64_t) CLAUDE_REST_S * 1000000) {
                     react(R_CLAUDE_START, "focus", now);
                 }
@@ -602,14 +638,19 @@ static void notice(const metrics_snapshot_t *snap, int64_t now)
 /** With s_lock held: one second on. */
 static void drift(const metrics_snapshot_t *snap, float dt)
 {
-    float energy_rest = s_minute >= 0 ? day_energy(s_minute) : 0.7f;
+    // Lively as the time of day says, and as rested as it is.
+    float energy_rest = fminf(s_minute >= 0 ? day_energy(s_minute) : 0.7f, 0.15f + 0.85f * needs_get(NEED_REST));
     ears_state_t ears;
     ears_get(&ears);
     if (ears.quiet_s >= QUIET_DROWSY_S && s_music_s == 0) {
         // Nothing to hear for half an hour: drowsy.
         energy_rest = fmaxf(0.1f, energy_rest - QUIET_ENERGY);
     }
-    float happy_rest = s_away && esp_timer_get_time() - s_away_since_us > 2LL * 3600 * 1000000 ? 0.5f : HAPPY_REST;
+    // Well cared for, it is happier: fed, rested, played with, in company.
+    float happy_rest = 0.25f + 0.6f * needs_wellbeing();
+    if (s_away && esp_timer_get_time() - s_away_since_us > 2LL * 3600 * 1000000) {
+        happy_rest -= 0.1f;
+    }
     s_energy += (energy_rest - s_energy) * dt / ENERGY_TAU_S;
     s_happy += (happy_rest - s_happy) * dt / HAPPY_TAU_S;
     s_affection += (AFFECTION_REST - s_affection) * dt / AFFECTION_TAU_S;
@@ -639,6 +680,11 @@ void pet_update(const metrics_snapshot_t *snap)
         s_tick_us = now;
         notice(snap, now);
         drift(snap, dt);
+        ears_state_t ears;
+        ears_get(&ears);
+        const bool company = (now - s_interacted_us) < (int64_t) PRESENT_S * 1000000
+                             || (s_idle_s >= 0 && s_idle_s < PRESENT_S) || ears.chatter;
+        needs_tick(dt, company, s_minute >= 0 && is_night(s_minute), s_music_s > 0);
         s_mood = mood_now(now);
         s_pitch = 1.0f + 0.16f * (s_happy - 0.5f) + 0.10f * (s_energy - 0.5f);
         due = now - s_saved_us >= (int64_t) SAVE_EVERY_S * 1000000
@@ -693,4 +739,18 @@ float pet_idle_pace(void)
 {
     // Lively: every 20-70 s; worn out: every 45-170 s.
     return 1.6f - s_energy;
+}
+
+uint32_t pet_alone_s(void)
+{
+    if (s_lock == NULL) {
+        return 0;
+    }
+    const int64_t now = esp_timer_get_time();
+    uint32_t alone = (uint32_t) ((now - s_interacted_us) / 1000000);
+    const int idle = s_idle_s;
+    if (idle >= 0 && (uint32_t) idle < alone) {
+        alone = (uint32_t) idle;
+    }
+    return alone;
 }

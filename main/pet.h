@@ -30,6 +30,8 @@ typedef enum {
     PET_MOOD_SAD,
     PET_MOOD_SLEEPY,
     PET_MOOD_HOT,
+    /* Short of fireflies (needs.c). */
+    PET_MOOD_HUNGRY,
     PET_MOOD_COUNT,
 } pet_mood_t;
 
@@ -49,6 +51,8 @@ typedef enum {
     PET_EVENT_SHAKEN,
     PET_EVENT_ROCKED,
     PET_EVENT_DROPPED,
+    /* You gave it a firefly. */
+    PET_EVENT_FED,
 } pet_event_t;
 
 /* What it heard in the room (ears.c). */
@@ -99,6 +103,9 @@ typedef struct {
     int idle_s;
     /* Since someone last talked or played with it, or music played. */
     uint32_t lonely_s;
+    /* Since there was last a sign of someone: a touch, a voice, input on
+     * the host, people talking in the room. */
+    uint32_t alone_s;
     /* PET_NOW_* */
     uint32_t now;
     /* Its voice's pitch (1 as written) and the idle scenes' pace (1: every
@@ -134,6 +141,10 @@ const char *pet_now_name(uint32_t bit);
  * taking it clears it. A reaction not taken soon is dropped. */
 const char *pet_take_reaction(void);
 pet_mood_t pet_mood(void);
+
+/** Seconds since there was last a sign of someone around (pet_state_t's
+ * alone_s). */
+uint32_t pet_alone_s(void);
 
 /** For the whims (behaviour.c): no whim now, nobody's there. */
 bool pet_quiet(void);

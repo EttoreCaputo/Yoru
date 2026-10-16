@@ -7,9 +7,6 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/idf_additions.h"
-#include "freertos/task.h"
 
 static const char *TAG = "look";
 
@@ -28,10 +25,25 @@ static const stop_t PEARL[] = {
     {0.00f, 0xF6F4F7}, {0.22f, 0xDEDBE2}, {0.58f, 0xAEAAB5}, {0.84f, 0x6F6B78}, {1.00f, 0x3A3742},
 };
 static look_t s_look;
-/* The squashed spheres, by level + LOOK_SQUASH_STEPS (the middle one is
- * s_look.day), and which are ready. */
-static look_sprite_t s_squashed[2 * LOOK_SQUASH_STEPS + 1];
-static volatile bool s_squashed_ready[2 * LOOK_SQUASH_STEPS + 1];
+/* The spheres of other sizes, rendered when first drawn: a few for the
+ * sizes and squashes in use, within a budget of PSRAM (a sphere up at the
+ * glass is about 450 KB). */
+#define BALL_SLOTS 14
+#define BALL_BUDGET (3200 * 1024)
+typedef struct {
+    look_sprite_t sp;
+    int rx, ry; // 0: empty
+    uint32_t used;
+} ball_slot_t;
+static ball_slot_t s_balls[BALL_SLOTS];
+static uint32_t s_ball_bytes;
+static int64_t s_ball_slowest_us;
+/* The pearl gradient by the squared distance to the light (1 at LIGHT_R),
+ * as RGB565 for each of the 16 dither levels: in PSRAM, read through the
+ * cache. */
+#define SHADE_N 256
+static uint16_t *s_shade565;
+static const uint8_t BAYER[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
 
 static float clampf(float v, float lo, float hi)
 {
@@ -43,7 +55,6 @@ static float clampf(float v, float lo, float hi)
  * over its neighbours, too fine to see at this pixel size. 0..1. */
 static float dither(int x, int y)
 {
-    static const uint8_t BAYER[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
     return ((float) BAYER[y & 3][x & 3] + 0.5f) / 16.0f;
 }
 
@@ -165,61 +176,178 @@ static esp_err_t render_halo(look_sprite_t *sp)
     return ESP_OK;
 }
 
-/* The sphere squashed by `level`: wider and shorter (or the other way), the
- * light moving with the surface, as if the round one were scaled. */
-static esp_err_t render_squashed(look_sprite_t *sp, int level)
-{
-    const float sq = LOOK_SQUASH * (float) level / LOOK_SQUASH_STEPS;
-    const float sx = 1 + sq, sy = 1 - sq, r = LOOK_SPHERE_R;
-    return render_ball(sp, r * sx, r * sy, LIGHT_X * sx, LIGHT_Y * sy, LIGHT_R);
-}
-
-/* The squashed spheres aren't needed at boot: they are made at low priority
- * while Yoru is already on screen, the small squashes first. */
-static void squash_task(void *arg)
-{
-    const int64_t start = esp_timer_get_time();
-    for (int step = 1; step <= LOOK_SQUASH_STEPS; step++) {
-        for (int sign = 1; sign >= -1; sign -= 2) {
-            const int i = LOOK_SQUASH_STEPS + sign * step;
-            if (render_squashed(&s_squashed[i], sign * step) != ESP_OK) {
-                ESP_LOGE(TAG, "squashed sphere %d", sign * step);
-                vTaskDeleteWithCaps(NULL);
-            }
-            s_squashed_ready[i] = true;
-        }
-    }
-    ESP_LOGI(TAG, "squashed spheres ready in %lld ms, PSRAM free %u KB", (esp_timer_get_time() - start) / 1000,
-             (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024));
-    vTaskDeleteWithCaps(NULL);
-}
+static esp_err_t render_ball_fast(look_sprite_t *sp, int rx, int ry);
 
 esp_err_t look_init(void)
 {
     const int64_t start = esp_timer_get_time();
-    const float r = LOOK_SPHERE_R;
-    ESP_RETURN_ON_ERROR(render_ball(&s_look.day, r, r, LIGHT_X, LIGHT_Y, LIGHT_R), TAG, "day");
+    s_shade565 = heap_caps_malloc(SHADE_N * 16 * sizeof(uint16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    ESP_RETURN_ON_FALSE(s_shade565, ESP_ERR_NO_MEM, TAG, "shade table");
+    for (int i = 0; i < SHADE_N; i++) {
+        float rgb[3];
+        gradient(PEARL, 5, sqrtf((float) i / (SHADE_N - 1)), rgb);
+        for (int d = 0; d < 16; d++) {
+            // RGB565 keeps the top bits: up to one step of dither before the cut.
+            const float k = ((float) d + 0.5f) / 16;
+            const lv_color_t c = lv_color_make((uint8_t) clampf(rgb[0] + 8 * k, 0, 255),
+                                               (uint8_t) clampf(rgb[1] + 4 * k, 0, 255),
+                                               (uint8_t) clampf(rgb[2] + 8 * k, 0, 255));
+            s_shade565[(i << 4) | d] = lv_color_to_u16(c);
+        }
+    }
+    // The same renderer as every other size, so going nearer or farther
+    // never changes the shading.
+    ESP_RETURN_ON_ERROR(render_ball_fast(&s_look.day, LOOK_SPHERE_R, LOOK_SPHERE_R), TAG, "day");
     ESP_RETURN_ON_ERROR(render_tint(&s_look.tint), TAG, "tint");
     ESP_RETURN_ON_ERROR(render_halo(&s_look.halo), TAG, "halo");
     ESP_RETURN_ON_ERROR(render_ball(&s_look.hand, 27 * K, 22 * K, -12 * K, -11 * K, 31 * K), TAG, "hand");
     ESP_LOGI(TAG, "Yoru rendered in %lld ms", (esp_timer_get_time() - start) / 1000);
-    // Lowest priority, stack in PSRAM: it only computes (0.3.1's rule).
-    BaseType_t ok = xTaskCreatePinnedToCoreWithCaps(squash_task, "look", 4096, NULL, 1, NULL, 0,
-                                                    MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    ESP_RETURN_ON_FALSE(ok == pdPASS, ESP_ERR_NO_MEM, TAG, "squash task");
     return ESP_OK;
 }
 
-const look_sprite_t *look_day(int level)
+/* The sphere at any size, quickly: the shading comes from a table by the
+ * squared distance to the light, already dithered and packed for each of the
+ * 16 dither levels, and walked along each row by forward differences (adds
+ * only, no square roots); only the rim's pixels work out their coverage.
+ * The light moves with the surface, as if the round one were scaled. */
+static esp_err_t render_ball_fast(look_sprite_t *sp, int rx, int ry)
 {
-    if (level == 0) {
+    const int w = 2 * rx + 4, h = 2 * ry + 4;
+    const uint32_t size = (uint32_t) (w * h * 3);
+    // Only the alpha plane needs clearing: colour outside the disc is unseen.
+    uint8_t *data = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    ESP_RETURN_ON_FALSE(data, ESP_ERR_NO_MEM, TAG, "ball %dx%d", rx, ry);
+    memset(data + w * h * 2, 0, (size_t) (w * h));
+    memset(&sp->img, 0, sizeof(sp->img));
+    sp->img.header.magic = LV_IMAGE_HEADER_MAGIC;
+    sp->img.header.cf = LV_COLOR_FORMAT_RGB565A8;
+    sp->img.header.w = w;
+    sp->img.header.h = h;
+    sp->img.header.stride = w * 2;
+    sp->img.data_size = size;
+    sp->img.data = data;
+    sp->ax = w / 2;
+    sp->ay = h / 2;
+
+    const float f = sqrtf((float) (rx * ry)) / LOOK_SPHERE_R;
+    const float lx = LIGHT_X * (float) rx / LOOK_SPHERE_R, ly = LIGHT_Y * (float) ry / LOOK_SPHERE_R;
+    const float shade_k = (SHADE_N - 1) / (LIGHT_R * f * LIGHT_R * f);
+    const float rx2 = (float) (rx * rx), irx2 = 1.0f / rx2, iry2 = 1.0f / (float) (ry * ry);
+    const float rmin = (float) (rx < ry ? rx : ry);
+    // Inside this the edge's antialiasing can't reach: fully covered.
+    const float inner = (1 - 1 / rmin) * (1 - 1 / rmin);
+    const float half = (float) w / 2;
+    uint16_t *rgb = (uint16_t *) data;
+    uint8_t *alpha = data + w * h * 2;
+    for (int y = 0; y < h; y++) {
+        const float py = (float) y + 0.5f - (float) h / 2;
+        const float row = 1 - py * py / ((ry + 1.0f) * (ry + 1.0f));
+        if (row <= 0) {
+            continue;
+        }
+        const int span = (int) ((float) (rx + 1) * sqrtf(row)) + 2;
+        const int x0 = w / 2 - span < 0 ? 0 : w / 2 - span, x1 = w / 2 + span > w ? w : w / 2 + span;
+        const float qy = py * py * iry2, dy = py - ly;
+        // The shading along the row: a quadratic in x, stepped by adds.
+        const float dx0 = (float) x0 + 0.5f - half - lx;
+        float t = (dx0 * dx0 + dy * dy) * shade_k, dt = (2 * dx0 + 1) * shade_k;
+        const float d2t = 2 * shade_k;
+        const uint8_t *bayer = BAYER[y & 3];
+        uint16_t *out = rgb + y * w;
+        for (int x = x0; x < x1; x++) {
+            int i = (int) t;
+            i = i >= SHADE_N ? SHADE_N - 1 : i;
+            out[x] = s_shade565[(i << 4) | bayer[x & 3]];
+            t += dt;
+            dt += d2t;
+        }
+        // Coverage: whole in the middle, worked out only at the rim.
+        uint8_t *a = alpha + y * w;
+        const float in2 = (inner - qy) * rx2;
+        int xi0 = x1, xi1 = x1;
+        if (in2 > 0) {
+            const float xin = sqrtf(in2);
+            xi0 = (int) (half - 0.5f - xin) + 1;
+            xi1 = w - xi0;
+            xi0 = xi0 < x0 ? x0 : xi0;
+            xi1 = xi1 > x1 ? x1 : xi1;
+            if (xi1 > xi0) {
+                memset(a + xi0, 255, (size_t) (xi1 - xi0));
+            } else {
+                xi0 = xi1 = x1;
+            }
+        }
+        for (int x = x0; x < x1; x++) {
+            if (x == xi0) {
+                x = xi1 - 1;
+                continue;
+            }
+            const float px = (float) x + 0.5f - half;
+            const float q = px * px * irx2 + qy;
+            const float cov = clampf(0.5f - (sqrtf(q) - 1) * rmin, 0, 1);
+            a[x] = (uint8_t) (cov * 255.0f + 0.5f);
+        }
+    }
+    return ESP_OK;
+}
+
+static void ball_free(ball_slot_t *b)
+{
+    heap_caps_free((void *) b->sp.img.data);
+    s_ball_bytes -= b->sp.img.data_size;
+    memset(b, 0, sizeof(*b));
+}
+
+const look_sprite_t *look_ball(int rx, int ry, uint32_t frame)
+{
+    rx = rx < 2 ? 2 : rx;
+    ry = ry < 2 ? 2 : ry;
+    if (rx == LOOK_SPHERE_R && ry == LOOK_SPHERE_R) {
         return &s_look.day;
     }
-    if (level < -LOOK_SQUASH_STEPS || level > LOOK_SQUASH_STEPS) {
+    ball_slot_t *free_slot = NULL, *oldest = NULL;
+    for (int i = 0; i < BALL_SLOTS; i++) {
+        ball_slot_t *b = &s_balls[i];
+        if (b->rx == rx && b->ry == ry) {
+            b->used = frame;
+            return &b->sp;
+        }
+        if (b->rx == 0) {
+            free_slot = free_slot ? free_slot : b;
+        } else if (b->used != frame && (oldest == NULL || frame - b->used > frame - oldest->used)) {
+            oldest = b;
+        }
+    }
+    // Room for it: the least recently drawn go, never one drawn this frame.
+    const uint32_t need = (uint32_t) ((2 * rx + 4) * (2 * ry + 4) * 3);
+    while (oldest != NULL && (free_slot == NULL || s_ball_bytes + need > BALL_BUDGET)) {
+        ball_free(oldest);
+        free_slot = free_slot ? free_slot : oldest;
+        oldest = NULL;
+        for (int i = 0; i < BALL_SLOTS; i++) {
+            ball_slot_t *b = &s_balls[i];
+            if (b->rx != 0 && b->used != frame && (oldest == NULL || frame - b->used > frame - oldest->used)) {
+                oldest = b;
+            }
+        }
+    }
+    if (free_slot == NULL) {
         return NULL;
     }
-    const int i = level + LOOK_SQUASH_STEPS;
-    return s_squashed_ready[i] ? &s_squashed[i] : NULL;
+    const int64_t start = esp_timer_get_time();
+    if (render_ball_fast(&free_slot->sp, rx, ry) != ESP_OK) {
+        return NULL;
+    }
+    free_slot->rx = rx;
+    free_slot->ry = ry;
+    free_slot->used = frame;
+    s_ball_bytes += free_slot->sp.img.data_size;
+    const int64_t took = esp_timer_get_time() - start;
+    if (took > s_ball_slowest_us) {
+        s_ball_slowest_us = took;
+        ESP_LOGI(TAG, "sphere %dx%d rendered in %lld us", rx, ry, took);
+    }
+    return &free_slot->sp;
 }
 
 const look_t *look_get(void)

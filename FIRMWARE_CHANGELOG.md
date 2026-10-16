@@ -1,5 +1,19 @@
 # Firmware changelog
 
+## 0.6.0
+
+Yoru has a life of its own, and the whole screen to live it in.
+
+- **Needs, like a Tamagotchi.** Yoru now needs rest, food, fun, company and something new to look at. Each runs down with time and with what it does, and what it does next comes from what it needs most, not from chance: hungry, it hunts; bored, it plays; curious, it explores; tired, it naps; lonely, it comes to ask for you. Well looked after it is happier; left alone it gets hungry and a bit sad, but it never starves: it feeds and amuses itself. The levels survive a restart.
+- **Fireflies.** Yoru eats little lights in the dark. Hungry, it spots one far away, creeps up on it, chases it as it flits and gulps it down. Tap the black anywhere (not Yoru) and a firefly drops there for it: it rushes to eat it, likes you for it, bats it away for fun when it isn't hungry, and shakes its head when it's full. "Give a firefly" in the new Yoru page of the menu, and the computer (`feed`), do the same.
+- **It asks for you.** When it is hungry, lonely or bored and you're around, it comes right up to the glass, its face filling the screen, and knocks twice: a whimper when hungry, a wave when lonely. Touch it to answer, or feed it. Nobody answers, it sighs, goes back, and asks less often.
+- **Depth.** Yoru floats in a space, not on a flat picture: far away it is small, dim and drawn towards the middle; up close it fills the screen. It glides along smooth curves, dashes with a little wind-up and overshoot, hops with a squash at each landing, stretches as it speeds along and looks where it's going.
+- **Play.** It hops along the bottom of the screen as if it had a floor, plays peekaboo (gone past the edge, then just its face peeking over the rim from another side, then "boo!"), and loops through the space, far behind and right back up to the glass. It explores the distance and goes to the rim to peek past it, daydreams, sulks by the edge when it's unhappy, and dances when music plays.
+- **Sleep that makes sense.** Tired, it yawns, stretches, finds a corner and drifts off; rested, it wakes by itself and stretches (not alone in the middle of the night). "Sleepy after" and "Asleep after" now count from the last sign of someone around, a touch, a voice or you using the computer, and are 5 and 10 minutes by default, so it has time to live while you work. Settings you changed are kept.
+- **Yoru page in the menu**, first on the ring: what it's doing and its five needs as bars, and "Give a firefly".
+- A new mood, hungry. `get_pet` reports the needs, what Yoru is doing and how long nobody has been around.
+- Under the hood: the sphere is drawn at any size without slow scaling, so moving near and far stays smooth; the squashed spheres are no longer prepared at startup, which frees about 2 MB of memory for the sizes in use.
+
 ## 0.5.4
 
 Answer Claude Code's permission requests on Yoru.

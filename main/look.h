@@ -1,10 +1,13 @@
 #pragma once
 
-/* Yoru's look, rendered once at boot into PSRAM (docs/CONCEPT.md, "On the
- * board"): the shaded sphere, the tint and the halo
- * as alpha maps to colour at draw time, and the hands. eyes.c only places
+/* Yoru's look, rendered into PSRAM (docs/CONCEPT.md, "On the board"): the
+ * shaded sphere (at boot, and at other sizes as Yoru moves nearer or
+ * farther), the tint and the halo as alpha maps to colour at draw time, and
+ * the hands. eyes.c only places
  * and blends these; the shapes come from the Rive mascot
  * (docs/mascot/yoru.riv). */
+
+#include <stdint.h>
 
 #include "esp_err.h"
 #include "lvgl.h"
@@ -18,11 +21,8 @@ extern "C" {
  * sphere is about 40% of the disc, small enough to float and cheap to draw. */
 #define LOOK_SCALE 0.7f
 #define LOOK_SPHERE_R 98
-/* How much a full poke (1) or stretch (-1) squashes the body. LVGL scaling
- * the sphere costs about 80 ms a frame on this chip, so the squashed
- * spheres are rendered ahead, this many steps on each side. */
+/* How much a full poke (1) or stretch (-1) squashes the body. */
 #define LOOK_SQUASH 0.12f
-#define LOOK_SQUASH_STEPS 8
 
 /* A sprite and where its anchor (the point it is placed by) sits in it. */
 typedef struct {
@@ -39,13 +39,15 @@ typedef struct {
     look_sprite_t hand;  // a small flattened sphere
 } look_t;
 
-/** Render Yoru's pictures now (call once before eyes_create()) and start
- * rendering the squashed spheres in a background task. */
+/** Render Yoru's pictures now (call once before eyes_create()). */
 esp_err_t look_init(void);
 
-/** The lit sphere squashed by `level` / LOOK_SQUASH_STEPS (-steps..steps,
- * positive wider), drawn at scale 1; NULL while it isn't rendered yet. */
-const look_sprite_t *look_day(int level);
+/** The lit sphere with radii `rx` x `ry` pixels (squashed when they differ),
+ * for any distance and squash: LVGL scaling the sphere costs about 80 ms a
+ * frame on this chip, so each size is rendered once, in a few ms, and kept
+ * while it is used. Drawn at scale 1. A sphere returned this frame stays
+ * valid until the next call with `frame` changed. NULL if memory runs out. */
+const look_sprite_t *look_ball(int rx, int ry, uint32_t frame);
 
 const look_t *look_get(void);
 
