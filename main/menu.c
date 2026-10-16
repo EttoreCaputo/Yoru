@@ -425,6 +425,9 @@ static lv_obj_t *full_screen(bool opaque)
     lv_obj_center(o);
     lv_obj_add_flag(o, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
+    // The swipes stop here: bubbled on, they'd reach the top layer, which
+    // nobody listens to.
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_GESTURE_BUBBLE);
     if (opaque) {
         lv_obj_set_style_bg_color(o, COL_BG, 0);
         lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
@@ -454,6 +457,15 @@ static void show_face(bool show)
 
 static void build_page(int cat);
 static void build_ring(void);
+
+/* The direction of a swipe, once: the release after it is not a tap too. */
+static lv_dir_t swipe_dir(void)
+{
+    lv_indev_t *indev = lv_indev_active();
+    const lv_dir_t dir = lv_indev_get_gesture_dir(indev);
+    lv_indev_wait_release(indev);
+    return dir;
+}
 
 /* ---- The arc ------------------------------------------------------------------------------ */
 
@@ -486,6 +498,9 @@ static void arc_changed_cb(lv_event_t *e)
 
 static void editor_back_cb(lv_event_t *e)
 {
+    if (lv_event_get_code(e) == LV_EVENT_GESTURE && swipe_dir() != LV_DIR_RIGHT) {
+        return;
+    }
     drop(&s.editor);
     build_page(s.cat);
 }
@@ -496,6 +511,7 @@ static void build_editor(const item_t *it)
     drop(&s.page);
     s.editor = full_screen(true);
     lv_obj_add_event_cb(s.editor, editor_back_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_add_event_cb(s.editor, editor_back_cb, LV_EVENT_GESTURE, NULL);
 
     int32_t lo, hi;
     board_settings_range(it->setting, &lo, &hi);
@@ -503,6 +519,10 @@ static void build_editor(const item_t *it)
     lv_obj_t *arc = lv_arc_create(s.editor);
     lv_obj_set_size(arc, BOARD_LCD_H_RES - 26, BOARD_LCD_V_RES - 26);
     lv_obj_center(arc);
+    // Only the ring is the arc: a tap inside it is the way back, not a jump
+    // of the value. Dragging it is no swipe either.
+    lv_obj_add_flag(arc, LV_OBJ_FLAG_ADV_HITTEST);
+    lv_obj_remove_flag(arc, LV_OBJ_FLAG_GESTURE_BUBBLE);
     lv_arc_set_rotation(arc, 135);
     lv_arc_set_bg_angles(arc, 0, 270);
     if (it->fmt == F_TIME) {
@@ -526,7 +546,7 @@ static void build_editor(const item_t *it)
     format(it, v, text, sizeof(text));
     s.edit_value = label(s.editor, &lv_font_montserrat_40, COL_TEXT, text);
     lv_obj_center(s.edit_value);
-    lv_obj_t *hint = label(s.editor, &lv_font_montserrat_20, COL_DIM, tr("Tap to go back", "Tocca per tornare"));
+    lv_obj_t *hint = label(s.editor, &lv_font_montserrat_20, COL_DIM, tr("Tap here to go back", "Tocca qui per tornare"));
     lv_obj_align(hint, LV_ALIGN_CENTER, 0, 64);
 }
 
@@ -663,6 +683,9 @@ static lv_obj_t *add_row(lv_obj_t *list, const item_t *it)
 
 static void page_back_cb(lv_event_t *e)
 {
+    if (lv_event_get_code(e) == LV_EVENT_GESTURE && swipe_dir() != LV_DIR_RIGHT) {
+        return;
+    }
     drop(&s.page);
     s.nvalues = 0;
     build_ring();
@@ -677,6 +700,7 @@ static void build_page(int cat)
     drop(&s.ring);
     show_face(false);
     s.page = full_screen(true);
+    lv_obj_add_event_cb(s.page, page_back_cb, LV_EVENT_GESTURE, NULL);
 
     // The title is the way back.
     char title[40];
@@ -722,7 +746,7 @@ static void icon_cb(lv_event_t *e)
 
 static void ring_gesture_cb(lv_event_t *e)
 {
-    if (lv_indev_get_gesture_dir(lv_indev_active()) == LV_DIR_TOP) {
+    if (swipe_dir() == LV_DIR_TOP) {
         menu_close();
     }
 }

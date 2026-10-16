@@ -1,5 +1,14 @@
 # Firmware changelog
 
+## 0.5.1
+
+The menu is easier to get out of.
+
+- **Swipe up closes the menu again.** On the ring of icons the swipe up never arrived, so the menu only closed by waiting. It works now, anywhere on the ring.
+- **Leaving a setting.** On the arc screen (brightness, volume, the hours, the waits) a tap in the middle now goes back to the page; before, the arc took the tap and moved the value instead. Only the ring at the rim moves the value now.
+- **Swipe right to go back,** on a page and on the arc screen, besides tapping the title or the middle.
+- With the menu open Yoru shrinks to a smaller ball in the middle, clear of the icons, and grows back when it closes.
+
 ## 0.5.0
 
 A menu on the board, and Yoru feels how you hold it.

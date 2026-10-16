@@ -37,6 +37,10 @@
  * slowing down as it goes and speeding up as it comes back. */
 #define SLEEP_AWAY_MS 2000
 #define SLEEP_BACK_MS 700
+/* With the menu open Yoru shrinks to this, clear of the ring of icons, in
+ * this long. */
+#define MENU_SIZE 0.62f
+#define MENU_SIZE_MS 220
 /* The most pieces an overlay has (three z's, three dots). */
 #define MAX_OVERLAY_RECTS 3
 /* The eye sprites: the largest eye (surprised, swelling, stretched) fits
@@ -260,6 +264,7 @@ static struct {
     int32_t dt_ms;        // how long since, for this frame's step
     float frames;         // the same in 33 ms frames, for the easing
     float near;
+    float size;           // 1, or MENU_SIZE with the menu open
     eyes_status_t status;
     float tint;
     float tint_rgb[3];
@@ -389,7 +394,9 @@ static void body_layout(body_vis_t *v)
     const float t = (float) s.t_ms / 1000.0f;
     // Breathing: a slow bob of a few pixels. Not asleep (far away and
     // still), not with the tint on (the halo covers the screen).
-    const bool still = s.near < 0.5f || s.tint > 0.01f;
+    // Small under the menu it keeps still too: every frame of a scaled
+    // sphere costs.
+    const bool still = s.near < 0.5f || s.tint > 0.01f || s.size < 0.999f;
     const float bob = still ? 0 : 3 * sinf(t * 2.1f);
     // Scared, it trembles; knocked, it is pushed and springs back; leaning,
     // it sags towards the low side.
@@ -402,7 +409,7 @@ static void body_layout(body_vis_t *v)
     // Going away is a perspective shrink: quick at first, slow in the
     // distance (and the other way coming back), so the expensive large
     // scaled frames are few.
-    v->dist = 1 / (1 + SLEEP_FAR * (1 - s.near));
+    v->dist = s.size / (1 + SLEEP_FAR * (1 - s.near));
     if (v->dist > 0.999f && look_day(level) != NULL) {
         sq = (float) level / LOOK_SQUASH_STEPS;
         v->day_level = level;
@@ -911,6 +918,9 @@ static bool step(void)
     } else {
         s.near = fminf(1, s.near + (float) s.dt_ms / SLEEP_BACK_MS);
     }
+    const float want_size = s.mood == EYES_MOOD_PEEK ? MENU_SIZE : 1;
+    const float size_step = (float) s.dt_ms * (1 - MENU_SIZE) / MENU_SIZE_MS;
+    s.size = want_size < s.size ? fmaxf(want_size, s.size - size_step) : fminf(want_size, s.size + size_step);
     const float want_tint = s.status == EYES_STATUS_IDLE ? 0 : 1;
     s.tint = fabsf(want_tint - s.tint) < 0.01f ? want_tint : lerp(s.tint, want_tint, ease(0.12f));
     if (s.status != EYES_STATUS_IDLE) {
@@ -1039,6 +1049,7 @@ lv_obj_t *eyes_create(lv_obj_t *parent)
     s.next_blink_ms = 2500;
     s.next_look_ms = 1500;
     s.near = 1;
+    s.size = 1;
     s.badge_scale = 1;
     s.last_tick = lv_tick_get();
     s.hand[0] = (hand_pose_t) TUCK_L;
