@@ -6,6 +6,7 @@
 #include "link.h"
 #include "cJSON.h"
 #include "ears.h"
+#include "ears_dir.h"
 #include "esp_afe_config.h"
 #include "esp_afe_sr_models.h"
 #include "esp_heap_caps.h"
@@ -111,6 +112,11 @@ typedef struct {
 
 static stream_t s_stream;
 static volatile bool s_wake_sound = true;
+/* The wake word is listened for (the menu's switch), and whether WakeNet is
+ * on in the AFE now: off during an utterance, and while the switch is. Only
+ * the fetch task touches the AFE's switch. */
+static volatile bool s_wake_on = true;
+static bool s_wakenet_on = true;
 
 static const char *const STATE_NAMES[VOICE_STATE_COUNT] = {
     [VOICE_IDLE] = "idle",
@@ -238,6 +244,17 @@ static void update_run(void)
     }
 }
 
+void voice_set_wake_on(bool on)
+{
+    s_wake_on = on;
+    ESP_LOGI(TAG, "wake word %s", on ? "on" : "off");
+}
+
+bool voice_wake_on(void)
+{
+    return s_wake_on;
+}
+
 void voice_set_wake_sound(bool on)
 {
     s_wake_sound = on;
@@ -352,6 +369,7 @@ static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms)
     // "Alexa" said again mid-sentence isn't a new wake, and WakeNet's CPU is
     // free meanwhile.
     s_afe->disable_wakenet(s_afe_data);
+    s_wakenet_on = false;
     cJSON *params = cJSON_CreateObject();
     cJSON_AddNumberToObject(params, "id", st->id);
     cJSON_AddStringToObject(params, "trigger", trigger);
@@ -368,7 +386,10 @@ static void stream_end(end_reason_t reason)
         return;
     }
     st->active = false;
-    s_afe->enable_wakenet(s_afe_data);
+    if (s_wake_on) {
+        s_afe->enable_wakenet(s_afe_data);
+        s_wakenet_on = true;
+    }
     int ms = (int) (st->samples / 16);
     ESP_LOGI(TAG, "utterance %d: %d ms, %s%s", st->id, ms, END_NAMES[reason],
              st->dropped ? " (frames dropped)" : "");
@@ -459,6 +480,8 @@ static void feed_task(void *arg)
         xSemaphoreTake(s_mic, portMAX_DELAY);
         esp_err_t err = board_audio_read(buf, (size_t) chunk);
         if (err == ESP_OK) {
+            // Where a sudden sound came from needs both raw mics.
+            ears_dir_feed(buf, chunk, BOARD_AUDIO_IN_CHANNELS);
             s_afe->feed(s_afe_data, buf);
         }
         xSemaphoreGive(s_mic);
@@ -489,6 +512,15 @@ static void fetch_task(void *arg)
                 } else {
                     stream_start("host", 0, NO_SPEECH_MS);
                 }
+            }
+            if (!s_stream.active && s_wakenet_on != s_wake_on) {
+                // The menu's switch: WakeNet's CPU is free while it's off.
+                if (s_wake_on) {
+                    s_afe->enable_wakenet(s_afe_data);
+                } else {
+                    s_afe->disable_wakenet(s_afe_data);
+                }
+                s_wakenet_on = s_wake_on;
             }
             afe_fetch_result_t *res = s_afe->fetch_with_delay(s_afe_data, pdMS_TO_TICKS(FETCH_WAIT_MS));
             if (res != NULL && res->ret_value != ESP_FAIL) {
@@ -606,6 +638,8 @@ esp_err_t voice_set_wake_word(const char *id)
     } else {
         strlcpy(s_model, model, sizeof(s_model));
     }
+    // A new AFE listens: the fetch task turns it off again if it should.
+    s_wakenet_on = true;
     xSemaphoreGive(s_fetch);
     xSemaphoreGive(s_mic);
     if (s_afe_data == NULL) {

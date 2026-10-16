@@ -1,5 +1,6 @@
 #include "behaviour.h"
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -10,6 +11,8 @@
 #include "esp_random.h"
 #include "eyes.h"
 #include "lvgl_port.h"
+#include "menu.h"
+#include "motion.h"
 #include "pet.h"
 #include "playback.h"
 
@@ -24,6 +27,20 @@
 #define WHIM_SPAN_MS 25000
 /* The host's pointer is followed this long after its last move. */
 #define GAZE_HOLD_MS 6000
+/* A swipe down that starts this close to the top edge opens the menu. */
+#define MENU_EDGE_PX 70
+#define MENU_SWIPE_PX 80
+/* A slap: a quick flick across the face. Three in a row and it's had enough. */
+#define SLAP_MAX_MS 280
+#define SLAP_PX 110
+#define SLAP_WINDOW_MS 2500
+/* A stroke is slower than a slap: the finger has been down this long. */
+#define STROKE_MIN_MS 350
+/* A sound from one side is looked at this long. */
+#define HEARD_LOOK_MS 1500
+/* Rocked twice within this long, it falls asleep. */
+#define LULLABY_MS 60000
+#define LEAN_MS 50
 /* How long "done" (green) and "error" (red) stay on the sphere. */
 #define STATUS_DONE_MS 2500
 #define STATUS_ERROR_MS 3500
@@ -69,7 +86,7 @@ static const scene_t SCENES[] = {
     {"sigh", EYES_MOOD_SLEEPY, 1200, FX_POKE, G(NONE), SOUND_SIGH},
     {"sad", EYES_MOOD_SAD, 3500, FX_NONE, G(NONE), SOUND_WHIMPER},
     {"surprised", EYES_MOOD_SURPRISED, 1500, FX_POKE, G(NONE), SOUND_GASP},
-    {"scared", EYES_MOOD_SURPRISED, 3000, FX_POKE, G(COVER), SOUND_EEP},
+    {"scared", EYES_MOOD_SCARED, 3000, FX_POKE, G(COVER), SOUND_EEP},
     {"bored", EYES_MOOD_BORED, 3000, FX_NONE, G(NONE), SOUND_COUNT},
     {"look_around", EYES_MOOD_NEUTRAL, 0, FX_NONE, G(NONE), SOUND_COUNT},
     {"blink", EYES_MOOD_NEUTRAL, 0, FX_BLINK, G(NONE), SOUND_COUNT},
@@ -79,6 +96,12 @@ static const scene_t SCENES[] = {
     {"shy", EYES_MOOD_HAPPY, 3000, FX_NONE, G(COVER), SOUND_COUNT},
     {"clap", EYES_MOOD_HAPPY, 1300, FX_NONE, G(CLAP), SOUND_COUNT},
     {"stretch", EYES_MOOD_SLEEPY, 1800, FX_NONE, G(STRETCH), SOUND_YAWN},
+    // The case as an input (motion.c) and slaps.
+    {"dizzy", EYES_MOOD_DIZZY, 3200, FX_POKE, G(HOLD), SOUND_CONFUSED},
+    {"annoyed", EYES_MOOD_GRUMPY, 2800, FX_POKE, G(SHOO), SOUND_GRUMBLE},
+    {"falling", EYES_MOOD_SCARED, 1500, FX_NONE, G(FLAIL), SOUND_EEP},
+    {"drowsy", EYES_MOOD_SLEEPY, 4000, FX_NONE, G(NONE), SOUND_YAWN},
+    {"lifted", EYES_MOOD_CURIOUS, 1800, FX_BLINK, G(NONE), SOUND_CHIRP},
 };
 
 /* Where the eyes rest in each of the pet's moods. The cheerful ones rest
@@ -109,9 +132,23 @@ static struct {
     uint32_t gaze_ms;
     /* "done" or "error" on the sphere until then (0: none). */
     uint32_t status_until_ms;
+    /* The press: where and when it started, and whether from the top edge. */
+    lv_point_t press_point;
+    uint32_t press_ms;
+    bool from_top;
+    int slaps;
+    uint32_t last_slap_ms;
+    /* A scene to play a moment later (relief after a fall). */
+    const char *later;
+    uint32_t later_ms;
+    bool menu;
+    /* Turned face down: asleep, and the mic is off until it's turned back. */
+    bool face_down;
+    uint32_t rocked_ms;
 } s;
 
 static void show_voice(voice_state_t state);
+static void apply_rotation(void);
 
 static void set_brightness(int percent)
 {
@@ -121,9 +158,24 @@ static void set_brightness(int percent)
     }
 }
 
+/* At night (the host sends the time) the screen is dimmer. */
+static bool night(void)
+{
+    pet_state_t pet;
+    pet_get(&pet);
+    if (pet.minute < 0) {
+        return false;
+    }
+    const int h = pet.minute / 60;
+    const int from = (int) board_settings_get(SETTING_NIGHT_FROM), to = (int) board_settings_get(SETTING_NIGHT_TO);
+    return from <= to ? (h >= from && h < to) : (h >= from || h < to);
+}
+
 static int awake_brightness(void)
 {
-    return (int) board_settings_get(SETTING_BRIGHTNESS);
+    const int day = (int) board_settings_get(SETTING_BRIGHTNESS);
+    const int dark = (int) board_settings_get(SETTING_NIGHT_BRIGHTNESS);
+    return night() && dark < day ? dark : day;
 }
 
 static int asleep_brightness(void)
@@ -213,8 +265,8 @@ static void watch_finger(lv_indev_t *indev)
     eyes_look_at((float) (p.x - BOARD_LCD_H_RES / 2) / 180.0f, (float) (p.y - BOARD_LCD_V_RES / 2) / 180.0f);
     s.stroke += abs(p.x - s.last_point.x) + abs(p.y - s.last_point.y);
     s.last_point = p;
-    if (!s.stroked && !s.asleep && s.voice == VOICE_IDLE && s.stroke > STROKE_PX
-        && board_settings_on(SETTING_TOUCH_REACTIONS)) {
+    if (!s.stroked && !s.asleep && s.voice == VOICE_IDLE && s.stroke > STROKE_PX && !s.from_top
+        && lv_tick_elaps(s.press_ms) >= STROKE_MIN_MS && board_settings_on(SETTING_TOUCH_REACTIONS)) {
         s.stroked = true;
         pet_event(PET_EVENT_STROKED);
         playback_sound(SOUND_PURR);
@@ -229,12 +281,30 @@ static void poke(uint32_t now)
     eyes_poke();
     if (s.pokes >= 3) {
         pet_event(PET_EVENT_ANNOYED);
-        playback_sound(SOUND_GRUMBLE);
-        react(EYES_MOOD_GRUMPY, 2500);
+        play("annoyed");
     } else {
         pet_event(PET_EVENT_POKED);
         playback_sound(SOUND_BOOP);
         react(EYES_MOOD_HAPPY, 1800);
+    }
+}
+
+/* A quick flick across the face knocks the body that way. The third in a
+ * row: it pushes you away. */
+static void slap(uint32_t now, int32_t dx, int32_t dy)
+{
+    s.slaps = (now - s.last_slap_ms < SLAP_WINDOW_MS) ? s.slaps + 1 : 1;
+    s.last_slap_ms = now;
+    const float len = sqrtf((float) (dx * dx + dy * dy));
+    eyes_knock((float) dx / len * 0.9f, (float) dy / len * 0.5f);
+    if (s.slaps >= 3) {
+        s.slaps = 0;
+        pet_event(PET_EVENT_ANNOYED);
+        play("annoyed");
+    } else {
+        pet_event(PET_EVENT_POKED);
+        playback_sound(SOUND_BOING);
+        react(EYES_MOOD_SURPRISED, 900);
     }
 }
 
@@ -249,25 +319,49 @@ static void touch_cb(lv_event_t *e)
     case LV_EVENT_PRESSED:
         s.pressed = true;
         lv_indev_get_point(indev, &s.last_point);
+        s.press_point = s.last_point;
+        s.press_ms = now;
+        s.from_top = s.press_point.y < MENU_EDGE_PX;
         s.stroke = 0;
         s.stroked = false;
+        motion_touched();
         if (!s.asleep) {
             watch_finger(indev);
         }
         break;
     case LV_EVENT_PRESSING:
+        if (s.from_top && !s.menu && s.last_point.y - s.press_point.y > MENU_SWIPE_PX) {
+            // Pulled down from the top edge: the menu, whatever else goes on.
+            s.from_top = false;
+            s.pressed = false; // no release comes after wait_release
+            if (s.asleep) {
+                wake_up();
+            }
+            lv_indev_wait_release(indev);
+            menu_open();
+            break;
+        }
         if (!s.asleep) {
             watch_finger(indev);
         }
         break;
-    case LV_EVENT_RELEASED:
+    case LV_EVENT_RELEASED: {
         s.pressed = false;
+        lv_point_t p;
+        lv_indev_get_point(indev, &p);
+        const int32_t dx = p.x - s.press_point.x, dy = p.y - s.press_point.y;
+        if (!s.asleep && !s.from_top && s.voice == VOICE_IDLE && lv_tick_elaps(s.press_ms) <= SLAP_MAX_MS
+            && abs(dx) > SLAP_PX && board_settings_on(SETTING_TOUCH_REACTIONS)) {
+            s.stroked = true; // not a poke too
+            slap(now, dx, dy);
+        }
         if (s.voice == VOICE_IDLE) {
             eyes_look_around();
         } else {
             show_voice(s.voice); // back to looking at you
         }
         break;
+    }
     case LV_EVENT_SHORT_CLICKED:
         // Waking and sleeping work with reactions off too: they're the controls.
         if (s.asleep) {
@@ -277,7 +371,7 @@ static void touch_cb(lv_event_t *e)
         }
         break;
     case LV_EVENT_LONG_PRESSED:
-        if (s.voice != VOICE_IDLE) {
+        if (s.voice != VOICE_IDLE || s.stroked || s.stroke > STROKE_PX) {
             break; // not in the middle of a conversation
         }
         eyes_look_around();
@@ -299,6 +393,20 @@ static void tick_cb(lv_timer_t *timer)
     if (s.status_until_ms != 0 && (int32_t) (now - s.status_until_ms) >= 0) {
         s.status_until_ms = 0;
         eyes_set_status(EYES_STATUS_IDLE);
+    }
+    apply_rotation();
+    if (s.menu) {
+        // The menu is company, and Yoru only watches it.
+        s.last_touch_ms = now;
+        set_brightness(awake_brightness());
+        return;
+    }
+    if (s.later != NULL && (int32_t) (now - s.later_ms) >= 0) {
+        const char *later = s.later;
+        s.later = NULL;
+        if (!s.asleep && s.voice == VOICE_IDLE) {
+            play(later);
+        }
     }
 
     if (s.asleep) {
@@ -342,6 +450,170 @@ static void tick_cb(lv_timer_t *timer)
         if (!focus && !pet_quiet()) {
             play(pet_idle_scene());
         }
+    }
+}
+
+/* The rotation setting: four fixed ones, or (4) following how the badge
+ * stands. Lying flat, it keeps the last one. */
+static void apply_rotation(void)
+{
+    int rot = (int) board_settings_get(SETTING_ROTATION);
+    if (rot >= 4) {
+        const int up = motion_upright();
+        if (up < 0) {
+            return;
+        }
+        // Turned a quarter clockwise, the panel's left edge is up: LVGL's
+        // 90° puts the top of the picture there.
+        rot = up;
+    }
+    lvgl_port_set_rotation(rot);
+}
+
+/* The lean, from the panel's axes to the picture's. */
+static void lean_cb(lv_timer_t *t)
+{
+    float x = 0, y = 0;
+    if (!s.asleep && !s.menu && board_settings_on(SETTING_MOTION_REACTIONS)) {
+        motion_lean(&x, &y);
+    }
+    float lx = x, ly = y;
+    switch (lvgl_port_rotation()) {
+    case 1:
+        lx = -y;
+        ly = x;
+        break;
+    case 2:
+        lx = -x;
+        ly = -y;
+        break;
+    case 3:
+        lx = y;
+        ly = -x;
+        break;
+    default:
+        break;
+    }
+    eyes_lean(lx, ly);
+}
+
+/* Look at a point for `ms`, then around again (the tick lets go). */
+static void hold_gaze(float x, float y, uint32_t ms)
+{
+    s.gaze_ms = lv_tick_get() - (GAZE_HOLD_MS - ms);
+    if (s.gaze_ms == 0) {
+        s.gaze_ms = 1; // 0 means none
+    }
+    eyes_look_at(x, y);
+}
+
+static void later(const char *scene, uint32_t after_ms)
+{
+    s.later = scene;
+    s.later_ms = lv_tick_get() + after_ms;
+}
+
+/* The mic off while it's face down; back as the setting says after. */
+static void set_face_down(bool down)
+{
+    s.face_down = down;
+    voice_set_muted(down || board_settings_on(SETTING_MIC_MUTED));
+}
+
+static void on_motion(motion_event_t ev)
+{
+    const uint32_t now = lv_tick_get();
+    const bool reactions = board_settings_on(SETTING_MOTION_REACTIONS) && !board_settings_on(SETTING_FOCUS);
+    // Face down and back are a control, like a long press: always on, even
+    // in a conversation (it's the privacy gesture).
+    if (ev == MOTION_FACE_DOWN) {
+        if (s.menu) {
+            menu_close();
+        }
+        eyes_look_around();
+        fall_asleep();
+        set_face_down(true);
+        return;
+    }
+    if (ev == MOTION_FACE_UP) {
+        if (s.face_down) {
+            set_face_down(false);
+            s.last_touch_ms = now;
+            if (s.asleep) {
+                wake_up();
+            }
+        }
+        return;
+    }
+    if (s.menu || s.voice != VOICE_IDLE || s.face_down) {
+        return;
+    }
+    // Picking it up is the gentlest way to wake it.
+    if (ev == MOTION_LIFTED && s.asleep) {
+        s.last_touch_ms = now;
+        wake_up();
+        return;
+    }
+    if (ev == MOTION_DOUBLE_KNOCK) {
+        // Called, like two claps.
+        s.last_touch_ms = now;
+        if (s.asleep) {
+            wake_up();
+        }
+        if (reactions) {
+            pet_heard(PET_HEARD_CLAPS, 2);
+        }
+        return;
+    }
+    if (s.asleep || !reactions) {
+        return;
+    }
+    s.last_touch_ms = now;
+    switch (ev) {
+    case MOTION_LIFTED:
+        pet_event(PET_EVENT_LIFTED);
+        play("lifted");
+        hold_gaze(0, -0.2f, 1800); // at you
+
+        break;
+    case MOTION_PUT_DOWN:
+        eyes_blink();
+        eyes_knock(0, 0.15f);
+        eyes_look_around();
+        break;
+    case MOTION_SHAKEN:
+    case MOTION_SPUN:
+        pet_event(PET_EVENT_SHAKEN);
+        play("dizzy");
+        break;
+    case MOTION_SHAKEN_LONG:
+        pet_event(PET_EVENT_ANNOYED);
+        play("annoyed");
+        break;
+    case MOTION_KNOCK:
+        eyes_knock(0, 0.35f);
+        poke(now);
+        break;
+    case MOTION_ROCKED:
+        pet_event(PET_EVENT_ROCKED);
+        if (s.rocked_ms != 0 && now - s.rocked_ms < LULLABY_MS) {
+            s.rocked_ms = 0;
+            fall_asleep();
+        } else {
+            s.rocked_ms = now;
+            play("drowsy");
+        }
+        break;
+    case MOTION_DROPPED:
+        pet_event(PET_EVENT_DROPPED);
+        play("falling");
+        break;
+    case MOTION_LANDED:
+        eyes_knock(0, 0.6f);
+        later("relieved", 1300);
+        break;
+    default:
+        break;
     }
 }
 
@@ -444,6 +716,52 @@ void behaviour_gaze(float x, float y)
     lvgl_port_unlock();
 }
 
+void behaviour_motion(motion_event_t event)
+{
+    lvgl_port_lock();
+    on_motion(event);
+    lvgl_port_unlock();
+}
+
+void behaviour_heard_from(float x)
+{
+    lvgl_port_lock();
+    if (!s.asleep && !s.pressed && !s.menu && s.voice == VOICE_IDLE && board_settings_on(SETTING_PET_HEARING)) {
+        // The gaze turns to the noise, and drifts back on its own.
+        hold_gaze(x * 0.9f, 0, HEARD_LOOK_MS);
+    }
+    lvgl_port_unlock();
+}
+
+void behaviour_power_key(void)
+{
+    lvgl_port_lock();
+    s.last_touch_ms = lv_tick_get();
+    if (s.menu) {
+        menu_close();
+    } else if (s.asleep) {
+        wake_up();
+    } else if (s.voice == VOICE_IDLE) {
+        eyes_look_around();
+        fall_asleep();
+    }
+    lvgl_port_unlock();
+}
+
+static void on_menu(bool open)
+{
+    s.menu = open;
+    s.last_touch_ms = lv_tick_get();
+    if (open) {
+        s.until_ms = 0;
+        eyes_set_mood(EYES_MOOD_PEEK);
+        eyes_look_at(0, -1);
+    } else {
+        eyes_blink();
+        eyes_look_around();
+    }
+}
+
 void behaviour_start(lv_obj_t *face)
 {
     const uint32_t now = lv_tick_get();
@@ -458,4 +776,6 @@ void behaviour_start(lv_obj_t *face)
     lv_obj_add_event_cb(face, touch_cb, LV_EVENT_SHORT_CLICKED, NULL);
     lv_obj_add_event_cb(face, touch_cb, LV_EVENT_LONG_PRESSED, NULL);
     lv_timer_create(tick_cb, TICK_MS, NULL);
+    lv_timer_create(lean_cb, LEAN_MS, NULL);
+    menu_init(face, on_menu);
 }

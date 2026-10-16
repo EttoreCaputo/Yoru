@@ -44,6 +44,11 @@ typedef enum {
     PET_EVENT_POKED,
     PET_EVENT_STROKED,
     PET_EVENT_ANNOYED,
+    /* The case (motion.c): picked up, shaken or spun, rocked, dropped. */
+    PET_EVENT_LIFTED,
+    PET_EVENT_SHAKEN,
+    PET_EVENT_ROCKED,
+    PET_EVENT_DROPPED,
 } pet_event_t;
 
 /* What it heard in the room (ears.c). */

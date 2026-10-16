@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "behaviour.h"
+#include "board_pmu.h"
 #include "board_settings.h"
 #include "ears.h"
 #include "esp_app_desc.h"
@@ -13,7 +14,9 @@
 #include "eyes.h"
 #include "link.h"
 #include "lvgl_port.h"
+#include "menu.h"
 #include "metrics_model.h"
+#include "motion.h"
 #include "net.h"
 #include "pet.h"
 #include "playback.h"
@@ -438,13 +441,59 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
     cJSON_AddNumberToObject(l, "rx_ignored", link.rx_ignored);
     cJSON_AddStringToObject(l, "transport", link_transport_name(link_active()));
     cJSON_AddItemToObject(st, "wifi", net_status());
+    board_pmu_state_t bat;
+    board_pmu_get(&bat);
+    cJSON *b = cJSON_AddObjectToObject(st, "battery");
+    cJSON_AddBoolToObject(b, "present", bat.battery);
+    cJSON_AddNumberToObject(b, "percent", bat.percent);
+    cJSON_AddNumberToObject(b, "mv", bat.mv);
+    cJSON_AddBoolToObject(b, "usb", bat.usb);
+    cJSON_AddBoolToObject(b, "charging", bat.charging);
+    if (motion_present()) {
+        // Gravity and turn rate on the screen's axes, for checking them.
+        float g[3], w[3], lx, ly;
+        motion_raw(g, w);
+        motion_lean(&lx, &ly);
+        cJSON *mo = cJSON_AddObjectToObject(st, "motion");
+        cJSON_AddItemToObject(mo, "g", cJSON_CreateFloatArray(g, 3));
+        cJSON_AddItemToObject(mo, "dps", cJSON_CreateFloatArray(w, 3));
+        cJSON_AddNumberToObject(mo, "lean_x", round2(lx));
+        cJSON_AddNumberToObject(mo, "lean_y", round2(ly));
+        cJSON_AddNumberToObject(mo, "upright", motion_upright());
+    }
     *structured = st;
     // The text is filled in by the caller from `structured`.
     text[0] = '\0';
     return true;
 }
 
+static bool tool_show_menu(const cJSON *args, char *text, cJSON **structured)
+{
+    const cJSON *open = cJSON_GetObjectItemCaseSensitive(args, "open");
+    const cJSON *page = cJSON_GetObjectItemCaseSensitive(args, "page");
+    bool ok = true;
+    lvgl_port_lock();
+    if (cJSON_IsFalse(open)) {
+        menu_close();
+    } else if (cJSON_IsString(page)) {
+        ok = menu_open_page(page->valuestring);
+    } else {
+        menu_open();
+    }
+    lvgl_port_unlock();
+    snprintf(text, TEXT_MAX, ok ? "done" : "no such page");
+    return ok;
+}
+
 static const tool_t TOOLS[] = {
+    {
+        .name = "show_menu",
+        .description = "Open or close the settings menu on Yoru's screen, on the ring of icons or straight on a page "
+                       "(display, sound, behaviour, voice, connection, battery, about).",
+        .schema = "{\"type\":\"object\",\"properties\":{\"open\":{\"type\":\"boolean\"},"
+                  "\"page\":{\"type\":\"string\"}}}",
+        .fn = tool_show_menu,
+    },
     {
         .name = "set_brightness",
         .description = "Set how bright Yoru's eyes glow while it's awake. Asleep it dims by itself. "

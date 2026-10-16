@@ -128,11 +128,13 @@ The Rive file is `docs/mascot/yoru.riv` (preview: `yoru.png`), one 466 × 466 ar
 | `squash` | number, -1…1 | Squash (positive) and stretch (negative) of the body |
 | `blink` | trigger | One blink |
 | `handsShown` | boolean | Hands out or tucked away |
-| `gesture` | enum | `none`, `wave`, `point`, `cover` (then peek), `think`, `clap`, `stretch` |
+| `gesture` | enum | `none`, `wave`, `point`, `cover` (then peek), `think`, `clap`, `stretch`, `hold`, `shoo`, `flail` |
 | `status` | enum | `idle`, `thinking`, `done`, `error`: tint, halo and badge |
 | `sleep` | boolean | Drifts away to a small dim dot with closed eyes, and back |
 
 The continuous parameters are bound directly, without easing: as on the board, the mood engine moves the targets and whoever drives the file eases them.
+
+The moods, knocks, slaps, lean, greeting and pointer-follow added with firmware 0.5.0 are described in `docs/mascot/STATES.md`.
 
 ## On the board
 

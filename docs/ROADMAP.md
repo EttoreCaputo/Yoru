@@ -45,7 +45,10 @@ Sources: Waveshare's BSP `waveshare/esp32_s3_touch_amoled_1_75c`, xiaozhi-esp32,
 
 To check on the hardware: rendering time per frame (`!lvgl stats`), and the flash size (`esptool flash_id`).
 
-### M2: settings menu and senses
+### M2: settings menu and senses (in since 0.5.0)
+
+In 0.5.0: the menu (`menu.c`), motion (`motion.c`), the PMU (`board_pmu.c`), the sound's direction (`ears_dir.c`), and new eye moods and gestures for them (dizzy, scared, peek; hold, shoo, flail; knock and lean). Left for later: the Look items (name, colour, eye shape: M5, when there is more than one), pairing a computer from the menu (the host does it over USB), deep sleep with wake-on-motion on battery, and checking on the board which way the IMU's x and y and the two mics lie (`SCREEN_X`/`SCREEN_Y` in `motion.c`, `MIC_A_SIDE` in `ears_dir.c`).
+
 
 **Settings menu on the board.** It is a round menu, made for the circle, that opens without the app.
 - **Opening and closing.** Swipe down from the top edge to open it, swipe up or wait a few seconds to close it. Yoru peeks at the menu while it is open, eyes small and up at the edge. The gesture must not clash with poking and stroking the eyes.
@@ -96,11 +99,11 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 - **Dropped.** Free fall: scared eyes and a squeak, then relief.
 - **Spun.** Turning it fast on the desk (gyroscope): dizzy.
 - **Orientation.** The screen's rotation can follow how the badge is held or stood, as an "auto" choice next to the four fixed ones in the menu.
-- **Power.** The IMU's wake-on-motion interrupt lets the board sleep deeply on battery and wake when it is picked up.
+- **Power (later).** The IMU's wake-on-motion interrupt lets the board sleep deeply on battery and wake when it is picked up.
 - **Later.** Gestures are sent to the host over the link (M3), so the app and MCP tools can use them; in M6 the gesture thresholds become data like the moods.
 
 **Senses**
-- Sound direction from the two mics, so the gaze turns to the noise.
+- Sound direction from the two mics, so the gaze turns to the noise (`ears_dir.c`, from the raw mics before the AFE).
 - `ears.c` for bangs, claps and chatter.
 - AXP2101: battery, charging, PWR key, power-off; sleep with the panel and touch in standby.
 
@@ -109,7 +112,7 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 - The link over USB and WiFi, `rpc` and `hello` with `board: "yoru-amoled-1.75c"`; the board tools reworked for one screen and the settings table. What differs from DualEye's protocol: `docs/protocol.md`.
 - Listening, thinking and speaking in the eye engine, with the voice's level; the wake word wakes Yoru.
 - The pet's sounds (`sounds.c`) on touch, reactions and whims.
-- Still to do: tune the mic gain (the mic next to the speaker nearly clips at 60% volume), use the second mic (two-mic AFE, and the sound direction in M2), check internal RAM with the WiFi on (0.3.1: 135 KB free, 99 KB at the lowest, without it; it was 48 and 12 KB in 0.3.0). Asleep, the floating z's make LVGL redraw a large rectangle every frame (about 55% busy against 22% awake): invalidate the eyes and the overlay separately.
+- Still to do: tune the mic gain (the mic next to the speaker nearly clips at 60% volume), use the second mic (two-mic AFE, and the sound direction in M2), check internal RAM with the WiFi on (0.3.1: 135 KB free, 99 KB at the lowest, without it; it was 48 and 12 KB in 0.3.0).
 
 ### M4: host and app
 - `yoru-core`, `yoru-cli` and `yoru-app` from DualEye's host. One screen, no faces: the app shows Yoru live, plus mood, settings and the voice set-up.

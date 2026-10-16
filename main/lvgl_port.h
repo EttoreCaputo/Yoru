@@ -12,6 +12,11 @@ extern "C" {
  * its own task on core 0. */
 esp_err_t lvgl_port_init(const board_lcd_t *lcd, lv_display_t **out_display);
 
+/** Turn what's drawn by `quarter` turns (0..3, LVGL's rotation: 1 is 90°
+ * clockwise). Touch follows. With the LVGL lock held. */
+void lvgl_port_set_rotation(int quarter);
+int lvgl_port_rotation(void);
+
 void lvgl_port_lock(void);
 void lvgl_port_unlock(void);
 

@@ -55,6 +55,8 @@ typedef struct {
     float top, slope, bottom;
     float tilt;
     float left, right;
+    /* 1: drawn as a spiral (dizzy) instead of a pill. */
+    float spiral;
 } eye_shape_t;
 
 static const eye_shape_t s_moods[EYES_MOOD_COUNT] = {
@@ -72,10 +74,13 @@ static const eye_shape_t s_moods[EYES_MOOD_COUNT] = {
     [EYES_MOOD_BORED] = {27, 55, 0.44f, 0, 0.2f, 0, 1, 1},
     [EYES_MOOD_LISTENING] = {29, 65, 0, 0, 0, -4, 1, 1},
     [EYES_MOOD_SPEAKING] = {28, 58, 0, 0, 0.3f, 0, 1, 1},
+    [EYES_MOOD_DIZZY] = {36, 36, 0, 0, 0, 0, 1, 1, 1},
+    [EYES_MOOD_SCARED] = {22, 70, 0.12f, -0.45f, 0, 0, 1, 1},
+    [EYES_MOOD_PEEK] = {20, 44, 0, 0, 0, 0, 1, 1},
 };
 
 static const char *const s_mood_names[EYES_MOOD_COUNT] = {
-    "neutral", "happy", "curious", "thinking", "grumpy", "hot", "sleepy", "asleep", "sad", "loving", "surprised", "bored", "listening", "speaking",
+    "neutral", "happy", "curious", "thinking", "grumpy", "hot", "sleepy", "asleep", "sad", "loving", "surprised", "bored", "listening", "speaking", "dizzy", "scared", "peek",
 };
 
 /* The status colours: blue thinking, green done, red error. */
@@ -144,6 +149,39 @@ static const hand_key_t CLAP[] = {
     {1000, {-72, 92, 1}, {72, 92, 1}},
     {1300, TUCK_L, TUCK_R},
 };
+/* Holding its head while the world spins: the hands at its temples, swaying. */
+static const hand_key_t HOLD[] = {
+    {0, TUCK_L, TUCK_R},
+    {300, {-118, -30, 1.1f}, {118, -30, 1.1f}},
+    {600, {-112, -40, 1.1f}, {124, -20, 1.1f}},
+    {900, {-124, -20, 1.1f}, {112, -40, 1.1f}},
+    {1200, {-112, -40, 1.1f}, {124, -20, 1.1f}},
+    {1500, {-124, -20, 1.1f}, {112, -40, 1.1f}},
+    {1800, {-118, -30, 1.1f}, {118, -30, 1.1f}},
+    {2100, TUCK_L, TUCK_R},
+};
+/* Go away: the right hand pushes out at you, twice. */
+static const hand_key_t SHOO[] = {
+    {0, TUCK_L, TUCK_R},
+    {200, TUCK_L, {120, 60, 1.0f}},
+    {330, TUCK_L, {70, 50, 1.4f}},
+    {480, TUCK_L, {120, 60, 1.0f}},
+    {610, TUCK_L, {70, 50, 1.4f}},
+    {900, TUCK_L, {120, 60, 1.0f}},
+    {1100, TUCK_L, TUCK_R},
+};
+/* Falling: both hands up, flapping. */
+static const hand_key_t FLAIL[] = {
+    {0, TUCK_L, TUCK_R},
+    {150, {-160, -120, 1}, {160, -110, 1}},
+    {270, {-150, -96, 1}, {170, -128, 1}},
+    {390, {-170, -128, 1}, {150, -96, 1}},
+    {510, {-150, -96, 1}, {170, -128, 1}},
+    {630, {-170, -128, 1}, {150, -96, 1}},
+    {750, {-150, -96, 1}, {170, -128, 1}},
+    {870, {-160, -120, 1}, {160, -110, 1}},
+    {1150, TUCK_L, TUCK_R},
+};
 static const hand_key_t STRETCH[] = {
     {0, TUCK_L, TUCK_R},
     {500, {-206, -34, 1.1f}, {206, -34, 1.1f}},
@@ -168,6 +206,9 @@ static const gesture_t s_gestures[EYES_GESTURE_COUNT] = {
     [EYES_GESTURE_THINK] = GESTURE("think", THINK, true),
     [EYES_GESTURE_CLAP] = GESTURE("clap", CLAP, true),
     [EYES_GESTURE_STRETCH] = GESTURE("stretch", STRETCH, false),
+    [EYES_GESTURE_HOLD] = GESTURE("hold", HOLD, false),
+    [EYES_GESTURE_SHOO] = GESTURE("shoo", SHOO, true),
+    [EYES_GESTURE_FLAIL] = GESTURE("flail", FLAIL, false),
 };
 
 /* Everything one frame shows, worked out before drawing so the same numbers
@@ -187,12 +228,14 @@ typedef struct {
     float x, y, w, h;      // centre and size in pixels
     float top_l, top_r;    // where the top lid cuts, from the centre
     float bottom;
+    float spiral;          // > 0.5: a spiral, turned by `phase` (radians)
+    float phase;
 } eye_box_t;
 
 /* An eye's picture, redrawn only when its shape changes. */
 typedef struct {
     look_sprite_t sp;
-    int32_t key[5];
+    int32_t key[6];
     lv_area_t drawn;
     bool valid;
 } eye_sprite_t;
@@ -227,6 +270,10 @@ static struct {
     hand_pose_t hand_from[2];
     hand_pose_t hand[2];
     bool hands_front;
+    /* A knock: where the body is pushed to and how fast it moves, in pixels;
+     * the lean from motion.c, eased, and where it is going. */
+    float kx, ky, kvx, kvy;
+    float lx, ly, tlx, tly;
     /* This frame and what the last one covered. */
     body_vis_t body;
     lv_area_t body_drawn;
@@ -279,7 +326,8 @@ static lv_color_t rgb_color(const float rgb[3])
 
 static bool has_overlay(eyes_mood_t mood)
 {
-    return mood == EYES_MOOD_THINKING || mood == EYES_MOOD_HOT || mood == EYES_MOOD_ASLEEP || mood == EYES_MOOD_LOVING;
+    return mood == EYES_MOOD_THINKING || mood == EYES_MOOD_HOT || mood == EYES_MOOD_ASLEEP || mood == EYES_MOOD_LOVING
+           || mood == EYES_MOOD_DIZZY;
 }
 
 /* ---- Hands ---------------------------------------------------------------- */
@@ -343,8 +391,11 @@ static void body_layout(body_vis_t *v)
     // still), not with the tint on (the halo covers the screen).
     const bool still = s.near < 0.5f || s.tint > 0.01f;
     const float bob = still ? 0 : 3 * sinf(t * 2.1f);
-    v->bx = CX;
-    v->by = CY + (int32_t) lroundf(bob);
+    // Scared, it trembles; knocked, it is pushed and springs back; leaning,
+    // it sags towards the low side.
+    const float shiver = s.mood == EYES_MOOD_SCARED && s.near > 0.5f ? 2.2f * sinf(t * 70) : 0;
+    v->bx = CX + (int32_t) lroundf(s.kx + shiver + s.lx * 8 * s.near);
+    v->by = CY + (int32_t) lroundf(bob + s.ky + s.ly * 6 * s.near);
     // The squash snaps to the nearest pre-rendered sphere, the eyes with it.
     float sq = clampf(s.squash + stretch_amount(), -1, 1);
     const int32_t level = (int32_t) lroundf(sq * LOOK_SQUASH_STEPS);
@@ -374,8 +425,10 @@ static void eye_layout(void)
     const float w = s.cur.w * K * nx * swell * s.body.sx;
     const float h = s.cur.h * K * ny * swell * s.body.sy * s.lid;
     const float lift = EYE_SPACING * sinf(s.cur.tilt * (float) M_PI / 180.0f);
-    const float ox = s.gx * GAZE_X;
-    const float oy = s.gy * GAZE_Y;
+    // The lean rolls the eyes towards the low side, on top of the gaze.
+    const float gx = clampf(s.gx + 0.6f * s.lx, -1, 1), gy = clampf(s.gy + 0.6f * s.ly, -1, 1);
+    const float ox = gx * GAZE_X;
+    const float oy = gy * GAZE_Y;
     for (int i = 0; i < 2; i++) {
         const int side = i == 0 ? -1 : 1;
         const int inner = -side; // the left eye's inner side is to the right
@@ -389,6 +442,9 @@ static void eye_layout(void)
         e->top_l = cut - s.cur.slope * hh * 0.6f * (float) inner;
         e->top_r = cut + s.cur.slope * hh * 0.6f * (float) inner;
         e->bottom = s.cur.bottom;
+        e->spiral = s.cur.spiral;
+        // The two spirals turn opposite ways, the silly way.
+        e->phase = (float) side * (float) s.t_ms / 1000.0f * 7.0f;
     }
 }
 
@@ -401,13 +457,40 @@ static float sd_round_box(float px, float py, float hw, float hh, float r)
     return hypotf(ox, oy) + fminf(fmaxf(qx, qy), 0) - r;
 }
 
-static void eye_key(const eye_box_t *e, int32_t key[5])
+static void eye_key(const eye_box_t *e, int32_t key[6])
 {
     key[0] = (int32_t) lroundf(e->w * 4);
     key[1] = (int32_t) lroundf(e->h * 4);
     key[2] = (int32_t) lroundf(e->top_l * 4);
     key[3] = (int32_t) lroundf(e->top_r * 4);
     key[4] = (int32_t) lroundf(e->bottom * 64);
+    // A turning spiral is redrawn every 1/24 turn, a pill never for this.
+    key[5] = e->spiral > 0.5f ? (int32_t) lroundf(e->phase * 24 / (2 * (float) M_PI)) : 0;
+}
+
+/* A dark spiral of two and a half turns in a circle of radius `rad`. */
+static void spiral_render(lv_color32_t *px, int w, int h, float rad, float phase)
+{
+    const float pitch = rad / 2.5f; // the gap between the arms
+    const float half = 1.7f;        // half the arm's width
+    for (int y = 0; y < h; y++) {
+        const float py = (float) y + 0.5f - (float) h / 2;
+        for (int x = 0; x < w; x++, px++) {
+            const float pxf = (float) x + 0.5f - (float) w / 2;
+            const float r = hypotf(pxf, py);
+            const float a = atan2f(py, pxf) + phase;
+            const float u = r - pitch * a / (2 * (float) M_PI);
+            const float d = fabsf(u - pitch * roundf(u / pitch)) - half;
+            // The centre is a dot, and the spiral stops at the rim.
+            float cov = clampf(0.5f - d, 0, 1);
+            cov = fmaxf(cov, clampf(2.5f - r, 0, 1));
+            cov *= clampf(rad + 0.5f - r, 0, 1);
+            px->red = 29;
+            px->green = 27;
+            px->blue = 36;
+            px->alpha = (uint8_t) (cov * 255);
+        }
+    }
 }
 
 /* Draw one eye into its sprite: a dark pill, a rounded box cut from above by
@@ -428,6 +511,10 @@ static void eye_render(eye_sprite_t *es, const eye_box_t *e)
     es->sp.ax = w / 2;
     es->sp.ay = h / 2;
 
+    if (e->spiral > 0.5f) {
+        spiral_render((lv_color32_t *) es->sp.img.data, w, h, fminf(hw, hh), e->phase);
+        return;
+    }
     const float rr = fminf(hw, hh);
     const bool lid = fmaxf(e->top_l, e->top_r) > -hh + 0.5f;
     const float lx0 = -hw - 6, lx1 = hw + 6;
@@ -534,13 +621,41 @@ static void draw_heart(lv_layer_t *layer, float x, float y, lv_color_t color, lv
 #define DOTS_Y (CY + (int32_t) (176 * K))
 #define SWEAT_X (CX + (int32_t) (128 * K))
 #define SWEAT_Y (CY - (int32_t) (120 * K))
+/* Dizzy, three little stars circle its head on a flat ellipse. */
+#define STARS_Y (CY - (int32_t) (118 * K))
+#define STARS_RX (120 * K)
+#define STARS_RY (26 * K)
 /* The z's rise from the small, far-away Yoru. */
 #define Z_X (CX + 14)
 #define Z_Y (CY - 40)
 
+static void star_pos(int i, float t, float *x, float *y)
+{
+    const float a = t * 4.2f + (float) i * 2.0944f;
+    *x = (float) s.body.bx + STARS_RX * cosf(a);
+    *y = (float) (STARS_Y - CY + s.body.by) + STARS_RY * sinf(a);
+}
+
+/* A small four-pointed star. */
+static void draw_star(lv_layer_t *layer, float x, float y, float r, lv_color_t c)
+{
+    fill_triangle(layer, x - r, y, x + r, y, x, y - 2.2f * r, c, LV_OPA_COVER);
+    fill_triangle(layer, x - r, y, x + r, y, x, y + 2.2f * r, c, LV_OPA_COVER);
+    fill_triangle(layer, x, y - r, x, y + r, x - 2.2f * r, y, c, LV_OPA_COVER);
+    fill_triangle(layer, x, y - r, x, y + r, x + 2.2f * r, y, c, LV_OPA_COVER);
+}
+
 static void draw_overlays(lv_layer_t *layer)
 {
     const float t = (float) s.t_ms / 1000.0f;
+    if (s.mood == EYES_MOOD_DIZZY) {
+        for (int i = 0; i < 3; i++) {
+            float x, y;
+            star_pos(i, t, &x, &y);
+            draw_star(layer, x, y, 4, lv_color_hex(0xFFD45C));
+        }
+        return;
+    }
     if (s.mood == EYES_MOOD_THINKING) {
         for (int i = 0; i < 3; i++) {
             float a = (sinf(t * 5 - (float) i * 0.9f) + 1) / 2;
@@ -649,6 +764,14 @@ static lv_area_t badge_area(void)
 static int overlay_areas(lv_area_t out[MAX_OVERLAY_RECTS])
 {
     const float t = (float) s.t_ms / 1000.0f;
+    if (s.mood == EYES_MOOD_DIZZY) {
+        for (int i = 0; i < 3; i++) {
+            float x, y;
+            star_pos(i, t, &x, &y);
+            out[i] = (lv_area_t) {(int32_t) x - 11, (int32_t) y - 11, (int32_t) x + 11, (int32_t) y + 11};
+        }
+        return 3;
+    }
     if (s.mood == EYES_MOOD_THINKING) {
         // The dots stay put and only fade: one box for the row.
         out[0] = (lv_area_t) {CX - 40, DOTS_Y - 10, CX + 40, DOTS_Y + 10};
@@ -740,6 +863,15 @@ static bool step(void)
             }
         }
     }
+    if (s.mood == EYES_MOOD_DIZZY) {
+        // The eyes roll round and round.
+        const float a = (float) s.t_ms / 1000.0f * 5.5f;
+        s.tgx = 0.45f * cosf(a);
+        s.tgy = 0.35f * sinf(a);
+    } else if (s.mood == EYES_MOOD_PEEK) {
+        s.tgx = 0;
+        s.tgy = -1; // up at the menu
+    }
     const float gk = s.held ? 0.3f : 0.2f;
     float gx = lerp(s.gx, s.tgx, ease(gk));
     float gy = lerp(s.gy, s.tgy, ease(gk));
@@ -791,6 +923,24 @@ static bool step(void)
     // While working, the badge breathes.
     s.badge_scale = s.status == EYES_STATUS_THINKING ? 0.89f + 0.11f * cosf((float) s.t_ms / 1000.0f * 5.2f) : 1;
 
+    // The knock: a damped spring, stepped in 5 ms slices so a slow frame
+    // doesn't make it explode.
+    const bool knocked = fabsf(s.kx) > 0.3f || fabsf(s.ky) > 0.3f || fabsf(s.kvx) > 0.3f || fabsf(s.kvy) > 0.3f;
+    for (int32_t left = knocked ? s.dt_ms : 0; left > 0; left -= 5) {
+        const float h = (float) LV_MIN(left, 5) / 1000.0f;
+        s.kvx += (-260 * s.kx - 9 * s.kvx) * h;
+        s.kvy += (-260 * s.ky - 9 * s.kvy) * h;
+        s.kx += s.kvx * h;
+        s.ky += s.kvy * h;
+    }
+    if (!knocked) {
+        s.kx = s.ky = s.kvx = s.kvy = 0;
+    }
+    const float lx = lerp(s.lx, s.tlx, ease(0.12f)), ly = lerp(s.ly, s.tly, ease(0.12f));
+    moved = moved || fabsf(lx - s.lx) > 0.002f || fabsf(ly - s.ly) > 0.002f;
+    s.lx = fabsf(lx - s.tlx) < 0.002f ? s.tlx : lx;
+    s.ly = fabsf(ly - s.tly) < 0.002f ? s.tly : ly;
+
     hands_step();
     return moved;
 }
@@ -824,7 +974,7 @@ static void frame_cb(lv_timer_t *timer)
     // The eyes: a new picture only when their shape changed.
     for (int i = 0; i < 2; i++) {
         eye_sprite_t *es = &s.eye_sp[i];
-        int32_t key[5];
+        int32_t key[6];
         eye_key(&s.eye[i], key);
         const bool reshaped = memcmp(key, es->key, sizeof(key)) != 0;
         if (reshaped) {
@@ -958,6 +1108,19 @@ void eyes_set_level(float level)
 void eyes_poke(void)
 {
     s.squash = 1;
+}
+
+void eyes_knock(float dx, float dy)
+{
+    // Pushed off by up to half its size: a quick jolt that springs back.
+    s.kvx += dx * R * 9;
+    s.kvy += dy * R * 9;
+}
+
+void eyes_lean(float x, float y)
+{
+    s.tlx = clampf(x, -1, 1);
+    s.tly = clampf(y, -1, 1);
 }
 
 void eyes_blink(void)

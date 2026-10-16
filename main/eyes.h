@@ -32,6 +32,12 @@ typedef enum {
     /* A conversation: attentive while it hears you, warm while it talks. */
     EYES_MOOD_LISTENING,
     EYES_MOOD_SPEAKING,
+    /* Shaken or spun: spiral eyes rolling round, stars circling its head. */
+    EYES_MOOD_DIZZY,
+    /* Dropped or startled: tall worried eyes, the body trembling. */
+    EYES_MOOD_SCARED,
+    /* The menu is open: small eyes, up at its edge. */
+    EYES_MOOD_PEEK,
     EYES_MOOD_COUNT,
 } eyes_mood_t;
 
@@ -53,6 +59,9 @@ typedef enum {
     EYES_GESTURE_THINK,   // a hand under the chin
     EYES_GESTURE_CLAP,
     EYES_GESTURE_STRETCH, // hands far out, the body stretched tall
+    EYES_GESTURE_HOLD,    // both hands at the sides of its head, wobbling (dizzy)
+    EYES_GESTURE_SHOO,    // one hand pushes you away, twice (annoyed)
+    EYES_GESTURE_FLAIL,   // both hands up, flapping (falling)
     EYES_GESTURE_COUNT,
 } eyes_gesture_t;
 
@@ -78,6 +87,13 @@ void eyes_set_level(float level);
 
 /** A poke: the body squashes and springs back. */
 void eyes_poke(void);
+/** A knock from the side (a slap, a knock on the case, a landing): the body
+ * is pushed by (dx, dy), about -1..1 of its size, and springs back with a
+ * wobble. */
+void eyes_knock(float dx, float dy);
+/** How the case leans, -1..1 each way (motion.c): the eyes roll towards the
+ * low side, as if they had weight, and the body sags a little. */
+void eyes_lean(float x, float y);
 void eyes_blink(void);
 
 /** Fade the tint, halo and badge to a status. */

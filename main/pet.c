@@ -274,6 +274,23 @@ void pet_event(pet_event_t event)
         nudge(0.01f, -0.05f, -0.01f);
         s_interacted_us = now;
         break;
+    case PET_EVENT_LIFTED:
+        // Company, and a little attention.
+        nudge(0.04f, 0.02f, 0.03f);
+        s_interacted_us = now;
+        break;
+    case PET_EVENT_SHAKEN:
+        nudge(0.05f, -0.03f, -0.01f);
+        s_interacted_us = now;
+        break;
+    case PET_EVENT_ROCKED:
+        nudge(-0.05f, 0.02f, 0.04f);
+        s_interacted_us = now;
+        break;
+    case PET_EVENT_DROPPED:
+        nudge(0.04f, -0.06f, -0.02f);
+        s_interacted_us = now;
+        break;
     }
     xSemaphoreGive(s_lock);
 }

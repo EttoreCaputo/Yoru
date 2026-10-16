@@ -26,7 +26,7 @@ typedef enum {
     SETTING_NIGHT_TO,
     /* Asleep, the screen dims to almost black. */
     SETTING_AUTO_DIM,
-    /* Quarter turns clockwise, 0..3. Not applied yet (M2 menu). */
+    /* Quarter turns, 0..3 (LVGL's), or 4: follow how the badge stands. */
     SETTING_ROTATION,
     /* Sound. Percent. */
     SETTING_VOLUME,
@@ -39,7 +39,7 @@ typedef enum {
     /* Do not disturb: no whims, no reactions, no sounds. */
     SETTING_FOCUS,
     SETTING_TOUCH_REACTIONS,
-    /* The IMU's tilt, shake and lift (M2). */
+    /* The case as an input: lift, shake, knocks, lean (motion.c). */
     SETTING_MOTION_REACTIONS,
     /* The pet reacts to what happens on the computer (pet.c). */
     SETTING_PET_REACTIONS,
@@ -48,7 +48,7 @@ typedef enum {
     /* Look: the resting eyes' colour as 0xRRGGBB, and the style (M5). */
     SETTING_EYE_COLOR,
     SETTING_EYE_STYLE,
-    /* Voice: the wake word is listened for (M2 menu; the mic mute does it now). */
+    /* Voice: the wake word is listened for. */
     SETTING_WAKE_WORD_ON,
     /* 0 English, 1 Italian. */
     SETTING_LANGUAGE,

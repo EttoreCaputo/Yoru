@@ -40,6 +40,11 @@ bool voice_available(void);
 void voice_set_wake_sound(bool on);
 bool voice_wake_sound(void);
 
+/** Listen for the wake word or not (the menu's switch). Off, the mic is still
+ * read for the room (ears.c) and the host can still start an utterance. */
+void voice_set_wake_on(bool on);
+bool voice_wake_on(void);
+
 /** Stop or restart listening for the wake word. Muted, the mic isn't read. */
 void voice_set_muted(bool muted);
 bool voice_muted(void);

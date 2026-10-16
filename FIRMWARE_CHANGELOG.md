@@ -1,5 +1,19 @@
 # Firmware changelog
 
+## 0.5.0
+
+A menu on the board, and Yoru feels how you hold it.
+
+- **Settings menu.** Swipe down from the top edge of the screen: a ring of icons appears around Yoru, who looks up at it with small eyes. Tap an icon for its page: Display, Sound, Behaviour, Voice, Connection, Battery, About. Rows fade out towards the edge of the circle; tap a switch to flip it, tap a value (brightness, volume, the night hours, how soon it gets sleepy) and drag your finger along the arc around the rim. Everything applies at once and is remembered. Tap the title to go back; swipe up on the ring, or leave it alone for a few seconds, and it closes. Labels are in English or Italian (Voice, Language).
+- From the menu: night brightness and hours now work (when the computer sends the time), the wake word can be switched off or changed, the screen can be turned a quarter at a time or follow how the badge stands (Rotation, Automatic), and About shows the version, free memory, flash and screen load, with Restart and a Factory reset you confirm by holding the row.
+- **Battery and PWR.** The Battery page shows the charge, whether it's on USB or charging, and the voltage, and Power off (hold the row). A short press of PWR puts Yoru to sleep and wakes it, or closes the menu.
+- **Motion.** Pick Yoru up and it wakes, curious, looking at you; put it down and it settles with a blink. Tilt it and its eyes roll towards the low side. Shake it or spin it on the desk and it gets dizzy: spiral eyes rolling round, little stars circling its head, hands holding its head; keep shaking and it gets annoyed. A knock on the case is a poke, two knocks call it. Rock it gently, twice, and it falls asleep. Drop it and it panics, flapping its hands, then sighs with relief. Turn it face down and it goes to sleep with the microphone off; turn it back and it wakes. "Motion reactions" in Behaviour turns these off (face down still works: it's the privacy gesture).
+- **Slaps.** A quick flick across the face knocks Yoru aside and it springs back; at the third in a row it pushes you away with a hand. Three pokes in a row now do the same.
+- **Sound direction.** A sudden sound from one side (a clap, a door) makes Yoru glance that way.
+- Scared now has its own face: tall, worried eyes and a trembling body.
+- New reactions for the computer: dizzy, annoyed, falling, drowsy, lifted. The host can open the menu (`show_menu`), and `get_state` now reports the battery and the motion sensor.
+- To check on your board: which way is "left" for the tilt and for sounds depends on how the parts sit on the board. If the eyes roll uphill, or turn away from a clap, tell us and it's a one-line fix.
+
 ## 0.4.3
 
 Smoother colours, a new way to sleep.

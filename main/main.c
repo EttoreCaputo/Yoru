@@ -4,9 +4,11 @@
 #include "behaviour.h"
 #include "board_audio.h"
 #include "board_display.h"
+#include "board_pmu.h"
 #include "board_settings.h"
 #include "board_touch.h"
 #include "ears.h"
+#include "ears_dir.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -19,6 +21,7 @@
 #include "lvgl_port.h"
 #include "metrics_io.h"
 #include "metrics_model.h"
+#include "motion.h"
 #include "net.h"
 #include "pet.h"
 #include "playback.h"
@@ -45,6 +48,9 @@ static void on_setting(setting_t id, int32_t value)
         break;
     case SETTING_WAKE_SOUND:
         voice_set_wake_sound(value != 0);
+        break;
+    case SETTING_WAKE_WORD_ON:
+        voice_set_wake_on(value != 0);
         break;
     case SETTING_PET_SOUNDS:
     case SETTING_FOCUS:
@@ -105,6 +111,8 @@ static void start_audio(void)
     char word[16];
     board_settings_wake_word(word, sizeof(word));
     voice_set_wake_sound(board_settings_on(SETTING_WAKE_SOUND));
+    voice_set_wake_on(board_settings_on(SETTING_WAKE_WORD_ON));
+    ears_dir_on(behaviour_heard_from);
     voice_start(board_settings_on(SETTING_MIC_MUTED), word);
     playback_start();
     apply_pet_sounds();
@@ -139,6 +147,14 @@ void app_main(void)
     lvgl_port_lock();
     behaviour_start(face);
     lvgl_port_unlock();
+
+    // The case and the power chip, on the same I2C bus as the touch.
+    if (motion_init(behaviour_motion) != ESP_OK) {
+        ESP_LOGW(TAG, "no IMU, continuing without motion");
+    }
+    if (board_pmu_init(behaviour_power_key) != ESP_OK) {
+        ESP_LOGW(TAG, "no PMU, continuing without battery and PWR");
+    }
 
     // The voice runs on core 1, as in DualEye; the UI and the pet on core 0.
     start_audio();

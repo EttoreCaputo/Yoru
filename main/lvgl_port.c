@@ -22,6 +22,11 @@
 
 static const char *TAG = "lvgl_port";
 static _lock_t s_lvgl_lock;
+static lv_display_t *s_disp;
+/* Turned, LVGL draws upright and flush_cb turns each area into this buffer
+ * on its way to the panel. Allocated the first time it's needed. */
+static void *s_rot_buf;
+static size_t s_buf_size;
 
 static int64_t s_window_start_us;
 static int64_t s_window_busy_us;
@@ -67,9 +72,18 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
     esp_lcd_panel_handle_t panel = (esp_lcd_panel_handle_t) lv_display_get_user_data(disp);
     const int w = lv_area_get_width(area);
     const int h = lv_area_get_height(area);
+    const lv_display_rotation_t rot = lv_display_get_rotation(disp);
+    lv_area_t out = *area;
+    if (rot != LV_DISPLAY_ROTATION_0 && s_rot_buf != NULL) {
+        const uint32_t px = sizeof(lv_color16_t);
+        const bool swap = rot == LV_DISPLAY_ROTATION_90 || rot == LV_DISPLAY_ROTATION_270;
+        lv_draw_sw_rotate(px_map, s_rot_buf, w, h, w * px, (swap ? h : w) * px, rot, LV_COLOR_FORMAT_RGB565);
+        lv_display_rotate_area(disp, &out);
+        px_map = s_rot_buf;
+    }
     // The panel wants big-endian RGB565 on the wire.
     lv_draw_sw_rgb565_swap(px_map, w * h);
-    esp_lcd_panel_draw_bitmap(panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, px_map);
+    esp_lcd_panel_draw_bitmap(panel, out.x1, out.y1, out.x2 + 1, out.y2 + 1, px_map);
 }
 
 /* The CO5300 only takes areas that start on an even pixel and are an even
@@ -120,6 +134,28 @@ static void lvgl_task(void *arg)
     }
 }
 
+void lvgl_port_set_rotation(int quarter)
+{
+    quarter &= 3;
+    if (quarter != 0 && s_rot_buf == NULL) {
+        s_rot_buf = spi_bus_dma_memory_alloc(BOARD_LCD_SPI_HOST, s_buf_size, 0);
+        if (s_rot_buf == NULL) {
+            ESP_LOGE(TAG, "no memory to turn the screen");
+            return;
+        }
+    }
+    if ((int) lv_display_get_rotation(s_disp) != quarter) {
+        ESP_LOGI(TAG, "screen turned %d degrees", quarter * 90);
+        lv_display_set_rotation(s_disp, (lv_display_rotation_t) quarter);
+        lv_obj_invalidate(lv_display_get_screen_active(s_disp));
+    }
+}
+
+int lvgl_port_rotation(void)
+{
+    return (int) lv_display_get_rotation(s_disp);
+}
+
 void lvgl_port_lock(void)
 {
     _lock_acquire(&s_lvgl_lock);
@@ -139,6 +175,8 @@ esp_err_t lvgl_port_init(const board_lcd_t *lcd, lv_display_t **out_display)
     void *buf1 = spi_bus_dma_memory_alloc(BOARD_LCD_SPI_HOST, buf_size, 0);
     void *buf2 = spi_bus_dma_memory_alloc(BOARD_LCD_SPI_HOST, buf_size, 0);
     ESP_RETURN_ON_FALSE(buf1 && buf2, ESP_ERR_NO_MEM, TAG, "draw buffers");
+    s_buf_size = buf_size;
+    s_disp = disp;
 
     lv_display_set_buffers(disp, buf1, buf2, buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_user_data(disp, lcd->panel);
