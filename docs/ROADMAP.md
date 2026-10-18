@@ -98,8 +98,9 @@ The firmware side mostly exists (0.7.x); it is adapted to coucou's states and pi
 - Answers are spoken through Yoru's speaker (`audio_down`).
 - Done when: "Hey Yoru, run the tests" reaches the chosen Claude Code session.
 
-**F6. Firmware in the app.**
-- The firmware image ships inside the app and is flashed through a bundled esptool, as Companion Hub does.
+**F6. Firmware in the app.** Done (2026-10-18), in the fork's `Sources/Yoru/YoruFlasher.swift`. Checked on the board: the four parts written and verified in 33 s, and the board back on the link.
+- The firmware ships inside the app: `scripts/yoru_fetch_firmware.sh` in the fork copies the parts of the last build (`build/flasher_args.json`) into `NotchBuddy/Resources/firmware/`.
+- The app writes it from the Firmware card of the Yoru page, over USB. It doesn't use esptool: it speaks the ROM bootloader's serial protocol itself (download-mode reset, compressed blocks, an MD5 check of each part). That avoids bundling Python, or esptool's 60 MB standalone build.
 - This replaces Companion Hub's `tools/fetch_firmware.sh` in this repository's CLAUDE.md rule.
 
 **F7. Windows and Linux.** The same Yoru module in the fork's Tauri app (`windows/src-tauri/src/yoru/`): the link, the agents and the voice, written for that app. Companion Hub is not used or shared.

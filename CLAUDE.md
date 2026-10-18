@@ -10,8 +10,9 @@ Host program: `../yoru-app` (the Yoru app, https://github.com/EttoreCaputo/yoru-
 2. Add a `## <version>` section at the top of `FIRMWARE_CHANGELOG.md`, written for the person using the board.
 3. Build: `source ~/.espressif/tools/activate_idf_v6.1.sh && idf.py build merge-bin`. If it fails, fix it or report it clearly.
 4. Flash the board once the build passes: `idf.py -p <port> flash` (the port is `/dev/cu.usbmodem*`). If no board is connected or flashing fails, say so.
+5. Copy the build into the Yoru app, which ships it: `../yoru-app/scripts/yoru_fetch_firmware.sh`.
 
-Report the new version, the build result and the flash result when done.
+Report the new version, the build result, the flash result and the copy into the app when done.
 
 ## Rule: the user makes the commits
 
