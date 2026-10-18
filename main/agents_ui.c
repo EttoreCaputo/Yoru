@@ -13,6 +13,7 @@
 #include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "look.h"
 #include "menu.h"
 #include "metrics_model.h"
 #include "question.h"
@@ -37,8 +38,17 @@ static const char *TAG = "agents_ui";
 /* The view. */
 #define VIEW_IDLE_MS 30000
 #define VIEW_REFRESH_MS 5000
-#define ROW_W 360
-#define ROW_H 100
+#define VIEW_FRAME_MS 40
+/* The little Yorus sit around this point, clear of the title and the
+ * quiet button; each box has room above for a hop and what floats over its
+ * head, beside for a badge, below for a squash. */
+#define VIEW_CY (CY - 14)
+#define MINI_TOP(r) ((r) * 9 / 10)
+#define MINI_SIDE(r) ((r) / 2)
+#define MINI_BOTTOM(r) ((r) / 4)
+#define QUIET_W 150
+#define QUIET_H 40
+#define QUIET_BOTTOM 30
 /* A hold arms the interrupt; a tap within this long sends it. */
 #define ARM_MS 3000
 
@@ -51,6 +61,14 @@ static const char *TAG = "agents_ui";
  * the stack, so PSRAM. */
 EXT_RAM_BSS_ATTR static agents_t s_view;
 EXT_RAM_BSS_ATTR static metrics_snapshot_t s_metrics;
+
+/* A little Yoru in the agents view, one per session. */
+typedef struct {
+    lv_obj_t *obj, *label;
+    int r;
+    uint32_t rgb;
+    float phase; // seconds, so they don't move in step
+} mini_t;
 
 static struct {
     lv_obj_t *face;
@@ -69,6 +87,9 @@ static struct {
     /* The view. */
     lv_obj_t *view;
     lv_obj_t *list;
+    lv_timer_t *anim;
+    mini_t minis[AGENTS_MAX];
+    int nminis;
     uint32_t view_built_ms;
     char armed[AGENTS_ID_MAX + 1];
     uint32_t armed_ms;
@@ -125,22 +146,6 @@ static void step_text(const agent_step_t *st, char *out, size_t len)
     if (st->del >= 0 && n > 0 && n < (int) len) {
         snprintf(out + n, len - n, " -%d", st->del);
     }
-}
-
-static void age_text(int secs, char *out, size_t len)
-{
-    if (secs < 60) {
-        snprintf(out, len, "%ds", secs);
-    } else if (secs < 3600) {
-        snprintf(out, len, "%dm", secs / 60);
-    } else {
-        snprintf(out, len, "%dh", secs / 3600);
-    }
-}
-
-static int age_now(const agent_session_t *a)
-{
-    return a->since_s + (int) ((uint32_t) (esp_timer_get_time() / 1000) - s_view.at_ms) / 1000;
 }
 
 /* ---- The dots ---------------------------------------------------------------- */
@@ -294,22 +299,313 @@ static const agent_session_t *session_of(lv_event_t *e)
     return i < s_view.n ? &s_view.sessions[i] : NULL;
 }
 
-static void row_cb(lv_event_t *e)
+/* ---- The little Yorus ------------------------------------------------------------------ */
+
+/* Each agent's colour, by the name the host gives it; others are pearl, as
+ * Yoru itself. */
+static uint32_t agent_rgb(const char *agent)
+{
+    static const struct {
+        const char *name;
+        uint32_t rgb;
+    } COLOURS[] = {
+        {"claude", 0xE07B4F},  {"gemini", 0xF2C94C}, {"codex", 0x4C8DF6},   {"gpt", 0x4C8DF6},
+        {"openai", 0x4C8DF6},  {"cursor", 0x3FC37E}, {"opencode", 0xA98BF5}, {"copilot", 0xE5E7EE},
+        {"windsurf", 0x2EC4C6}, {"aider", 0xF06EA9}, {"qwen", 0x8F7CF7},    {"grok", 0x9AA3B2},
+    };
+    char low[sizeof(((agent_session_t *) 0)->agent)];
+    size_t n = 0;
+    for (; agent[n] != '\0' && n < sizeof(low) - 1; n++) {
+        low[n] = (char) (agent[n] >= 'A' && agent[n] <= 'Z' ? agent[n] + 32 : agent[n]);
+    }
+    low[n] = '\0';
+    for (size_t i = 0; i < sizeof(COLOURS) / sizeof(COLOURS[0]); i++) {
+        if (strstr(low, COLOURS[i].name) != NULL) {
+            return COLOURS[i].rgb;
+        }
+    }
+    return 0xAEAAB5;
+}
+
+/* Where the k-th of n sits: one in the middle, more on a ring, never one
+ * straight up under the title. */
+static void mini_place(int k, int n, int32_t *x, int32_t *y, int *r)
+{
+    static const int RADIUS[AGENTS_MAX + 1] = {0, 72, 60, 50, 46, 42, 40};
+    static const int RING[AGENTS_MAX + 1] = {0, 0, 108, 104, 108, 112, 114};
+    *r = RADIUS[n];
+    const float deg = -90.0f + 180.0f / (float) n + 360.0f * (float) k / (float) n;
+    const float a = deg * 3.14159265f / 180.0f;
+    *x = CX + (int32_t) lroundf((float) RING[n] * cosf(a));
+    *y = VIEW_CY + (int32_t) lroundf((float) RING[n] * sinf(a));
+}
+
+/* What a little Yoru does this frame. */
+typedef struct {
+    float dx, dy;       // the body, from its place
+    float sx, sy;       // squash, one of SQUASH
+    float gx, gy;       // the gaze, as a share of the radius
+    float eye_h;        // the eyes' height (1 normal, small when blinking)
+} pose_t;
+
+/* The only squashes there are: each is a sphere rendered once per agent
+ * (look.c), so a hop costs nothing after its first. Continuous ones made a
+ * new size nearly every frame. Round, stretched up in the air, three steps
+ * of landing, sagging. */
+static const float SQUASH[][2] = {{1, 1}, {0.96f, 1.05f}, {1.04f, 0.95f}, {1.08f, 0.90f}, {1.11f, 0.86f},
+                                  {1.05f, 0.93f}};
+
+static void squash(pose_t *p, int step)
+{
+    p->sx = SQUASH[step][0];
+    p->sy = SQUASH[step][1];
+}
+
+static float wave(float t, float period)
+{
+    return sinf(2 * 3.14159265f * t / period);
+}
+
+static pose_t mini_pose(agent_state_t st, float t)
+{
+    pose_t p = {0, 0, 1, 1, 0, 0, 1};
+    // A blink every few seconds while awake.
+    if ((st == AGENT_WORK || st == AGENT_WAIT) && fmodf(t, 3.7f) < 0.12f) {
+        p.eye_h = 0.15f;
+    }
+    switch (st) {
+    case AGENT_WORK: {
+        // Bobbing at its work, the eyes reading along a line.
+        p.dy = -0.08f * wave(t, 1.2f);
+        p.gx = 0.17f * wave(t, 2.4f);
+        p.gy = 0.06f;
+        break;
+    }
+    case AGENT_WAIT: {
+        // Hopping on the spot to be seen, eyes on you.
+        const float ph = fmodf(t, 0.9f) / 0.9f;
+        if (ph < 0.7f) {
+            p.dy = -0.34f * sinf(3.14159265f * ph / 0.7f);
+            squash(&p, 1);
+        } else {
+            const float q = sinf(3.14159265f * (ph - 0.7f) / 0.3f);
+            squash(&p, q < 0.35f ? 2 : q < 0.7f ? 3 : 4);
+        }
+        p.gy = -0.04f;
+        break;
+    }
+    case AGENT_DONE:
+        // Floating, pleased.
+        p.dy = -0.06f * wave(t, 3.0f);
+        break;
+    case AGENT_ERROR: {
+        // Sagging, with a shiver now and then.
+        const float ph = fmodf(t, 2.6f);
+        if (ph < 0.5f) {
+            p.dx = 0.08f * sinf(2 * 3.14159265f * 8 * ph) * (1 - ph / 0.5f);
+        }
+        squash(&p, 5);
+        p.gy = 0.10f;
+        break;
+    }
+    default:
+        // Idle: dozing, breathing slowly.
+        p.dy = -0.04f * wave(t, 4.0f);
+        p.gy = 0.06f;
+        break;
+    }
+    return p;
+}
+
+static void disc(lv_layer_t *layer, float x, float y, float r, lv_color_t color, lv_opa_t opa)
+{
+    lv_draw_rect_dsc_t dsc;
+    lv_draw_rect_dsc_init(&dsc);
+    dsc.bg_color = color;
+    dsc.bg_opa = opa;
+    dsc.radius = LV_RADIUS_CIRCLE;
+    const lv_area_t a = {(int32_t) (x - r), (int32_t) (y - r), (int32_t) (x + r), (int32_t) (y + r)};
+    lv_draw_rect(layer, &dsc, &a);
+}
+
+static void bar(lv_layer_t *layer, float x1, float y1, float x2, float y2, float w, lv_color_t color, lv_opa_t opa)
+{
+    lv_draw_line_dsc_t dsc;
+    lv_draw_line_dsc_init(&dsc);
+    dsc.p1.x = x1;
+    dsc.p1.y = y1;
+    dsc.p2.x = x2;
+    dsc.p2.y = y2;
+    dsc.width = (int32_t) w;
+    dsc.round_start = dsc.round_end = 1;
+    dsc.color = color;
+    dsc.opa = opa;
+    lv_draw_line(layer, &dsc);
+}
+
+static void ring(lv_layer_t *layer, float x, float y, float r, float w, lv_color_t color, lv_opa_t opa)
+{
+    lv_draw_arc_dsc_t dsc;
+    lv_draw_arc_dsc_init(&dsc);
+    dsc.center.x = (int32_t) x;
+    dsc.center.y = (int32_t) y;
+    dsc.radius = (uint16_t) r;
+    dsc.start_angle = 0;
+    dsc.end_angle = 360;
+    dsc.width = (int32_t) w;
+    dsc.color = color;
+    dsc.opa = opa;
+    lv_draw_arc(layer, &dsc);
+}
+
+/* The eyes, as on Yoru: dark pills, a little below the middle. Their shape
+ * says the state: closed dozing, wide waiting, ^ ^ when done, x x on an
+ * error. */
+static void mini_eyes(lv_layer_t *layer, agent_state_t st, float x, float y, float r, const pose_t *p)
+{
+    const lv_color_t ink = lv_color_hex(0x1D1B24);
+    const float gap = 0.33f * r * p->sx;
+    const float ey = y + (0.12f + p->gy) * r * p->sy;
+    const float stroke = fmaxf(2.5f, 0.09f * r);
+    for (int side = -1; side <= 1; side += 2) {
+        const float ex = x + side * gap + p->gx * r;
+        switch (st) {
+        case AGENT_IDLE:
+            bar(layer, ex - 0.11f * r, ey + 0.04f * r, ex + 0.11f * r, ey + 0.04f * r, stroke, ink, LV_OPA_COVER);
+            break;
+        case AGENT_DONE: {
+            lv_draw_arc_dsc_t dsc;
+            lv_draw_arc_dsc_init(&dsc);
+            dsc.center.x = (int32_t) ex;
+            dsc.center.y = (int32_t) (ey + 0.08f * r);
+            dsc.radius = (uint16_t) (0.13f * r);
+            dsc.start_angle = 200;
+            dsc.end_angle = 340;
+            dsc.width = (int32_t) stroke;
+            dsc.rounded = 1;
+            dsc.color = ink;
+            lv_draw_arc(layer, &dsc);
+            break;
+        }
+        case AGENT_ERROR: {
+            const float k = 0.09f * r;
+            bar(layer, ex - k, ey - k, ex + k, ey + k, stroke, ink, LV_OPA_COVER);
+            bar(layer, ex - k, ey + k, ex + k, ey - k, stroke, ink, LV_OPA_COVER);
+            break;
+        }
+        default: {
+            const bool wide = st == AGENT_WAIT;
+            const float hw = (wide ? 0.11f : 0.085f) * r;
+            const float hh = fmaxf((wide ? 0.21f : 0.18f) * r * p->eye_h * p->sy, 1.5f);
+            lv_draw_rect_dsc_t dsc;
+            lv_draw_rect_dsc_init(&dsc);
+            dsc.bg_color = ink;
+            dsc.radius = LV_RADIUS_CIRCLE;
+            const lv_area_t a = {(int32_t) (ex - hw), (int32_t) (ey - hh), (int32_t) (ex + hw), (int32_t) (ey + hh)};
+            lv_draw_rect(layer, &dsc, &a);
+            break;
+        }
+        }
+    }
+}
+
+/* What floats around it: thinking dots, a call, a sparkle, an error badge,
+ * a z. */
+static void mini_extras(lv_layer_t *layer, agent_state_t st, float x, float y, float r, float t)
+{
+    const float top = y - r;
+    switch (st) {
+    case AGENT_WORK:
+        for (int k = 0; k < 3; k++) {
+            const float on = fmaxf(0, wave(t - (float) k * 0.3f, 0.9f));
+            disc(layer, x + (float) (k - 1) * 0.3f * r, top - 0.32f * r, fmaxf(2.5f, 0.07f * r), CARD_TEXT,
+                 (lv_opa_t) (70 + 185 * on));
+        }
+        break;
+    case AGENT_WAIT: {
+        // A "!" over its head, pulsing.
+        const float s = 1 + 0.15f * fmaxf(0, wave(t, 0.9f));
+        const float w = fmaxf(4, 0.12f * r) * s;
+        bar(layer, x, top - 0.78f * r * s, x, top - 0.42f * r, w, CARD_WAIT, LV_OPA_COVER);
+        disc(layer, x, top - 0.24f * r, w / 2, CARD_WAIT, LV_OPA_COVER);
+        break;
+    }
+    case AGENT_DONE: {
+        // A twinkle by its head.
+        const float on = fmaxf(0, wave(t, 1.6f));
+        const float k = (0.06f + 0.08f * on) * r, sx = x + 0.78f * r, sy = top + 0.05f * r;
+        const lv_opa_t opa = (lv_opa_t) (60 + 195 * on);
+        bar(layer, sx - k, sy, sx + k, sy, 2, CARD_ALLOW, opa);
+        bar(layer, sx, sy - k, sx, sy + k, 2, CARD_ALLOW, opa);
+        break;
+    }
+    case AGENT_ERROR: {
+        const float bx = x + 0.72f * r, by = y - 0.72f * r, br = fmaxf(7, 0.2f * r);
+        disc(layer, bx, by, br, COL_ERROR, LV_OPA_COVER);
+        bar(layer, bx, by - 0.5f * br, bx, by + 0.1f * br, 2.5f, CARD_TEXT, LV_OPA_COVER);
+        disc(layer, bx, by + 0.48f * br, 1.5f, CARD_TEXT, LV_OPA_COVER);
+        break;
+    }
+    default: {
+        // A z rising from it every few seconds.
+        const float ph = fmodf(t, 3.0f) / 3.0f;
+        lv_draw_label_dsc_t dsc;
+        lv_draw_label_dsc_init(&dsc);
+        dsc.text = "z";
+        dsc.font = &lv_font_montserrat_14;
+        dsc.color = CARD_DIM;
+        dsc.opa = (lv_opa_t) (255 * sinf(3.14159265f * ph));
+        const int32_t zx = (int32_t) (x + 0.6f * r + 0.2f * r * ph), zy = (int32_t) (top - 0.5f * r * ph);
+        const lv_area_t a = {zx, zy - 16, zx + 14, zy};
+        lv_draw_label(layer, &dsc, &a);
+        break;
+    }
+    }
+}
+
+static void mini_draw_cb(lv_event_t *e)
+{
+    const int i = (int) (intptr_t) lv_event_get_user_data(e);
+    if (i >= s_view.n) {
+        return;
+    }
+    const mini_t *m = &s.minis[i];
+    const agent_session_t *a = &s_view.sessions[i];
+    lv_layer_t *layer = lv_event_get_layer(e);
+    lv_area_t box;
+    lv_obj_get_coords(m->obj, &box);
+    const float t = (float) now_ms() / 1000.0f + m->phase;
+    const pose_t p = mini_pose(a->state, t);
+    const float r = (float) m->r;
+    // Squashed by rendering, not by LVGL scaling the sprite every frame.
+    const int rx = (int) lroundf(r * p.sx), ry = (int) lroundf(r * p.sy);
+    const float x = (float) (box.x1 + box.x2 + 1) / 2 + p.dx * r;
+    // Squashed, it stays on its feet.
+    const float y = (float) box.y1 + MINI_TOP(m->r) + r + p.dy * r + (r - (float) ry);
+    const look_sprite_t *sp = look_tinted_ball(rx, ry, m->rgb);
+    if (sp != NULL) {
+        look_draw(layer, sp, (int32_t) x, (int32_t) y, 1, 1, 0, LV_OPA_COVER, CARD_TEXT);
+    }
+    mini_eyes(layer, a->state, x, y, r, &p);
+    mini_extras(layer, a->state, x, y - ((float) ry - r), r, t);
+    if (strcmp(s.armed, a->id) == 0 && now_ms() - s.armed_ms < ARM_MS) {
+        ring(layer, x, y, r + 7, 3, COL_ERROR, LV_OPA_COVER);
+    }
+}
+
+static void mini_cb(lv_event_t *e)
 {
     const agent_session_t *a = session_of(e);
     if (a == NULL || !s_view.focus) {
         return;
     }
+    const int i = (int) (intptr_t) lv_event_get_user_data(e);
     if (lv_event_get_code(e) == LV_EVENT_LONG_PRESSED) {
         // Armed: the next tap on it stops the agent.
         snprintf(s.armed, sizeof(s.armed), "%s", a->id);
         s.armed_ms = now_ms();
-        lv_obj_t *row = lv_event_get_current_target(e);
-        lv_obj_set_style_border_color(row, COL_ERROR, 0);
-        lv_obj_set_style_border_width(row, 2, 0);
-        lv_label_set_text(lv_obj_get_child(row, 3), card_tr(LV_SYMBOL_STOP " Tap to interrupt the agent",
-                                                            LV_SYMBOL_STOP " Tocca per interrompere"));
-        lv_obj_set_style_text_color(lv_obj_get_child(row, 3), COL_ERROR, 0);
+        lv_label_set_text(s.minis[i].label, card_tr("Tap to stop", "Tocca: ferma"));
+        lv_obj_set_style_text_color(s.minis[i].label, COL_ERROR, 0);
         return;
     }
     const bool armed = strcmp(s.armed, a->id) == 0 && now_ms() - s.armed_ms < ARM_MS;
@@ -320,149 +616,130 @@ static void row_cb(lv_event_t *e)
     agents_ui_shortcut(armed ? "interrupt" : "focus", id);
 }
 
+static void add_mini(lv_obj_t *parent, int i)
+{
+    const agent_session_t *a = &s_view.sessions[i];
+    mini_t *m = &s.minis[i];
+    int32_t x, y;
+    mini_place(i, s_view.n, &x, &y, &m->r);
+    m->rgb = agent_rgb(a->agent);
+    // Out of step with each other, by the session's id.
+    uint32_t h = 2166136261u;
+    for (const char *c = a->id; *c; c++) {
+        h = (h ^ (uint8_t) *c) * 16777619u;
+    }
+    m->phase = (float) (h % 1000) / 100.0f;
+
+    const int32_t w = 2 * m->r + 2 * MINI_SIDE(m->r), hgt = MINI_TOP(m->r) + 2 * m->r + MINI_BOTTOM(m->r);
+    m->obj = lv_obj_create(parent);
+    lv_obj_remove_style_all(m->obj);
+    lv_obj_set_size(m->obj, w, hgt);
+    lv_obj_set_pos(m->obj, x - w / 2, y - m->r - MINI_TOP(m->r));
+    lv_obj_remove_flag(m->obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(m->obj, mini_draw_cb, LV_EVENT_DRAW_MAIN, (void *) (intptr_t) i);
+    if (s_view.focus) {
+        lv_obj_add_flag(m->obj, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(m->obj, mini_cb, LV_EVENT_SHORT_CLICKED, (void *) (intptr_t) i);
+        lv_obj_add_event_cb(m->obj, mini_cb, LV_EVENT_LONG_PRESSED, (void *) (intptr_t) i);
+    }
+
+    // Its project underneath, amber while it waits for you.
+    char name[20];
+    card_ascii(a->project[0] ? a->project : a->agent, name, sizeof(name) - 1);
+    const bool armed = strcmp(s.armed, a->id) == 0;
+    m->label = card_label(parent, &lv_font_montserrat_14,
+                          armed ? COL_ERROR : a->state == AGENT_WAIT ? CARD_WAIT : CARD_DIM,
+                          armed ? card_tr("Tap to stop", "Tocca: ferma") : name);
+    lv_label_set_long_mode(m->label, LV_LABEL_LONG_MODE_DOTS);
+    lv_obj_set_width(m->label, 2 * m->r + 36 > 120 ? 120 : 2 * m->r + 36);
+    lv_obj_set_style_text_align(m->label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_pos(m->label, x - lv_obj_get_style_width(m->label, 0) / 2, y + m->r + 6);
+}
+
+static void anim_cb(lv_timer_t *t)
+{
+    for (int i = 0; i < s.nminis; i++) {
+        lv_obj_invalidate(s.minis[i].obj);
+    }
+}
+
 static void quiet_cb(lv_event_t *e)
 {
     agents_ui_shortcut("quiet", NULL);
 }
 
-static lv_obj_t *row_box(lv_obj_t *list, int32_t h)
+/* The plan's limits, one short line: "5 h 42%   Week 18%". */
+static void add_limits(lv_obj_t *parent)
 {
-    lv_obj_t *row = lv_obj_create(list);
-    lv_obj_remove_style_all(row);
-    lv_obj_set_size(row, ROW_W, h);
-    lv_obj_set_style_radius(row, 26, 0);
-    lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(row, CARD_ROW, 0);
-    lv_obj_set_style_bg_color(row, CARD_ROW_PRESSED, LV_STATE_PRESSED);
-    lv_obj_set_style_pad_hor(row, 26, 0);
-    lv_obj_set_style_pad_ver(row, 10, 0);
-    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-    return row;
-}
-
-static lv_obj_t *line_in(lv_obj_t *row, const lv_font_t *font, lv_color_t color, const char *text, int32_t w)
-{
-    lv_obj_t *l = card_label(row, font, color, text);
-    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_DOTS);
-    lv_obj_set_size(l, w, lv_font_get_line_height(font));
-    return l;
-}
-
-static void add_session(lv_obj_t *list, int i)
-{
-    const agent_session_t *a = &s_view.sessions[i];
-    lv_obj_t *row = row_box(list, ROW_H);
-    if (s_view.focus) {
-        lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(row, row_cb, LV_EVENT_SHORT_CLICKED, (void *) (intptr_t) i);
-        lv_obj_add_event_cb(row, row_cb, LV_EVENT_LONG_PRESSED, (void *) (intptr_t) i);
+    metrics_model_get(&s_metrics);
+    if (!s_metrics.claude.valid || (!s_metrics.claude.has_session && !s_metrics.claude.has_week)) {
+        return;
     }
-    const int32_t w = ROW_W - 52;
-    char text[96], age[16];
-    age_text(age_now(a), age, sizeof(age));
-    snprintf(text, sizeof(text), LV_SYMBOL_BULLET " %s  %s", a->project[0] ? a->project : "?",
-             a->agent[0] ? a->agent : "");
-    lv_obj_t *head = line_in(row, &lv_font_montserrat_20, state_color(a->state), text, w - 50);
-    lv_obj_align(head, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_obj_t *since = card_label(row, &lv_font_montserrat_14, CARD_DIM, age);
-    lv_obj_align(since, LV_ALIGN_TOP_RIGHT, 0, 4);
-
-    // The task, or what it waits for.
-    const char *task = a->task[0] ? a->task
-                       : a->state == AGENT_WAIT ? card_tr("Waiting for you", "Ti aspetta")
-                                                : "";
-    lv_obj_t *t = line_in(row, &lv_font_montserrat_14, CARD_TEXT, task, w);
-    lv_obj_align(t, LV_ALIGN_TOP_LEFT, 0, 30);
-
-    text[0] = '\0';
-    if (a->nsteps > 0) {
-        step_text(&a->steps[a->nsteps - 1], text, sizeof(text));
+    char text[48] = "";
+    float worst = 0;
+    int n = 0;
+    if (s_metrics.claude.has_session) {
+        n += snprintf(text + n, sizeof(text) - n, "%s %.0f%%", card_tr("5 h", "5 ore"), s_metrics.claude.session_pct);
+        worst = s_metrics.claude.session_pct;
     }
-    lv_obj_t *st = line_in(row, &lv_font_montserrat_14, a->nsteps > 0 && a->steps[a->nsteps - 1].ok == 0 ? COL_ERROR
-                                                                                                        : CARD_DIM,
-                           text, w);
-    lv_obj_align(st, LV_ALIGN_TOP_LEFT, 0, 54);
-}
-
-static void add_limit(lv_obj_t *list, const char *name, float pct)
-{
-    lv_obj_t *row = row_box(list, 64);
-    char text[40];
-    snprintf(text, sizeof(text), "%s  %.0f%%", name, pct);
-    lv_obj_t *l = line_in(row, &lv_font_montserrat_20, pct >= 95 ? COL_ERROR : pct >= 80 ? CARD_WAIT : CARD_TEXT,
-                          text, ROW_W - 52);
-    lv_obj_align(l, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_obj_t *bar = lv_bar_create(row);
-    lv_obj_set_size(bar, ROW_W - 52, 8);
-    lv_bar_set_range(bar, 0, 100);
-    lv_bar_set_value(bar, (int32_t) (pct > 100 ? 100 : pct < 0 ? 0 : pct), LV_ANIM_OFF);
-    lv_obj_set_style_bg_color(bar, CARD_TRACK, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(bar, pct >= 95 ? COL_ERROR : pct >= 80 ? CARD_WAIT : CARD_ACCENT, LV_PART_INDICATOR);
-    lv_obj_align(bar, LV_ALIGN_BOTTOM_LEFT, 0, -2);
+    if (s_metrics.claude.has_week && n < (int) sizeof(text)) {
+        snprintf(text + n, sizeof(text) - n, "%s%s %.0f%%", n > 0 ? "   " : "", card_tr("Week", "Sett."),
+                 s_metrics.claude.week_pct);
+        worst = fmaxf(worst, s_metrics.claude.week_pct);
+    }
+    lv_obj_t *l = card_label(parent, &lv_font_montserrat_14,
+                             worst >= 95 ? COL_ERROR : worst >= 80 ? CARD_WAIT : CARD_DIM, text);
+    lv_obj_align(l, LV_ALIGN_BOTTOM_MID, 0, -QUIET_BOTTOM - QUIET_H - 6);
 }
 
 static void build_list(void)
 {
-    const int32_t scroll = s.list != NULL ? lv_obj_get_scroll_y(s.list) : 0;
     if (s.list != NULL) {
         lv_obj_delete(s.list);
     }
     s.view_built_ms = now_ms();
     s.list = lv_obj_create(s.view);
+    s.nminis = 0;
     lv_obj_t *list = s.list;
     lv_obj_remove_style_all(list);
-    lv_obj_set_size(list, BOARD_LCD_H_RES, BOARD_LCD_V_RES - 80);
-    lv_obj_align(list, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(list, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(list, 10, 0);
-    lv_obj_set_style_pad_top(list, 20, 0);
-    lv_obj_set_style_pad_bottom(list, 140, 0);
-    lv_obj_set_scroll_dir(list, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_set_size(list, BOARD_LCD_H_RES, BOARD_LCD_V_RES);
+    lv_obj_remove_flag(list, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(list, LV_OBJ_FLAG_CLICKABLE); // the view takes the swipes
 
     if (s_view.n == 0) {
         lv_obj_t *none = card_label(list, &lv_font_montserrat_20, CARD_DIM,
                                     !s_view.valid ? card_tr("No word from the computer", "Nessuna notizia dal PC")
                                                   : card_tr("No agents running", "Nessun agente al lavoro"));
-        lv_obj_set_style_pad_top(none, 60, 0);
+        lv_obj_align(none, LV_ALIGN_CENTER, 0, -16);
         lv_obj_t *hint = card_label(list, &lv_font_montserrat_14, CARD_DIM,
                                     card_tr("Connect agents in Companion Hub", "Collega gli agenti in Companion Hub"));
-        (void) hint;
+        lv_obj_align(hint, LV_ALIGN_CENTER, 0, 16);
     }
     for (int i = 0; i < s_view.n; i++) {
-        add_session(list, i);
+        add_mini(list, i);
     }
-    if (s_view.n > 0 && s_view.focus) {
-        lv_obj_t *hint = card_label(list, &lv_font_montserrat_14, CARD_DIM,
-                                    card_tr("Tap: terminal   Hold: interrupt", "Tocca: terminale   Tieni: interrompi"));
-        (void) hint;
-    }
+    s.nminis = s_view.n;
 
     // Do not disturb, as the host keeps it.
-    lv_obj_t *quiet = row_box(list, 56);
+    lv_obj_t *quiet = lv_obj_create(list);
+    lv_obj_remove_style_all(quiet);
+    lv_obj_set_size(quiet, QUIET_W, QUIET_H);
+    lv_obj_set_style_radius(quiet, QUIET_H / 2, 0);
+    lv_obj_set_style_bg_opa(quiet, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(quiet, CARD_ROW, 0);
+    lv_obj_set_style_bg_color(quiet, CARD_ROW_PRESSED, LV_STATE_PRESSED);
+    lv_obj_align(quiet, LV_ALIGN_BOTTOM_MID, 0, -QUIET_BOTTOM);
     lv_obj_add_flag(quiet, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(quiet, quiet_cb, LV_EVENT_CLICKED, NULL);
     char text[48];
     if (s_view.quiet_min > 0) {
-        snprintf(text, sizeof(text), card_tr(LV_SYMBOL_MUTE " Quiet, %d min left", LV_SYMBOL_MUTE " Silenzio, %d min"),
-                 s_view.quiet_min);
+        snprintf(text, sizeof(text), card_tr(LV_SYMBOL_MUTE " %d min", LV_SYMBOL_MUTE " %d min"), s_view.quiet_min);
     } else {
-        snprintf(text, sizeof(text), "%s", card_tr(LV_SYMBOL_MUTE " Quiet for 1 hour", LV_SYMBOL_MUTE " Silenzio per 1 ora"));
+        snprintf(text, sizeof(text), "%s", card_tr(LV_SYMBOL_MUTE " Quiet 1 h", LV_SYMBOL_MUTE " Silenzio 1 h"));
     }
-    lv_obj_t *q = line_in(quiet, &lv_font_montserrat_20, s_view.quiet_min > 0 ? CARD_WAIT : CARD_TEXT, text, ROW_W - 52);
-    lv_obj_align(q, LV_ALIGN_LEFT_MID, 0, 0);
-
-    // The plan's limits, from the metrics.
-    metrics_model_get(&s_metrics);
-    if (s_metrics.claude.valid && s_metrics.claude.has_session) {
-        add_limit(list, card_tr("5 h limit", "Limite 5 ore"), s_metrics.claude.session_pct);
-    }
-    if (s_metrics.claude.valid && s_metrics.claude.has_week) {
-        add_limit(list, card_tr("Week", "Settimana"), s_metrics.claude.week_pct);
-    }
-    lv_obj_update_layout(list);
-    lv_obj_scroll_to_y(list, scroll, LV_ANIM_OFF);
+    lv_obj_t *q = card_label(quiet, &lv_font_montserrat_14, s_view.quiet_min > 0 ? CARD_WAIT : CARD_TEXT, text);
+    lv_obj_center(q);
+    add_limits(list);
 }
 
 void agents_ui_open(void)
@@ -476,14 +753,15 @@ void agents_ui_open(void)
     s.armed[0] = '\0';
     s.view = card_root(true);
     lv_obj_add_event_cb(s.view, view_gesture_cb, LV_EVENT_GESTURE, NULL);
-    lv_obj_t *title = card_label(s.view, &lv_font_montserrat_28, CARD_ACCENT,
+    s.list = NULL;
+    build_list();
+    lv_obj_t *title = card_label(s.view, &lv_font_montserrat_20, CARD_ACCENT,
                                  card_tr(LV_SYMBOL_DOWN "  Agents", LV_SYMBOL_DOWN "  Agenti"));
-    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 34);
+    lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 22);
     lv_obj_add_flag(title, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_ext_click_area(title, 24);
     lv_obj_add_event_cb(title, close_cb, LV_EVENT_CLICKED, NULL);
-    s.list = NULL;
-    build_list();
+    s.anim = lv_timer_create(anim_cb, VIEW_FRAME_MS, NULL);
     lv_obj_fade_in(s.view, 180, 0);
     if (s.face != NULL) {
         lv_obj_add_flag(s.face, LV_OBJ_FLAG_HIDDEN);
@@ -500,8 +778,11 @@ void agents_ui_close(void)
     if (s.view == NULL) {
         return;
     }
+    lv_timer_delete(s.anim);
+    s.anim = NULL;
     lv_obj_delete_async(s.view);
     s.view = s.list = NULL;
+    s.nminis = 0;
     if (s.face != NULL) {
         lv_obj_remove_flag(s.face, LV_OBJ_FLAG_HIDDEN);
     }
@@ -536,11 +817,11 @@ static void poll_cb(lv_timer_t *t)
     if (s.view != NULL) {
         if (lv_display_get_inactive_time(NULL) >= VIEW_IDLE_MS) {
             agents_ui_close();
-        } else if (changed || now_ms() - s.view_built_ms >= VIEW_REFRESH_MS) {
-            if (s.armed[0] == '\0' || now_ms() - s.armed_ms >= ARM_MS) {
-                s.armed[0] = '\0';
-                build_list(); // not under a finger that is about to interrupt
-            }
+        } else if (s.armed[0] != '\0' && now_ms() - s.armed_ms >= ARM_MS) {
+            s.armed[0] = '\0'; // not stopped in time: back to its name
+            build_list();
+        } else if (changed || (s.armed[0] == '\0' && now_ms() - s.view_built_ms >= VIEW_REFRESH_MS)) {
+            build_list(); // the armed one stays armed: it goes by id
         }
     }
 }

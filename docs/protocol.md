@@ -131,7 +131,7 @@ Since 0.7.0. The host follows every coding agent session it has hooks for (Claud
 - `focus`: the host can bring a session's terminal to the front (and interrupt it).
 - The whole call stays under the 4096-byte payload.
 
-The board shows them on the rim (one segment per session, coloured by state), in a ticker over the bottom rim, and in the agents view (swipe up from the bottom edge, or the BOOT button).
+The board shows them on the rim (one segment per session, coloured by state), in a ticker over the bottom rim, and in the agents view (swipe up from the bottom edge, or the BOOT button), where each session is a little Yoru in its agent's colour acting out its state. The colour comes from `agent`: `claude` orange, `gemini` yellow, `codex`/`gpt`/`openai` blue, `cursor` green, `opencode` violet, `copilot` white, `windsurf` teal, `aider` pink, `qwen` indigo, `grok` grey; any other name is pearl.
 
 ### Shortcuts
 

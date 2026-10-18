@@ -1,5 +1,14 @@
 # Firmware changelog
 
+## 0.7.2
+
+- **Smoother agents view.** The little Yorus hop and squash in a few fixed steps, each drawn once, instead of a new shape almost every frame. With six agents on screen the animation no longer stutters, and the view uses less memory.
+
+## 0.7.1
+
+- **The agents view is a little family of Yorus.** Swipe up from the bottom edge (or press BOOT, or open Agents in the menu) and instead of a list you see one small Yoru for each agent session, in its agent's colour: Claude orange, Gemini yellow, Codex/GPT blue, Cursor green, OpenCode violet, Copilot white, Windsurf teal, Aider pink; any other agent is pearl like Yoru. Each one acts out what its agent is doing: bobbing with thinking dots while it works, hopping with a "!" when it needs you, smiling ^ ^ with a little twinkle when it's done, x x eyes and a shiver with a red badge when something failed, and dozing with a rising "z" when idle. Its project's name is underneath, in amber while it waits for you.
+- Tap a little Yoru to bring its terminal to the front; hold it until a red ring appears ("Tap to stop"), then tap again to interrupt the agent. "Quiet 1 h" and the Claude plan's limits are at the bottom. Swipe right or down, or tap the title, to close it.
+
 ## 0.7.0
 
 Yoru keeps an eye on your coding agents: Claude Code, Codex, Gemini CLI, Cursor and OpenCode, through Companion Hub.

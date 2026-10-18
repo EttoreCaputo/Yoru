@@ -122,7 +122,7 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 ### M4b: the agents' companion (in since 0.7.0)
 
 Yoru is the physical side of the coding agents on the computer, the way the coucou notch app is on the screen: it shows what they are doing, lets them be answered without going back to the terminal, and gets you to the right terminal. Nothing else (no chat, no service pills): the host does the agents' bookkeeping, Yoru shows it.
-- On the board: a dot per session on the rim (`agents_ui.c`), coloured by its state; the step ticker over the bottom rim and the host's toasts; the agents view (swipe up from the bottom edge, BOOT, the menu) with each session's task and last steps, tap for its terminal, hold to interrupt, quiet for an hour, and the plan's limits.
+- On the board: a dot per session on the rim (`agents_ui.c`), coloured by its state; the step ticker over the bottom rim and the host's toasts; the agents view (swipe up from the bottom edge, BOOT, the menu): a little Yoru per session in its agent's colour (Claude orange, Gemini yellow, Codex blue, Cursor green...), animated by its state, tap for its terminal, hold to interrupt, quiet for an hour, and the plan's limits.
 - Cards: permission requests with Always, refusing blind allows of a request cut to fit (`approval.c`); questions with their choices (`question.c`); both on `card.c`.
 - Yoru reacts: blue while an agent works, a nod when it finishes, a wince when it fails, a knock on the glass while one waits for you (`life_call`).
 - The host side (Companion Hub): hooks for Claude Code, Codex, Gemini CLI, Cursor and OpenCode; `set_agents`, `show_question`, the `shortcut` notification. The protocol is in `docs/protocol.md` (Agents, Questions, Shortcuts).

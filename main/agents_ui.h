@@ -7,9 +7,13 @@
  * - a line over the bottom rim: the host's toasts (show_toast), else the
  *   step the working session is on;
  * - the agents view (a swipe up from the bottom edge, the BOOT button, the
- *   menu): every session with its task and last steps, tap one to bring its
- *   terminal to the front, hold it to interrupt the agent, "Quiet for 1 h",
- *   and the plan's limits.
+ *   menu): a little Yoru per session in its agent's colour (Claude orange,
+ *   Gemini yellow, Codex blue, Cursor green...), acting out its state:
+ *   bobbing with thinking dots while it works, hopping with a "!" while it
+ *   waits for you, ^ ^ when done, x x and a shiver on an error, dozing when
+ *   idle. Its project underneath; tap one to bring its terminal to the
+ *   front, hold it to interrupt the agent; "Quiet 1 h" and the plan's
+ *   limits at the bottom.
  * The dots and the line keep out of the way of the menu and the cards. All
  * calls with the LVGL lock held. */
 

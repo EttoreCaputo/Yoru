@@ -116,7 +116,8 @@ static inline void put_px(look_sprite_t *sp, int x, int y, const float rgb[3], f
 
 /* The sphere by day, `r` pixels across from its centre, and the same shading
  * for the hands (an ellipse, flattened). */
-static esp_err_t render_ball(look_sprite_t *sp, float rx, float ry, float light_x, float light_y, float light_r)
+static esp_err_t render_ball(look_sprite_t *sp, float rx, float ry, float light_x, float light_y, float light_r,
+                             const stop_t *stops)
 {
     const int w = (int) ceilf(2 * rx) + 4;
     const int h = (int) ceilf(2 * ry) + 4;
@@ -133,7 +134,7 @@ static esp_err_t render_ball(look_sprite_t *sp, float rx, float ry, float light_
                 continue;
             }
             float rgb[3];
-            gradient(PEARL, 5, hypotf(px - light_x, py - light_y) / light_r, rgb);
+            gradient(stops, 5, hypotf(px - light_x, py - light_y) / light_r, rgb);
             put_px(sp, x, y, rgb, cov);
         }
     }
@@ -200,7 +201,7 @@ esp_err_t look_init(void)
     ESP_RETURN_ON_ERROR(render_ball_fast(&s_look.day, LOOK_SPHERE_R, LOOK_SPHERE_R), TAG, "day");
     ESP_RETURN_ON_ERROR(render_tint(&s_look.tint), TAG, "tint");
     ESP_RETURN_ON_ERROR(render_halo(&s_look.halo), TAG, "halo");
-    ESP_RETURN_ON_ERROR(render_ball(&s_look.hand, 27 * K, 22 * K, -12 * K, -11 * K, 31 * K), TAG, "hand");
+    ESP_RETURN_ON_ERROR(render_ball(&s_look.hand, 27 * K, 22 * K, -12 * K, -11 * K, 31 * K, PEARL), TAG, "hand");
     ESP_LOGI(TAG, "Yoru rendered in %lld ms", (esp_timer_get_time() - start) / 1000);
     return ESP_OK;
 }
@@ -348,6 +349,90 @@ const look_sprite_t *look_ball(int rx, int ry, uint32_t frame)
         ESP_LOGI(TAG, "sphere %dx%d rendered in %lld us", rx, ry, took);
     }
     return &free_slot->sp;
+}
+
+/* The coloured spheres, kept by size and colour. Only a few are drawn at
+ * once (a few squashes each), so the least recently drawn one is never on
+ * screen when it goes. */
+#define TINTED_SLOTS 40
+typedef struct {
+    look_sprite_t sp;
+    int rx, ry; // 0: empty
+    uint32_t rgb, used;
+} tinted_slot_t;
+/* Six agents with every squash fit well within it, so the ones that go are
+ * old sizes, never one on screen. */
+#define TINTED_BUDGET (1200 * 1024)
+static tinted_slot_t s_tinted[TINTED_SLOTS];
+static uint32_t s_tinted_clock, s_tinted_bytes;
+
+static void tinted_free(tinted_slot_t *t)
+{
+    heap_caps_free((void *) t->sp.img.data);
+    s_tinted_bytes -= t->sp.img.data_size;
+    t->rx = 0;
+    t->used = 0;
+}
+
+static tinted_slot_t *tinted_oldest(void)
+{
+    tinted_slot_t *oldest = NULL;
+    for (int i = 0; i < TINTED_SLOTS; i++) {
+        if (s_tinted[i].rx != 0 && (oldest == NULL || s_tinted[i].used < oldest->used)) {
+            oldest = &s_tinted[i];
+        }
+    }
+    return oldest;
+}
+
+static uint32_t mix(uint32_t a, uint32_t b, float k)
+{
+    uint32_t out = 0;
+    for (int c = 16; c >= 0; c -= 8) {
+        const float x = (float) ((a >> c) & 0xFF), y = (float) ((b >> c) & 0xFF);
+        out |= (uint32_t) (x + (y - x) * k + 0.5f) << c;
+    }
+    return out;
+}
+
+const look_sprite_t *look_tinted_ball(int rx, int ry, uint32_t rgb)
+{
+    s_tinted_clock++;
+    tinted_slot_t *slot = &s_tinted[0];
+    for (int i = 0; i < TINTED_SLOTS; i++) {
+        tinted_slot_t *t = &s_tinted[i];
+        if (t->rx == rx && t->ry == ry && t->rgb == rgb) {
+            t->used = s_tinted_clock;
+            return &t->sp;
+        }
+        if (t->used < slot->used) {
+            slot = t; // an empty one, else the least recently drawn
+        }
+    }
+    if (slot->rx != 0) {
+        tinted_free(slot);
+    }
+    const uint32_t need = (uint32_t) ((2 * rx + 4) * (2 * ry + 4) * 3);
+    for (tinted_slot_t *old; s_tinted_bytes + need > TINTED_BUDGET && (old = tinted_oldest()) != NULL;) {
+        tinted_free(old);
+    }
+    slot->used = s_tinted_clock;
+    // The pearl's light and falloff in the agent's colour: matte, lit from
+    // the top left, deep at the bottom-right edge.
+    const stop_t stops[] = {
+        {0.00f, mix(rgb, 0xFFFFFF, 0.55f)}, {0.22f, mix(rgb, 0xFFFFFF, 0.25f)}, {0.58f, rgb},
+        {0.84f, mix(rgb, 0x000000, 0.45f)}, {1.00f, mix(rgb, 0x000000, 0.72f)},
+    };
+    const float fx = (float) rx / LOOK_SPHERE_R, fy = (float) ry / LOOK_SPHERE_R;
+    if (render_ball(&slot->sp, (float) rx, (float) ry, LIGHT_X * fx, LIGHT_Y * fy, LIGHT_R * sqrtf(fx * fy), stops) !=
+        ESP_OK) {
+        return NULL;
+    }
+    slot->rx = rx;
+    slot->ry = ry;
+    slot->rgb = rgb;
+    s_tinted_bytes += slot->sp.img.data_size;
+    return &slot->sp;
 }
 
 const look_t *look_get(void)
