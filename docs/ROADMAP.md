@@ -6,6 +6,124 @@ Yoru reuses what the [DualEye PC Monitor](../../esp32s3-dualeye-pcmonitor) alrea
 
 What is new is the character, the UI and the hardware. The computer side is not copied: it is [Companion Hub](https://github.com/EttoreCaputo/companion-hub) (`../companion-hub`), the host program DualEye's `host/` became, shared by both boards and able to drive several at once. The firmware parts are still copied, and fixes go to both.
 
+> **Change of direction (2026-10-18).** Yoru stops being a pet for now and becomes the physical side of the coding agents, like [coucou](https://github.com/louis-cfm/coucou) is on the screen. Its computer side becomes the **Yoru app**, a fork of coucou, instead of Companion Hub, which Yoru no longer uses at all. The plan is in [The Yoru app](#the-yoru-app-a-fork-of-coucou) below. Where the rest of this page says something different (Companion Hub, the needs, the moods, M4 and the pet parts of M5), this plan wins. The pet comes back later.
+
+## The Yoru app: a fork of coucou
+
+### Why and what
+
+Yoru does three things:
+- it shows what the agents are doing;
+- it answers their permission requests and questions;
+- it is a microphone that sends a prompt to an agent.
+
+coucou already does all of this on the computer: the agents' hooks (Claude Code, Codex, Cursor, Gemini CLI, OpenCode and others), approvals with Always, questions, jumping to the right terminal, the plan limits, speech recognition (Parakeet offline, or the Mac's own) and a voice assistant. The fork keeps all of that and adds Yoru as a device the app drives. It replaces Companion Hub for Yoru. DualEye keeps its own `host/` and stays as it was.
+
+### Constraints that shape the plan
+
+- **Licence.** coucou's code is MIT. The names "Coucou" and "Mochi", the Mochi character, the icons, the sounds and the media are © Louis Raillé (`LICENSE-ASSETS.md`). A published fork needs its own name, icon, character and sounds. Keep the MIT notice.
+- **coucou changes fast.** It had 17 releases in three weeks, and some files are huge (`IslandViewContent.swift` is 218 KB, `HookServer.swift` 180 KB). To keep merging from upstream:
+  - Yoru's code lives in new files (`NotchBuddy/Sources/Yoru/`, and `windows/src-tauri/src/yoru/`);
+  - upstream files only get small hooks into that code;
+  - internal names (`NotchBuddy`, `pillId`) stay as they are;
+  - features Yoru doesn't need are hidden, not deleted.
+- **There is no device link on the Mac.** coucou's phone link (TLS and newline-delimited JSON, `docs/ANDROID_LINK.md`) exists only in the Windows/Linux app (`phone_link/`). The Mac app talks to the iPhone through iCloud. So the Mac side of the device link has to be written anyway.
+- **Mac first.** The Mac app is Swift 6 / SwiftUI, needs macOS 15, and is generated with XcodeGen (`NotchBuddy/project.yml`). The Windows/Linux app is Tauri 2 with Rust, the same stack as Companion Hub.
+- **Sandbox.** The App Store sandbox limits USB serial. Yoru ships with the GitHub build, the way coucou ships plan usage.
+
+### Decisions (proposed)
+
+- **The link keeps Yoru's protocol v2** (USB and WiFi, sealing, JSON-RPC, the audio streams; `docs/protocol.md`), not coucou's phone link.
+  - The firmware's link already works.
+  - USB powers the board and needs no set-up.
+  - The audio streams are needed for the voice.
+  - On the Mac it was ported to Swift from Companion Hub's `link.rs`, `wifi.rs`, `serial.rs` and `protocol.rs`, about 1,350 lines of Rust. On Windows/Linux it goes into the fork's own Tauri app; Companion Hub's Rust is only a reference to port from.
+- **Yoru replaces Mochi in the app.** The sphere with its eyes is drawn in the island, the greeting and on the desktop, so the screen and the board show the same character. coucou draws Mochi in `BotCanvasView.swift`, `GreetingCanvasView.swift` and `DesktopMochi.swift`. The outfits are switched off.
+- **Kept but hidden by default:** portfolio, Stripe/n8n/Resend/Notion/Cal.com, the music pills, the Notetaker, the file drop, WhatsApp. **Left alone for now:** the iPhone and Android apps. Their iCloud and phone-link switches stay off.
+- **Companion Hub features coucou lacks:**
+  - the flasher, WiFi pairing and Yoru's settings are needed and get ported;
+  - timers, the MCP server, the diary and the quips are dropped for now.
+
+### Phases
+
+**F0. Fork and build.** Done (2026-10-18): [EttoreCaputo/yoru-app](https://github.com/EttoreCaputo/yoru-app), branch `yoru`, in `../yoru-app`.
+- Fork `louis-cfm/coucou` on GitHub. Clone it to `../yoru-app`, add `upstream`, and work on a `yoru` branch.
+- Build the stock Mac app to check the toolchain (Xcode, XcodeGen).
+- Done when: coucou runs as it is, built from the fork.
+
+**F1. Rebrand.** Done for the Mac app (2026-10-18). How it works and what is left: `YORU.md` in the fork.
+- In `project.yml`: name, bundle id, URL scheme (`yoru://`), Keychain service, app group, iCloud off.
+- The update feed points at the fork's releases.
+- The icon and the menu bar icon.
+- The 29 sounds: replaced, reusing Yoru's `sounds.c` where it fits.
+- Mochi → Yoru (see the decisions).
+- "Coucou" and "Mochi" in `Localizable.xcstrings` (10 languages), with a script.
+- README and licence.
+- Done when: no asset of coucou's is shipped and the app says Yoru everywhere.
+- Also done (2026-10-18): Yoru shares nothing on disk with an installed Coucou (its own support and log folders, `yoru.sock`, `yoru-hook`, the agents' plugins), so the two run side by side. It is signed by the bytebusters team (`79AC9KV62T`) as `it.bytebusters.yoru`, with the iCloud container `iCloud.it.bytebusters.yoru`. The Debug build is signed; DebugCloud and Release need the App ID, the container, a Developer ID certificate and its profile created once in that account (`YORU.md`, "Signing").
+
+**F2. Firmware: drop the pet.** Done in 0.8.0.
+- Remove `needs.c`, `life.c`, the fireflies, the needs-driven parts of `pet.c` and `behaviour.c`, the moods from metrics, the Yoru page of the menu, and `feed` and `get_pet`.
+- Keep the eye engine and its expressions (they act out the agents' states), the look, motion, the voice, the link, the agents view and the cards.
+- Version 0.8.0.
+- Done when: Yoru only rests, reacts to touch and motion, and reacts to the agents.
+
+**F3. Yoru link in Swift.** Done (2026-10-18), in the fork's `NotchBuddy/Sources/Yoru/`. Checked on the board over USB, including a reboot. WiFi is checked only against a fake board, because the board's WiFi wasn't set up.
+- `Sources/Yoru/`: USB serial, WiFi (mDNS `_yoru._tcp`, the sealing from `link_crypto.c`), framing, JSON-RPC, `hello` and its capabilities.
+- A Yoru page in the settings: connection, WiFi pairing, the board's settings table, the firmware version.
+- Check against `tools/yoru_link.py`.
+- Done when: the app finds Yoru over USB and WiFi and changes a setting both ways.
+
+**F4. Agents on Yoru.** Built (2026-10-18), in the fork's `Sources/Yoru/YoruAgents.swift`. Checked on the board: sessions, cards shown and taken down, toasts, Allow and a question answered on the touchscreen, BOOT short (focus) and long (quiet). Feed the board from coucou's own model (`HookServer`, `PillSessionRegistry`, `ApprovalQueue`, `AskQuestion`):
+- `set_agents`, using coucou's 11 states (`idle working thinking searching approval question error finished ratelimit sleeping dizzy`);
+- `show_approval`, with the decision going back through coucou's fingerprint check;
+- `show_question` and `answer`;
+- the step ticker and toasts;
+- jump to terminal, interrupt, quiet, the plan limits, the BOOT shortcut.
+
+The firmware side mostly exists (0.7.x); it is adapted to coucou's states and pills. Done when: an approval, a question and a jump to terminal work from Yoru with Claude Code and Codex.
+
+**F5. Voice.** First part built (2026-10-18), in the fork's `Sources/Yoru/YoruVoice.swift`. Checked on the board: "Alexa", then a sentence, is transcribed (the Mac's speech recognition, Italian) and sent with `claude -p --resume` to a test session. Prompt to an agent session is done. The voice assistant, dictation and spoken answers are still to do.
+- What it does now:
+  - assembles the `audio_up` frames (a dropped frame becomes silence);
+  - transcribes with Parakeet when its models are installed, else the Mac's speech recognition in the first two Automatic dictation languages, keeping the most confident result;
+  - sends the text to the session waiting for you, else the one active last, among those a prompt can reach. In its terminal it is pasted, then Return is sent (this needs Accessibility). Otherwise it goes in the background with `claude -p --resume` in its folder;
+  - shows thinking, then a toast.
+- Claude Desktop's own sessions can't be reached, so they are skipped.
+- Yoru's wake word or a touch opens the mic. `audio_up` goes into coucou's speech recognition (Parakeet or the Mac's own).
+- The text goes to one of three places:
+  1. **a prompt to an agent session**: coucou's "send the next instruction", which resumes the session in its own folder;
+  2. the voice assistant;
+  3. dictation where you type.
+- Answers are spoken through Yoru's speaker (`audio_down`).
+- Done when: "Hey Yoru, run the tests" reaches the chosen Claude Code session.
+
+**F6. Firmware in the app.**
+- The firmware image ships inside the app and is flashed through a bundled esptool, as Companion Hub does.
+- This replaces Companion Hub's `tools/fetch_firmware.sh` in this repository's CLAUDE.md rule.
+
+**F7. Windows and Linux.** The same Yoru module in the fork's Tauri app (`windows/src-tauri/src/yoru/`): the link, the agents and the voice, written for that app. Companion Hub is not used or shared.
+
+**F8. Retire Companion Hub.** Yoru no longer depends on it (2026-10-18).
+- Archive its GitHub repository (archive, not delete) and remove the local copy, once nothing else on this Mac uses it (Claude Code's status line still runs `companion-hub --claude-statusline`).
+- DualEye is not touched: it has its own `host/`.
+- Update this repository's CLAUDE.md, `docs/protocol.md` and this roadmap.
+
+**Ongoing: keep up with coucou.** About once a week, `scripts/yoru_sync_upstream.sh` in the fork lists coucou's new commits and releases, merges them into `yoru` without committing, rebrands them, renders Yoru's sounds and icons again, checks that no coucou name or shared path came back, and builds. Each new feature is then hidden or adapted to Yoru before the merge is committed (`YORU.md`, "Merging upstream").
+
+### Risks
+
+- **Merge conflicts** with a fast upstream; the rule of keeping Yoru's code in its own files is what keeps them small.
+- **Swift.** The Mac work is Swift, not Rust.
+- **Lost Hub features.** Timers, MCP, the diary and the quips are gone until they are ported.
+- **RAM.** The board's internal RAM is unchanged by this plan. F5 adds no new firmware load, because the voice and the audio streams already exist.
+
+### Open questions
+
+- Should the unused features be hidden or deleted?
+- Are Windows/Linux (F7) wanted, and when?
+- Should the iPhone/Android apps be kept, renamed or dropped?
+
 ## Hardware
 
 Waveshare ESP32-S3-Touch-AMOLED-1.75C only, for now. DualEye support may follow.

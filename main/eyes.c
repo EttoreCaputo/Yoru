@@ -47,15 +47,6 @@
 #define SPEED_STRETCH 900.0f
 /* A hop rises this high on screen, plus a share of how far it goes. */
 #define HOP_ARC 34.0f
-/* The mouth, just below the eyes, in pixels at the resting distance: where
- * a firefly goes in. */
-#define MOUTH_Y 20.0f
-/* The firefly: its core and glow radius at the resting distance, how long
- * it takes to fade, and to be gulped down. */
-#define MOTE_CORE 4.0f
-#define MOTE_GLOW 17.0f
-#define MOTE_FADE_MS 600
-#define MOTE_EAT_MS 380
 /* With the menu or an approval card open Yoru shrinks to this, clear of
  * the icons or the card, in this long. */
 #define MENU_SIZE 0.62f
@@ -318,20 +309,9 @@ static struct {
     float lx, ly, tlx, tly;
     /* Where it is in the space, and how it gets around. */
     mover_t mv;
-    bool chase;           // following the firefly
     float vsq;            // stretch from speed, eased
     uint32_t frame;
     const look_sprite_t *ball;
-    /* The firefly. */
-    struct {
-        mover_t mv;
-        bool on, eating;
-        float glow;       // 0..1, fading in and out
-        int32_t eat_ms;
-        float x, y, core, halo; // this frame, on screen
-        lv_area_t drawn;
-        bool drawn_valid;
-    } mote;
     /* This frame and what the last one covered. */
     body_vis_t body;
     lv_area_t body_drawn;
@@ -799,36 +779,16 @@ static void draw_overlays(lv_layer_t *layer)
     }
 }
 
-/* The firefly: a warm core in a soft glow, flickering. */
-static void draw_mote(lv_layer_t *layer)
-{
-    if (s.mote.glow <= 0.01f) {
-        return;
-    }
-    const float t = (float) s.t_ms / 1000.0f;
-    const float g = s.mote.glow * (0.82f + 0.18f * sinf(t * 13 + 2 * sinf(t * 3.1f)));
-    const lv_color_t halo = lv_color_hex(0xFFC24D), core = lv_color_hex(0xFFF3C4);
-    draw_disc(layer, s.mote.x, s.mote.y, s.mote.halo, halo, (lv_opa_t) (34 * g));
-    draw_disc(layer, s.mote.x, s.mote.y, s.mote.halo * 0.6f, halo, (lv_opa_t) (60 * g));
-    draw_disc(layer, s.mote.x, s.mote.y, s.mote.core * 1.7f, halo, (lv_opa_t) (130 * g));
-    draw_disc(layer, s.mote.x, s.mote.y, s.mote.core, core, (lv_opa_t) (255 * g));
-}
-
 static void draw_cb(lv_event_t *e)
 {
     lv_layer_t *layer = lv_event_get_layer(e);
     const look_t *lk = look_get();
     const body_vis_t *v = &s.body;
     const lv_color_t black = lv_color_black();
-    // The firefly behind Yoru or in front of it, by distance.
-    const bool mote_behind = s.mote.mv.pos.z > body_z();
 
     if (v->tint > 0.01f) {
         const float d = fminf(1, v->dist);
         look_draw(layer, &lk->halo, v->bx, v->by, d, d, 0, (lv_opa_t) (90 * v->tint), rgb_color(v->tint_rgb));
-    }
-    if (mote_behind) {
-        draw_mote(layer);
     }
     if (!s.hands_front) {
         draw_hands(layer);
@@ -849,9 +809,6 @@ static void draw_cb(lv_event_t *e)
     }
     if (s.hands_front) {
         draw_hands(layer);
-    }
-    if (!mote_behind) {
-        draw_mote(layer);
     }
     draw_overlays(layer);
 }
@@ -935,12 +892,6 @@ static int overlay_areas(lv_area_t out[MAX_OVERLAY_RECTS])
         return 2;
     }
     return 0;
-}
-
-static lv_area_t mote_area(void)
-{
-    const float r = s.mote.halo + 3;
-    return box(s.mote.x, s.mote.y, r, r, r, r);
 }
 
 static bool areas_equal(const lv_area_t *a, const lv_area_t *b)
@@ -1093,68 +1044,10 @@ static bool mover_busy(const mover_t *m)
     return off > 4 || hypotf(m->vel.x, m->vel.y) / z > 30;
 }
 
-/* Where the mouth is in the space: a firefly goes there. */
-static eyes_pos_t mouth_pos(void)
-{
-    return (eyes_pos_t) {s.mv.pos.x, s.mv.pos.y + MOUTH_Y * s.size, s.mv.pos.z};
-}
-
-/* The firefly's flutter, in pixels at the resting distance. */
-static void mote_flutter(float t, float *fx, float *fy)
-{
-    *fx = 6 * sinf(t * 5.3f) + 3 * sinf(t * 8.9f + 1);
-    *fy = 5 * sinf(t * 4.1f + 2) + 3 * sinf(t * 9.7f);
-}
-
-static void mote_step(void)
-{
-    if (!s.mote.on && s.mote.glow <= 0) {
-        return;
-    }
-    if (s.mote.eating) {
-        s.mote.mv.to = mouth_pos();
-        s.mote.eat_ms += s.dt_ms;
-        if (s.mote.eat_ms >= MOTE_EAT_MS) {
-            // Gulp.
-            s.mote.eating = false;
-            s.mote.on = false;
-            s.mote.glow = 0;
-            s.squash = 0.8f;
-            if (s.chase) {
-                s.chase = false;
-                s.mv.to = s.mv.pos; // settle where it caught it
-            }
-        }
-    } else {
-        const float step = (float) s.dt_ms / MOTE_FADE_MS;
-        s.mote.glow = s.mote.on ? fminf(1, s.mote.glow + step) : fmaxf(0, s.mote.glow - step);
-    }
-    mover_step(&s.mote.mv, s.dt_ms);
-    const float t = (float) s.t_ms / 1000.0f;
-    float fx, fy;
-    mote_flutter(t, &fx, &fy);
-    if (s.mote.eating) {
-        fx = fy = 0;
-    }
-    const float z = fmaxf(Z_NEAR, s.mote.mv.pos.z);
-    const float shrink = s.mote.eating ? 1 - (float) s.mote.eat_ms / MOTE_EAT_MS : 1;
-    s.mote.x = CX + (s.mote.mv.pos.x + fx) / z;
-    s.mote.y = CY + (s.mote.mv.pos.y + fy) / z;
-    s.mote.core = fmaxf(1.5f, MOTE_CORE / z) * shrink;
-    s.mote.halo = fmaxf(4, MOTE_GLOW / z) * shrink;
-}
-
-/* Moving, the eyes lead the way; chasing, they stay on the firefly; coming
- * up to the glass, they look at you. False when nothing calls for a look. */
+/* Moving, the eyes lead the way; coming up to the glass, they look at you. False when nothing calls for a look. */
 static bool lead_gaze(float *gx, float *gy)
 {
     const float z = body_z();
-    if (s.chase && s.mote.glow > 0.05f) {
-        const float r = R * fmaxf(0.2f, s.body.dist) * 1.6f;
-        *gx = clampf((s.mote.x - (float) s.body.bx) / r, -1, 1);
-        *gy = clampf((s.mote.y - (float) s.body.by) / r, -1, 1);
-        return true;
-    }
     const float vx = s.mv.vel.x / z, vy = s.mv.vel.y / z;
     const float speed = hypotf(vx, vy);
     if (s.mv.vel.z < -0.35f && speed < 150) {
@@ -1296,10 +1189,6 @@ static bool step(void)
 
     // Through the space: a hop stretches as it leaves and squashes as it
     // lands; fast, it stretches along the way it goes.
-    if (s.chase) {
-        const eyes_pos_t m = s.mote.mv.pos;
-        s.mv.to = (eyes_pos_t) {m.x, m.y - MOUTH_Y * s.size, m.z};
-    }
     const int ev = mover_step(&s.mv, s.dt_ms);
     if (ev & MOVED_LANDED) {
         s.squash = 0.75f;
@@ -1309,7 +1198,6 @@ static bool step(void)
     const float z = body_z();
     const float want_vsq = clampf((fabsf(s.mv.vel.x) - fabsf(s.mv.vel.y)) / z / SPEED_STRETCH, -0.5f, 0.5f);
     s.vsq = fabsf(want_vsq - s.vsq) < 0.01f ? want_vsq : lerp(s.vsq, want_vsq, ease(0.3f));
-    mote_step();
 
     hands_step();
     return moved;
@@ -1381,18 +1269,6 @@ static void frame_cb(lv_timer_t *timer)
         s.badge_drawn = now;
     }
 
-    // The firefly flutters all the time it shows.
-    if (s.mote.glow > 0.01f || s.mote.drawn_valid) {
-        lv_area_t now = mote_area();
-        if (s.mote.drawn_valid) {
-            invalidate_move(&s.mote.drawn, &now);
-        } else {
-            lv_obj_invalidate_area(s.obj, &now);
-        }
-        s.mote.drawn = now;
-        s.mote.drawn_valid = s.mote.glow > 0.01f;
-    }
-
     // Each overlay piece against its own last place; a piece the mood no
     // longer has is cleared once.
     if (has_overlay(s.mood) || s.over_count > 0) {
@@ -1425,7 +1301,6 @@ lv_obj_t *eyes_create(lv_obj_t *parent)
     s.near = 1;
     s.size = 1;
     s.mv.pos = (eyes_pos_t) {0, 0, 1};
-    s.mote.mv.pos = (eyes_pos_t) {0, 0, 3};
     s.badge_scale = 1;
     s.last_tick = lv_tick_get();
     s.hand[0] = (hand_pose_t) TUCK_L;
@@ -1555,7 +1430,6 @@ const char *eyes_gesture_name(eyes_gesture_t gesture)
 
 void eyes_move(const eyes_pos_t *pts, int n, uint32_t ms, eyes_path_t path)
 {
-    s.chase = false;
     mover_path(&s.mv, pts, n, ms, path);
 }
 
@@ -1567,17 +1441,10 @@ void eyes_move_to(float x, float y, float z, uint32_t ms, eyes_path_t path)
 
 void eyes_follow(float x, float y, float z, float stiffness)
 {
-    s.chase = false;
     s.mv.n = 0;
     s.mv.follow = true;
     s.mv.to = (eyes_pos_t) {x, y, fmaxf(Z_NEAR, z)};
     s.mv.stiff = clampf(stiffness, 1, 200);
-}
-
-void eyes_chase(float stiffness)
-{
-    eyes_follow(s.mv.pos.x, s.mv.pos.y, s.mv.pos.z, stiffness);
-    s.chase = true;
 }
 
 bool eyes_moving(void)
@@ -1601,50 +1468,3 @@ bool eyes_hit(int32_t x, int32_t y)
     return hypotf((float) (x - s.body.bx), (float) (y - s.body.by)) <= r;
 }
 
-void eyes_mote_show(eyes_pos_t at)
-{
-    if (!s.mote.on || s.mote.glow <= 0) {
-        s.mote.mv.pos = at;
-        s.mote.mv.vel = (eyes_pos_t) {0};
-    }
-    mover_path(&s.mote.mv, &at, 1, 300, EYES_PATH_GLIDE);
-    s.mote.on = true;
-    s.mote.eating = false;
-}
-
-void eyes_mote_fly(eyes_pos_t to, uint32_t ms)
-{
-    if (s.mote.on && !s.mote.eating) {
-        mover_path(&s.mote.mv, &to, 1, ms, EYES_PATH_GLIDE);
-    }
-}
-
-bool eyes_mote(eyes_pos_t *where)
-{
-    if (where != NULL) {
-        *where = s.mote.mv.pos;
-    }
-    return s.mote.on;
-}
-
-void eyes_mote_eat(void)
-{
-    if (!s.mote.on || s.mote.eating) {
-        return;
-    }
-    s.mote.eating = true;
-    s.mote.eat_ms = 0;
-    s.mote.mv.n = 0;
-    s.mote.mv.follow = true;
-    s.mote.mv.stiff = 160;
-    s.mote.mv.to = mouth_pos();
-}
-
-void eyes_mote_hide(void)
-{
-    s.mote.on = false;
-    s.mote.eating = false;
-    if (s.chase) {
-        eyes_follow(s.mv.pos.x, s.mv.pos.y, s.mv.pos.z, 20);
-    }
-}

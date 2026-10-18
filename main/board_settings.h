@@ -41,9 +41,8 @@ typedef enum {
     SETTING_TOUCH_REACTIONS,
     /* The case as an input: lift, shake, knocks, lean (motion.c). */
     SETTING_MOTION_REACTIONS,
-    /* The pet reacts to what happens on the computer (pet.c). */
-    SETTING_PET_REACTIONS,
-    /* The pet listens to the room: bangs, claps, people talking (ears.c). */
+    /* It turns to a sudden sound (ears_dir.c). The NVS key is still
+     * "pet_hear". */
     SETTING_PET_HEARING,
     /* Look: the resting eyes' colour as 0xRRGGBB, and the style (M5). */
     SETTING_EYE_COLOR,

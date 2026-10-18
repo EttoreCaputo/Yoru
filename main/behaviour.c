@@ -20,20 +20,17 @@
 #include "lvgl_port.h"
 #include "menu.h"
 #include "motion.h"
-#include "needs.h"
-#include "pet.h"
+#include "metrics_model.h"
 #include "playback.h"
 #include "question.h"
 
-/* Often enough for life.c's choreography. */
+/* Often enough for life.c's moves. */
 #define TICK_MS 100
 #define BRIGHTNESS_ASLEEP 12
 /* Three pokes closer than this make it grumpy. */
 #define POKE_WINDOW_MS 1500
 /* How much finger travel counts as stroking. */
 #define STROKE_PX 160
-/* Nobody around for longer than this: no company (needs.c). */
-#define COMPANY_MS 300000
 /* Back to the middle when something needs Yoru's attention. */
 #define HOME_MS 350
 /* The host's pointer is followed this long after its last move. */
@@ -63,11 +60,11 @@
 
 static const char *TAG = "behaviour";
 
-/* How each of pet.c's scenes looks: a mood for a while, a poke or a blink to
- * start it, a gesture of the hands, and the pet's sound for it (SOUND_COUNT
- * for none; playback.c drops them while pet sounds are off). Names as in
- * DualEye, so the host's scenes and the pet's reactions mean the same on both
- * boards; the gesture scenes are Yoru's own. */
+/* How each scene looks: a mood for a while, a poke or a blink to start it, a
+ * gesture of the hands, and Yoru's sound for it (SOUND_COUNT for none;
+ * playback.c drops them while its sounds are off). Names as in DualEye, so the
+ * host's scenes mean the same on both boards; the gesture scenes are Yoru's
+ * own. */
 typedef enum { FX_NONE, FX_POKE, FX_BLINK } fx_t;
 
 typedef struct {
@@ -183,15 +180,26 @@ static void set_brightness(int percent)
     }
 }
 
+/* The host's clock and idle time, from its snapshots (minute -1 and idle 0
+ * until it sends them). */
+static void host_now(int *minute, uint32_t *idle_ms)
+{
+    static metrics_snapshot_t snap; // big for the LVGL task's stack
+    metrics_model_get(&snap);
+    *minute = snap.host.valid ? snap.host.minute : -1;
+    *idle_ms = snap.host.valid ? (uint32_t) snap.host.idle_s * 1000 : UINT32_MAX;
+}
+
 /* At night (the host sends the time) the screen is dimmer. */
 static bool night(void)
 {
-    pet_state_t pet;
-    pet_get(&pet);
-    if (pet.minute < 0) {
+    int minute;
+    uint32_t idle_ms;
+    host_now(&minute, &idle_ms);
+    if (minute < 0) {
         return false;
     }
-    const int h = pet.minute / 60;
+    const int h = minute / 60;
     const int from = (int) board_settings_get(SETTING_NIGHT_FROM), to = (int) board_settings_get(SETTING_NIGHT_TO);
     return from <= to ? (h >= from && h < to) : (h >= from || h < to);
 }
@@ -215,7 +223,7 @@ static void react(eyes_mood_t mood, uint32_t for_ms)
     eyes_set_mood(mood);
 }
 
-/* Show one of pet.c's scenes; false if it isn't one these eyes know. */
+/* Show one of the scenes; false if it isn't one these eyes know. */
 static bool play(const char *name)
 {
     if (name == NULL) {
@@ -258,26 +266,17 @@ static void fall_asleep(void)
     life_slept();
 }
 
-/* Woken by you it says hello; waking by itself, it stretches (life.c). */
-static void wake_up_as(bool natural)
+/* Woken, it says hello. */
+static void wake_up(void)
 {
-    ESP_LOGI(TAG, "awake%s", natural ? ": rested" : "");
+    ESP_LOGI(TAG, "awake");
     s.asleep = false;
     s.woke_ms = lv_tick_get();
     set_brightness(awake_brightness());
     eyes_blink();
-    if (natural) {
-        eyes_set_mood(EYES_MOOD_SLEEPY);
-    } else {
-        eyes_gesture(EYES_GESTURE_WAVE); // hello again
-        react(EYES_MOOD_CURIOUS, 1500);
-    }
-    life_woke(natural);
-}
-
-static void wake_up(void)
-{
-    wake_up_as(false);
+    eyes_gesture(EYES_GESTURE_WAVE); // hello again
+    react(EYES_MOOD_CURIOUS, 1500);
+    life_woke();
 }
 
 /* Something needs Yoru here: back to the middle, whatever it was doing. */
@@ -309,9 +308,8 @@ static void watch_finger(lv_indev_t *indev)
         && lv_tick_elaps(s.press_ms) >= STROKE_MIN_MS && board_settings_on(SETTING_TOUCH_REACTIONS)) {
         s.stroked = true;
         life_attend();
-        pet_event(PET_EVENT_STROKED);
         playback_sound(SOUND_PURR);
-        react(pet_mood() == PET_MOOD_LOVING ? EYES_MOOD_LOVING : EYES_MOOD_HAPPY, 2500);
+        react(EYES_MOOD_HAPPY, 2500);
     }
 }
 
@@ -331,10 +329,8 @@ static void poke(uint32_t now)
     life_attend();
     eyes_poke();
     if (s.pokes >= 3) {
-        pet_event(PET_EVENT_ANNOYED);
         play("annoyed");
     } else {
-        pet_event(PET_EVENT_POKED);
         playback_sound(SOUND_BOOP);
         react(EYES_MOOD_HAPPY, 1800);
     }
@@ -351,10 +347,8 @@ static void slap(uint32_t now, int32_t dx, int32_t dy)
     eyes_knock((float) dx / len * 0.9f, (float) dy / len * 0.5f);
     if (s.slaps >= 3) {
         s.slaps = 0;
-        pet_event(PET_EVENT_ANNOYED);
         play("annoyed");
     } else {
-        pet_event(PET_EVENT_POKED);
         playback_sound(SOUND_BOING);
         react(EYES_MOOD_SURPRISED, 900);
     }
@@ -431,13 +425,11 @@ static void touch_cb(lv_event_t *e)
         if (s.asleep) {
             wake_up();
         } else if (!s.stroked && s.voice == VOICE_IDLE && board_settings_on(SETTING_TOUCH_REACTIONS)) {
-            // On Yoru it's a poke; on the black, a firefly drops there.
+            // On Yoru it's a poke; the black is just the black.
             lv_point_t p;
             lv_indev_get_point(indev, &p);
             if (eyes_hit(p.x, p.y)) {
                 poke(now);
-            } else {
-                life_tap(p.x, p.y);
             }
         }
         break;
@@ -454,26 +446,24 @@ static void touch_cb(lv_event_t *e)
 }
 
 /* What life.c needs to know this tick. Someone is around if they touched,
- * talked or moved the case lately, or use the computer (pet_alone_s()). */
+ * talked or moved the case lately, or use the computer (the host's idle
+ * time). */
 static life_ctx_t life_context(uint32_t now, bool playing)
 {
+    int minute;
+    uint32_t host_idle_ms;
+    host_now(&minute, &host_idle_ms);
     uint32_t alone_ms = now - s.last_touch_ms;
-    const uint32_t pet_alone_ms = pet_alone_s() * 1000;
-    alone_ms = pet_alone_ms < alone_ms ? pet_alone_ms : alone_ms;
+    alone_ms = host_idle_ms < alone_ms ? host_idle_ms : alone_ms;
     const uint32_t awake_ms = now - s.woke_ms;
     const uint32_t lonely_ms = alone_ms < awake_ms ? alone_ms : awake_ms;
-    pet_state_t pet;
-    pet_get(&pet);
     return (life_ctx_t) {
         .free = !s.pressed && s.voice == VOICE_IDLE && !s.menu && !s.view && !card_up() && !s.face_down && !playing,
         .asleep = s.asleep,
-        // With an agent waiting, its own whims step back.
+        // With an agent waiting, it keeps still.
         .focus = board_settings_on(SETTING_FOCUS) || s.agents_waiting,
-        .company = alone_ms < COMPANY_MS,
         .drowsy = lonely_ms >= (uint32_t) board_settings_get(SETTING_SLEEPY_AFTER_S) * 1000,
         .lonely = lonely_ms >= (uint32_t) board_settings_get(SETTING_ASLEEP_AFTER_S) * 1000,
-        .night = (pet.now & PET_NOW_NIGHT) != 0,
-        .music = (pet.now & PET_NOW_MUSIC) != 0,
         .agent_sounds = board_settings_on(SETTING_AGENTS_SOUNDS),
     };
 }
@@ -548,9 +538,6 @@ static void agents_tick(uint32_t now)
 static void tick_cb(lv_timer_t *timer)
 {
     const uint32_t now = lv_tick_get();
-    const bool focus = board_settings_on(SETTING_FOCUS);
-    // Taken even when it can't be shown, so an old one doesn't play later.
-    const char *reaction = pet_take_reaction();
 
     if (s.status_until_ms != 0 && (int32_t) (now - s.status_until_ms) >= 0) {
         s.status_until_ms = 0;
@@ -579,9 +566,7 @@ static void tick_cb(lv_timer_t *timer)
     if (s.asleep) {
         set_brightness(asleep_brightness()); // follows the menu's changes
         const life_ctx_t ctx = life_context(now, false);
-        if (life_step(&ctx) == LIFE_WAKE) {
-            wake_up_as(true);
-        }
+        life_step(&ctx);
         return;
     }
     set_brightness(awake_brightness());
@@ -594,10 +579,6 @@ static void tick_cb(lv_timer_t *timer)
     if (s.voice != VOICE_IDLE) {
         // A conversation counts as company, and owns the eyes.
         s.last_touch_ms = now;
-        return;
-    }
-    if (reaction != NULL && !focus && play(reaction)) {
-        life_attend(); // something happened: it comes to look
         return;
     }
     const bool playing = s.until_ms != 0 && (int32_t) (now - s.until_ms) < 0;
@@ -719,7 +700,8 @@ static void on_motion(motion_event_t ev)
             wake_up();
         }
         if (reactions) {
-            pet_heard(PET_HEARD_CLAPS, 2);
+            life_attend();
+            play("curious");
         }
         return;
     }
@@ -730,7 +712,6 @@ static void on_motion(motion_event_t ev)
     life_attend();
     switch (ev) {
     case MOTION_LIFTED:
-        pet_event(PET_EVENT_LIFTED);
         play("lifted");
         hold_gaze(0, -0.2f, 1800); // at you
 
@@ -742,11 +723,9 @@ static void on_motion(motion_event_t ev)
         break;
     case MOTION_SHAKEN:
     case MOTION_SPUN:
-        pet_event(PET_EVENT_SHAKEN);
         play("dizzy");
         break;
     case MOTION_SHAKEN_LONG:
-        pet_event(PET_EVENT_ANNOYED);
         play("annoyed");
         break;
     case MOTION_KNOCK:
@@ -754,7 +733,6 @@ static void on_motion(motion_event_t ev)
         poke(now);
         break;
     case MOTION_ROCKED:
-        pet_event(PET_EVENT_ROCKED);
         if (s.rocked_ms != 0 && now - s.rocked_ms < LULLABY_MS) {
             s.rocked_ms = 0;
             fall_asleep();
@@ -764,7 +742,6 @@ static void on_motion(motion_event_t ev)
         }
         break;
     case MOTION_DROPPED:
-        pet_event(PET_EVENT_DROPPED);
         play("falling");
         break;
     case MOTION_LANDED:
@@ -1087,23 +1064,4 @@ void behaviour_start(lv_obj_t *face)
     question_init(on_question);
     agents_ui_init(face, on_view);
     board_button_init(behaviour_boot_key);
-}
-
-void behaviour_whim(const char *name)
-{
-    if (name != NULL && !board_settings_on(SETTING_FOCUS)) {
-        play(name);
-    }
-}
-
-bool behaviour_feed(void)
-{
-    lvgl_port_lock();
-    bool ok = false;
-    if (!s.asleep && !s.menu && !s.view && !card_up() && s.voice == VOICE_IDLE) {
-        s.last_touch_ms = lv_tick_get();
-        ok = life_feed();
-    }
-    lvgl_port_unlock();
-    return ok;
 }

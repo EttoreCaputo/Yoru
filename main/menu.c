@@ -18,10 +18,8 @@
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "life.h"
 #include "link.h"
 #include "lvgl_port.h"
-#include "needs.h"
 #include "net.h"
 #include "nvs_flash.h"
 #include "voice.h"
@@ -98,13 +96,6 @@ static void info_memory(char *out, size_t len);
 static void info_flash(char *out, size_t len);
 static void info_load(char *out, size_t len);
 static void info_hold(char *out, size_t len);
-static void info_rest(char *out, size_t len);
-static void info_food(char *out, size_t len);
-static void info_fun(char *out, size_t len);
-static void info_company(char *out, size_t len);
-static void info_curiosity(char *out, size_t len);
-static void info_doing(char *out, size_t len);
-static void act_snack(void);
 static void info_agents(char *out, size_t len);
 static void info_quiet(char *out, size_t len);
 static void act_agents(void);
@@ -118,16 +109,6 @@ static void act_factory_reset(void);
 #define ACT(en, it, kind, fn, info) {en, it, kind, SETTING_COUNT, F_NONE, info, fn}
 
 /* Italian without accents: the built-in fonts only have ASCII. */
-/* How Yoru is doing, the way a Tamagotchi's status screen shows it. */
-static const item_t YORU_ITEMS[] = {
-    INFO("Doing", "Sta", info_doing),
-    INFO("Rest", "Riposo", info_rest),
-    INFO("Food", "Cibo", info_food),
-    INFO("Fun", "Svago", info_fun),
-    INFO("Company", "Compagnia", info_company),
-    INFO("Curiosity", "Curiosita", info_curiosity),
-    ACT("Give a firefly", "Dai una lucciola", K_TAP, act_snack, NULL),
-};
 /* What the coding agents on the computer do, on Yoru (agents_ui.c). */
 static const item_t AGENTS_ITEMS[] = {
     ACT("Open the agents", "Apri gli agenti", K_TAP, act_agents, info_agents),
@@ -157,8 +138,7 @@ static const item_t BEHAVIOUR_ITEMS[] = {
     SET("Do not disturb", "Non disturbare", K_SWITCH, SETTING_FOCUS, F_NONE),
     SET("Touch reactions", "Reazioni al tocco", K_SWITCH, SETTING_TOUCH_REACTIONS, F_NONE),
     SET("Motion reactions", "Reazioni al moto", K_SWITCH, SETTING_MOTION_REACTIONS, F_NONE),
-    SET("Computer reactions", "Reazioni al PC", K_SWITCH, SETTING_PET_REACTIONS, F_NONE),
-    SET("Hears the room", "Ascolta la stanza", K_SWITCH, SETTING_PET_HEARING, F_NONE),
+    SET("Turns to sounds", "Si gira ai suoni", K_SWITCH, SETTING_PET_HEARING, F_NONE),
 };
 static const item_t VOICE_ITEMS[] = {
     SET("Wake word", "Parola d'attivazione", K_SWITCH, SETTING_WAKE_WORD_ON, F_NONE),
@@ -189,7 +169,6 @@ static const item_t ABOUT_ITEMS[] = {
 
 #define CAT(en, it, icon, items) {en, it, icon, items, sizeof(items) / sizeof(items[0])}
 static const category_t CATEGORIES[] = {
-    CAT("Yoru", "Yoru", LV_SYMBOL_HOME, YORU_ITEMS),
     CAT("Agents", "Agenti", LV_SYMBOL_KEYBOARD, AGENTS_ITEMS),
     CAT("Display", "Schermo", LV_SYMBOL_IMAGE, DISPLAY_ITEMS),
     CAT("Sound", "Suono", LV_SYMBOL_VOLUME_MAX, SOUND_ITEMS),
@@ -390,74 +369,7 @@ static void info_hold(char *out, size_t len)
     snprintf(out, len, "%s", tr("Hold to confirm", "Tieni premuto"));
 }
 
-/* A need as a bar of ten, and the level. */
-static void info_need(need_t need, char *out, size_t len)
-{
-    const int pct = (int) (needs_get(need) * 100 + 0.5f), full = (pct + 5) / 10;
-    char bar[11];
-    for (int i = 0; i < 10; i++) {
-        bar[i] = i < full ? '|' : '.';
-    }
-    bar[10] = 0;
-    snprintf(out, len, "%s %d%%", bar, pct);
-}
-
-static void info_rest(char *out, size_t len)
-{
-    info_need(NEED_REST, out, len);
-}
-
-static void info_food(char *out, size_t len)
-{
-    info_need(NEED_FOOD, out, len);
-}
-
-static void info_fun(char *out, size_t len)
-{
-    info_need(NEED_FUN, out, len);
-}
-
-static void info_company(char *out, size_t len)
-{
-    info_need(NEED_COMPANY, out, len);
-}
-
-static void info_curiosity(char *out, size_t len)
-{
-    info_need(NEED_CURIOSITY, out, len);
-}
-
-static void info_doing(char *out, size_t len)
-{
-    static const char *const DOING[][3] = {
-        {"lounge", "Floating about", "Gironzola"}, {"explore", "Exploring", "Esplora"},
-        {"forage", "Hunting", "Caccia"},           {"snack", "Eating", "Mangia"},
-        {"ask", "Asking for you", "Ti chiama"},    {"bounce", "Playing", "Gioca"},
-        {"peekaboo", "Playing", "Gioca"},          {"loop", "Playing", "Gioca"},
-        {"daydream", "Daydreaming", "Sogna"},     {"sulk", "Sulking", "Tiene il broncio"},
-        {"dance", "Dancing", "Balla"},            {"nap", "Getting sleepy", "Ha sonno"},
-        {"sleep", "Asleep", "Dorme"},             {"wake", "Waking up", "Si sveglia"},
-        {"come", "With you", "Con te"},
-    };
-    const char *now = life_activity();
-    for (size_t i = 0; i < sizeof(DOING) / sizeof(DOING[0]); i++) {
-        if (strcmp(now, DOING[i][0]) == 0) {
-            // Watching the menu, it's with you whatever it was doing.
-            snprintf(out, len, "%s", tr(DOING[i][1], DOING[i][2]));
-            return;
-        }
-    }
-    snprintf(out, len, "%s", now);
-}
-
 /* ---- Actions ---------------------------------------------------------------------- */
-
-static void snack_cb(lv_timer_t *t)
-{
-    // Out of the menu first: the firefly is for Yoru to chase.
-    menu_close();
-    life_feed();
-}
 
 static void info_agents(char *out, size_t len)
 {
@@ -492,11 +404,6 @@ static void act_agents(void)
 static void act_quiet(void)
 {
     agents_ui_shortcut("quiet", NULL);
-}
-
-static void act_snack(void)
-{
-    lv_timer_set_repeat_count(lv_timer_create(snack_cb, 250, NULL), 1);
 }
 
 static void restart_cb(lv_timer_t *t)

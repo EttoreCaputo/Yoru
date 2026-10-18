@@ -36,7 +36,6 @@ static const setting_info_t INFO[SETTING_COUNT] = {
     [SETTING_FOCUS] = {"focus", 0, 1, 0},
     [SETTING_TOUCH_REACTIONS] = {"touch_react", 0, 1, 1},
     [SETTING_MOTION_REACTIONS] = {"motion_react", 0, 1, 1},
-    [SETTING_PET_REACTIONS] = {"pet_react", 0, 1, 1},
     [SETTING_PET_HEARING] = {"pet_hear", 0, 1, 1},
     [SETTING_EYE_COLOR] = {"eye_color", 0, 0xFFFFFF, 0x3EE6FF},
     [SETTING_EYE_STYLE] = {"eye_style", 0, 15, 0},

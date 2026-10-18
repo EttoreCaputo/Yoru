@@ -93,8 +93,6 @@ static QueueHandle_t s_sounds;
 static synth_t s_synth;
 static bool s_synth_on;
 static volatile bool s_pet_sounds = true;
-/* The pet's voice, set by its mood (pet.c): higher when it's happy and lively. */
-static volatile float s_pet_pitch = 1.0f;
 
 bool playback_available(void)
 {
@@ -226,19 +224,14 @@ bool playback_pet_sounds(void)
     return s_pet_sounds;
 }
 
-void playback_set_pet_pitch(float pitch)
-{
-    s_pet_pitch = pitch < 0.7f ? 0.7f : pitch > 1.4f ? 1.4f : pitch;
-}
-
-/** As the pet says it now: its pitch, give or take 3% so it's never quite
- * the same twice. The earcons as written. */
+/** Yoru's sounds give or take 3%, so they're never quite the same twice. The
+ * earcons as written. */
 static float pitch_of(uint8_t id)
 {
     if (id < SOUND_FIRST_PET) {
         return 1.0f;
     }
-    return s_pet_pitch * (0.97f + 0.06f * (float) (esp_random() % 1000u) / 1000.0f);
+    return (0.97f + 0.06f * (float) (esp_random() % 1000u) / 1000.0f);
 }
 
 /** With s_lock held, in the task: start the next queued sound when nothing

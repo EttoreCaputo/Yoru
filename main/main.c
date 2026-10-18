@@ -8,12 +8,12 @@
 #include "board_pmu.h"
 #include "board_settings.h"
 #include "board_touch.h"
-#include "ears.h"
 #include "ears_dir.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "eyes.h"
+#include "life.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/task.h"
@@ -26,7 +26,6 @@
 #include "motion.h"
 #include "net.h"
 #include "nvs.h"
-#include "pet.h"
 #include "playback.h"
 #include "rpc.h"
 #include "voice.h"
@@ -111,12 +110,6 @@ static void on_setting(setting_t id, int32_t value)
     case SETTING_FOCUS:
         apply_pet_sounds();
         break;
-    case SETTING_PET_REACTIONS:
-        pet_set_reactions(value != 0);
-        break;
-    case SETTING_PET_HEARING:
-        ears_set_on(value != 0);
-        break;
     case SETTING_LCD_FAST:
         if (s_display == NULL) {
             break; // turned off at boot by lcd_fast(), before the bus is up
@@ -130,24 +123,6 @@ static void on_setting(setting_t id, int32_t value)
     }
 }
 
-/* The pet's mood moves once a second on the host's snapshots; touch and
- * sounds nudge it in between. */
-static void pet_task(void *arg)
-{
-    metrics_snapshot_t snap;
-    metrics_ui_state_t was = METRICS_UI_WAITING;
-    while (true) {
-        metrics_model_get(&snap);
-        pet_update(&snap);
-        if (snap.state == METRICS_UI_LIVE && was != METRICS_UI_LIVE) {
-            // The host is here (again): say hi.
-            playback_sound(SOUND_HELLO);
-        }
-        was = snap.state;
-        vTaskDelay(pdMS_TO_TICKS(200));
-    }
-}
-
 /* M1 measurement: how much of the CPU drawing the eyes takes. */
 static void stats_task(void *arg)
 {
@@ -158,8 +133,8 @@ static void stats_task(void *arg)
         lvgl_port_lock();
         const char *eyes = eyes_mood_name(eyes_get_mood());
         lvgl_port_unlock();
-        ESP_LOGI(TAG, "lvgl %.1f%% busy, longest %lu us, eyes %s, pet %s", st.busy_pct, (unsigned long) st.max_us,
-                 eyes, pet_mood_name(pet_mood()));
+        ESP_LOGI(TAG, "lvgl %.1f%% busy, longest %lu us, eyes %s, %s", st.busy_pct, (unsigned long) st.max_us,
+                 eyes, life_activity());
     }
 }
 
@@ -191,9 +166,6 @@ void app_main(void)
     board_settings_on_change(on_setting);
     metrics_model_init();
     agents_init();
-    pet_init();
-    pet_set_reactions(board_settings_on(SETTING_PET_REACTIONS));
-    ears_set_on(board_settings_on(SETTING_PET_HEARING));
 
     ESP_ERROR_CHECK(board_display_init(&s_lcd, lcd_fast()));
     if (board_touch_init() != ESP_OK) {
@@ -220,9 +192,8 @@ void app_main(void)
         ESP_LOGW(TAG, "no PMU, continuing without battery and PWR");
     }
 
-    // The voice runs on core 1, as in DualEye; the UI and the pet on core 0.
+    // The voice runs on core 1, as in DualEye; the UI on core 0.
     start_audio();
-    xTaskCreatePinnedToCore(pet_task, "pet", 4096, NULL, 3, NULL, 0);
     // Its stack can live in PSRAM: it never writes the flash (0.3.1).
     xTaskCreatePinnedToCoreWithCaps(stats_task, "stats", 3072, NULL, 2, NULL, 0, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 

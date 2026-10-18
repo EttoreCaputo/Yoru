@@ -2,7 +2,7 @@
 
 Yoru speaks DualEye's protocol v2, copied from [DualEye's protocol](../../esp32s3-dualeye-pcmonitor/docs/protocol.md): the same frames, channels, JSON-RPC methods, audio streams and WiFi pairing. This page lists only what is different on Yoru; read DualEye's for the rest. When the two diverge, fix both until the shared parts move to a repository of their own.
 
-Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main/net.c`, `main/rpc.c` (board); `tools/yoru_link.py` (test scripts); `core/src/link.rs` and `wifi.rs` in [Companion Hub](https://github.com/EttoreCaputo/companion-hub) (host).
+Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main/net.c`, `main/rpc.c` (board); `tools/yoru_link.py` (test scripts); `NotchBuddy/Sources/Yoru/` in the [Yoru app](https://github.com/EttoreCaputo/yoru-app) (host, since 2026-10-18); `core/src/link.rs` and `wifi.rs` in [Companion Hub](https://github.com/EttoreCaputo/companion-hub) (the earlier host).
 
 ## Identity
 
@@ -34,7 +34,7 @@ The TCP port is the same, 7340.
 
 ## Metrics
 
-The same snapshot. Yoru reads it for the pet's mood only (temperatures, music, Claude Code, the battery, the time and the host's idle time) and shows none of it. A timer's `screen` is ignored.
+The same snapshot. Since 0.8.0 Yoru reads only the host's time and idle time (night brightness, and the sleep times count from your last input on the computer) and the Claude plan's limits for the agents view; it shows none of the rest. A timer's `screen` is ignored.
 
 ## Board tools
 
@@ -46,15 +46,12 @@ Settings are kept in NVS and survive a reboot.
 | `set_mic` | `muted`, `wake_sound`: booleans, at least one | As on DualEye. Muted, the mic isn't read: no wake word, nothing heard in the room |
 | `set_wake_word` | `word`: one of `voice.wake_words` (`alexa`, `hiesp`) | As on DualEye. Yoru's own word comes in M6 |
 | `set_volume` | `percent`: 0–100 | Speaker volume, with the `volume` sound at the new level |
-| `react` | `name`: `happy` · `excited` · `wink` · `proud` · `relieved` · `charged` · `dance` · `love` · `curious` · `thinking` · `focus` · `angry` · `hot` · `sleepy` · `yawn` · `tired` · `sigh` · `sad` · `surprised` · `scared` · `bored` · `look_around` · `blink` · `wave` · `point` · `shy` · `clap` · `stretch` · `dizzy` · `annoyed` · `falling` · `drowsy` · `lifted` | The eyes react for a few seconds, with the pet's sound for it. DualEye's `play_eyes` names, those these eyes can show. Refused during a conversation |
+| `react` | `name`: `happy` · `excited` · `wink` · `proud` · `relieved` · `charged` · `dance` · `love` · `curious` · `thinking` · `focus` · `angry` · `hot` · `sleepy` · `yawn` · `tired` · `sigh` · `sad` · `surprised` · `scared` · `bored` · `look_around` · `blink` · `wave` · `point` · `shy` · `clap` · `stretch` · `dizzy` · `annoyed` · `falling` · `drowsy` · `lifted` | The eyes react for a few seconds, with Yoru's sound for it. DualEye's `play_eyes` names, those these eyes can show. Refused during a conversation |
 | `play_sound` | `name` | As on DualEye: the same sounds |
-| `set_pet` | `sounds`, `react`, `hear`: booleans, at least one | As on DualEye |
-| `get_pet` | none | As on DualEye, without `idle_scenes`. Since 0.6.0 also `needs` (`rest`, `food`, `fun`, `company`, `curiosity`, 0–1, 1 fully met), `activity` (what it is doing: `lounge`, `explore`, `forage`, `snack`, `ask`, `bounce`, `peekaboo`, `loop`, `daydream`, `sulk`, `dance`, `nap`, `sleep`, `wake`, `come`) and `alone_s` (seconds since the last sign of someone: a touch, a voice, input on the host). `mood` can also be `hungry` |
-| `feed` | none | Since 0.6.0. A firefly drifts in from the rim and Yoru chases and eats it, or bats it away when it isn't hungry. An error while it sleeps, the menu or a request is up, or a conversation is on |
-| `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_react`, `pet_hear`, `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`. `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
+| `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`. `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
 | `set_setting` | `name`, `value`: integer | Change one setting within its range (switches are 0 or 1); it applies at once |
-| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, the pet (with its `activity`), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging`) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) |
-| `show_menu` | `open`: boolean, `page`: `yoru` (its needs, since 0.6.0) · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the settings menu on the ring or on a page, or close it |
+| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging`) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) |
+| `show_menu` | `open`: boolean, `page`: `agents` · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the settings menu on the ring or on a page, or close it |
 | `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Show a Claude Code permission request over the eyes with Allow and Deny (see below). A second call replaces it |
 | `hide_approval` | `id`: string | Take that request away: it was answered in the app or the terminal, or gave up. An `id` that isn't shown is fine |
 | `set_agents` | `sessions`: array, `quiet_min`: integer, `focus`: boolean | Since 0.7.0. What every coding agent session on the computer is doing (see Agents) |

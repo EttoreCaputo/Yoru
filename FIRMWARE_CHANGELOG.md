@@ -1,5 +1,14 @@
 # Firmware changelog
 
+## 0.8.0
+
+Yoru is no longer a Tamagotchi, for now: it becomes the companion of your coding agents, and the pet comes back later.
+
+- **No more needs, moods or fireflies.** Yoru doesn't get hungry, bored or lonely any more, doesn't hunt fireflies, play, explore, sulk or dance on its own, and its mood no longer changes with what happens on the computer or in the room. A tap on the black does nothing.
+- **What it still does.** It floats calmly near the middle and turns to sudden sounds. It reacts to touch (poke, stroke, slap) and to the case (lift, shake, knock, drop, face down). It gets sleepy and falls asleep when nobody is around. It does everything for the agents: the dots, the steps, the cards, the agents view, the nod, the wince, and knocking on the glass when one waits for you. It no longer wakes up by itself: a touch, the voice, lifting it or an agent wakes it.
+- **Menu.** The Yoru page (needs and "Give a firefly") and "Computer reactions" are gone. "Hears the room" is now "Turns to sounds".
+- For the computer: the `feed`, `get_pet` and `set_pet` tools are gone, and `get_state` reports `activity` instead of `pet`. Sounds and turning to sounds are still set with `set_setting` (`pet_sounds`, `pet_hear`).
+
 ## 0.7.2
 
 - **Smoother agents view.** The little Yorus hop and squash in a few fixed steps, each drawn once, instead of a new shape almost every frame. With six agents on screen the animation no longer stutters, and the view uses less memory.

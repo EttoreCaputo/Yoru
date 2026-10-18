@@ -11,7 +11,6 @@
 #include "board_pmu.h"
 #include "board_settings.h"
 #include "card.h"
-#include "ears.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
@@ -22,9 +21,7 @@
 #include "menu.h"
 #include "metrics_model.h"
 #include "motion.h"
-#include "needs.h"
 #include "net.h"
-#include "pet.h"
 #include "playback.h"
 #include "question.h"
 #include "voice.h"
@@ -182,7 +179,6 @@ static bool tool_react(const cJSON *args, char *text, cJSON **structured)
         snprintf(text, TEXT_MAX, "unknown reaction \"%s\"", name->valuestring);
         return false;
     }
-    pet_event(PET_EVENT_PLAYED);
     snprintf(text, TEXT_MAX, "reacting: %s", name->valuestring);
     return true;
 }
@@ -236,104 +232,13 @@ static bool tool_play_sound(const cJSON *args, char *text, cJSON **structured)
         return false;
     }
     playback_sound(sound);
-    pet_event(PET_EVENT_PLAYED);
     snprintf(text, TEXT_MAX, "playing %s", name->valuestring);
-    return true;
-}
-
-static bool tool_set_pet(const cJSON *args, char *text, cJSON **structured)
-{
-    const cJSON *sounds = cJSON_GetObjectItemCaseSensitive(args, "sounds");
-    const cJSON *react = cJSON_GetObjectItemCaseSensitive(args, "react");
-    const cJSON *hear = cJSON_GetObjectItemCaseSensitive(args, "hear");
-    if ((sounds != NULL && !cJSON_IsBool(sounds)) || (react != NULL && !cJSON_IsBool(react))
-        || (hear != NULL && !cJSON_IsBool(hear)) || (sounds == NULL && react == NULL && hear == NULL)) {
-        snprintf(text, TEXT_MAX, "give sounds, react and/or hear, true or false");
-        return false;
-    }
-    int n = 0;
-    if (sounds != NULL) {
-        bool on = cJSON_IsTrue(sounds);
-        board_settings_set(SETTING_PET_SOUNDS, on);
-        if (on) {
-            playback_sound(SOUND_HAPPY);
-        }
-        n += snprintf(text, TEXT_MAX, on ? "it makes its little sounds" : "it keeps quiet, but for chimes");
-    }
-    if (react != NULL) {
-        bool on = cJSON_IsTrue(react);
-        board_settings_set(SETTING_PET_REACTIONS, on);
-        n += snprintf(text + n, TEXT_MAX - n, "%s%s", n ? "; " : "",
-                      on ? "it reacts to the computer" : "no reactions to the computer");
-    }
-    if (hear != NULL && n < TEXT_MAX) {
-        bool on = cJSON_IsTrue(hear);
-        board_settings_set(SETTING_PET_HEARING, on);
-        snprintf(text + n, TEXT_MAX - n, "%s%s", n ? "; " : "",
-                 on ? "it listens to the room" : "it doesn't listen to the room");
-    }
     return true;
 }
 
 static double round2(float v)
 {
     return (int) (v * 100.0f + (v < 0 ? -0.5f : 0.5f)) / 100.0;
-}
-
-static bool tool_get_pet(const cJSON *args, char *text, cJSON **structured)
-{
-    pet_state_t pet;
-    pet_get(&pet);
-    cJSON *p = cJSON_CreateObject();
-    cJSON_AddStringToObject(p, "mood", pet_mood_name(pet.mood));
-    cJSON_AddNumberToObject(p, "energy", round2(pet.energy));
-    cJSON_AddNumberToObject(p, "happiness", round2(pet.happiness));
-    cJSON_AddNumberToObject(p, "affection", round2(pet.affection));
-    cJSON_AddBoolToObject(p, "away", pet.away);
-    cJSON *now = cJSON_AddArrayToObject(p, "now");
-    for (uint32_t bit = 1; bit != 0 && bit <= PET_NOW_LAST; bit <<= 1) {
-        if (pet.now & bit) {
-            cJSON_AddItemToArray(now, cJSON_CreateString(pet_now_name(bit)));
-        }
-    }
-    if (pet.minute >= 0) {
-        cJSON_AddNumberToObject(p, "minute", pet.minute);
-    }
-    if (pet.idle_s >= 0) {
-        cJSON_AddNumberToObject(p, "idle_s", pet.idle_s);
-    }
-    cJSON_AddNumberToObject(p, "lonely_s", pet.lonely_s);
-    cJSON_AddNumberToObject(p, "alone_s", pet.alone_s);
-    cJSON_AddStringToObject(p, "activity", life_activity());
-    cJSON *needs = cJSON_AddObjectToObject(p, "needs");
-    for (int i = 0; i < NEED_COUNT; i++) {
-        cJSON_AddNumberToObject(needs, needs_name((need_t) i), round2(needs_get((need_t) i)));
-    }
-    cJSON_AddNumberToObject(p, "pitch", round2(pet.pitch));
-    cJSON_AddNumberToObject(p, "pace", round2(pet.pace));
-    cJSON *recent = cJSON_AddArrayToObject(p, "recent");
-    for (int i = 0; i < pet.recent_count; i++) {
-        cJSON *r = cJSON_CreateObject();
-        cJSON_AddStringToObject(r, "what", pet.recent[i].what);
-        cJSON_AddStringToObject(r, "scene", pet.recent[i].scene);
-        cJSON_AddNumberToObject(r, "ago_s", pet.recent[i].ago_s);
-        cJSON_AddItemToArray(recent, r);
-    }
-    cJSON_AddBoolToObject(p, "sounds", board_settings_on(SETTING_PET_SOUNDS));
-    cJSON_AddBoolToObject(p, "reactions", board_settings_on(SETTING_PET_REACTIONS));
-    cJSON_AddBoolToObject(p, "hearing", board_settings_on(SETTING_PET_HEARING));
-    ears_state_t ears;
-    ears_get(&ears);
-    if (ears.listening) {
-        cJSON *room = cJSON_AddObjectToObject(p, "room");
-        cJSON_AddNumberToObject(room, "floor_db", (int) ears.floor_db);
-        cJSON_AddNumberToObject(room, "level_db", (int) ears.level_db);
-        cJSON_AddNumberToObject(room, "quiet_s", ears.quiet_s);
-        cJSON_AddBoolToObject(room, "chatter", ears.chatter);
-    }
-    *structured = p;
-    text[0] = '\0';
-    return true;
 }
 
 static bool tool_get_settings(const cJSON *args, char *text, cJSON **structured)
@@ -425,15 +330,7 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
         cJSON_AddBoolToObject(voice, "muted", voice_muted());
         cJSON_AddStringToObject(voice, "state", voice_state_name(voice_state()));
     }
-    pet_state_t pet;
-    pet_get(&pet);
-    cJSON *p = cJSON_AddObjectToObject(st, "pet");
-    cJSON_AddStringToObject(p, "mood", pet_mood_name(pet.mood));
-    cJSON_AddNumberToObject(p, "energy", round2(pet.energy));
-    cJSON_AddNumberToObject(p, "happiness", round2(pet.happiness));
-    cJSON_AddNumberToObject(p, "affection", round2(pet.affection));
-    cJSON_AddBoolToObject(p, "away", pet.away);
-    cJSON_AddStringToObject(p, "activity", life_activity());
+    cJSON_AddStringToObject(st, "activity", life_activity());
     cJSON *audio = cJSON_AddObjectToObject(st, "audio");
     cJSON_AddBoolToObject(audio, "speaker", playback_available());
     cJSON_AddNumberToObject(audio, "volume", board_settings_get(SETTING_VOLUME));
@@ -692,21 +589,11 @@ static bool tool_hide_question(const cJSON *args, char *text, cJSON **structured
     return true;
 }
 
-static bool tool_feed(const cJSON *args, char *text, cJSON **structured)
-{
-    if (!behaviour_feed()) {
-        snprintf(text, TEXT_MAX, "Yoru can't eat now (asleep, busy or the menu is open)");
-        return false;
-    }
-    snprintf(text, TEXT_MAX, "a firefly drifts in for Yoru (food %.0f%%)", needs_get(NEED_FOOD) * 100);
-    return true;
-}
-
 static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
         .description = "Open or close the settings menu on Yoru's screen, on the ring of icons or straight on a page "
-                       "(yoru, agents, display, sound, behaviour, voice, connection, battery, about).",
+                       "(agents, display, sound, behaviour, voice, connection, battery, about).",
         .schema = "{\"type\":\"object\",\"properties\":{\"open\":{\"type\":\"boolean\"},"
                   "\"page\":{\"type\":\"string\"}}}",
         .fn = tool_show_menu,
@@ -821,32 +708,6 @@ static const tool_t TOOLS[] = {
         .fn = tool_play_sound,
     },
     {
-        .name = "set_pet",
-        .description = "Whether Yoru makes its little sounds (sounds; chimes play either way), reacts to what "
-                       "happens on the computer (react: a hot CPU, music, Claude finishing, the battery, bedtime, "
-                       "you coming back) and listens to the room (hear: a bang, claps, people talking, silence). "
-                       "All on by default; the board remembers them.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"sounds\":{\"type\":\"boolean\"},"
-                  "\"react\":{\"type\":\"boolean\"},\"hear\":{\"type\":\"boolean\"}},\"minProperties\":1}",
-        .fn = tool_set_pet,
-    },
-    {
-        .name = "feed",
-        .description = "Give Yoru a snack: a firefly drifts in from the edge of the screen and Yoru chases it "
-                       "and eats it (or bats it away if it isn't hungry). Fails while it sleeps or is busy.",
-        .schema = "{\"type\":\"object\",\"properties\":{}}",
-        .fn = tool_feed,
-    },
-    {
-        .name = "get_pet",
-        .description = "Read Yoru's mood (content, happy, excited, loving, bored, grumpy, sad, sleepy, hot, "
-                       "hungry), its energy, happiness and affection (0 to 1), its needs (rest, food, fun, "
-                       "company, curiosity, 0 to 1), what it is doing, what's affecting it now, what the room "
-                       "sounds like and its last reactions.",
-        .schema = "{\"type\":\"object\",\"properties\":{}}",
-        .fn = tool_get_pet,
-    },
-    {
         .name = "get_settings",
         .description = "Read all of the board's settings, each with its value and range, as the menu on the "
                        "board shows them: brightness, night hours, volume, sleep times, focus mode, reactions, "
@@ -865,7 +726,7 @@ static const tool_t TOOLS[] = {
     {
         .name = "get_state",
         .description = "Read the board's state: firmware, uptime, whether metrics are live, the eyes' mood, the "
-                       "voice (wake word, muted, listening), the speaker, the pet's mood, how busy the UI is, "
+                       "voice (wake word, muted, listening), the speaker, what Yoru is doing, how busy the UI is, "
                        "memory, the link and the WiFi.",
         .schema = "{\"type\":\"object\",\"properties\":{}}",
         .fn = tool_get_state,

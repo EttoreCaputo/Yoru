@@ -1,17 +1,15 @@
 #pragma once
 
-/* The bridge between what Yoru feels (pet.c), its own life (life.c) and its
- * eyes (eyes.c), and how it answers touch and the senses:
- * - when nothing else has its attention, life.c runs it: what it does comes
- *   from what it needs; behaviour.c plays the pet's reactions over it;
+/* The bridge between Yoru's idle life (life.c) and its eyes (eyes.c), and how
+ * it answers touch, the senses and the coding agents:
+ * - when nothing else has its attention, life.c runs it: it floats about;
  * - left alone (nobody touching, talking or at the computer) it gets
  *   sleepy, then naps and dims the screen (the times and the brightness are
- *   settings); it also sleeps when it is tired, and wakes when rested;
+ *   settings);
  * - a tap on Yoru pokes it: happy once or twice, grumpy at the third in a
- *   row; a tap on the black drops a firefly there for it;
+ *   row;
  * - a finger on the screen is watched, and stroking it makes it happy;
- * - pokes and strokes move the pet's mood, so it remembers being petted;
- * - focus mode: no whims and no reactions;
+ * - focus mode: no reactions;
  * - in a conversation the eyes listen, think and speak, and nothing else
  *   plays; the wake word wakes it up;
  * - the host's mouse pointer, when it sends it, is followed;
@@ -47,7 +45,7 @@ void behaviour_start(lv_obj_t *face);
 /** The voice state changed (ui_voice.c). With the LVGL lock held. */
 void behaviour_voice(voice_state_t state);
 
-/** Play one of the scenes (pet.c's names, as in DualEye) now, waking it if
+/** Play one of the scenes (names as in DualEye) now, waking it if
  * asleep; false for an unknown one. With the LVGL lock held. */
 bool behaviour_play(const char *name);
 /** The scenes' names, at most `max`; returns how many. */
@@ -60,14 +58,7 @@ void behaviour_motion(motion_event_t event);
  * callback): the eyes turn there for a moment. Takes the LVGL lock. */
 void behaviour_heard_from(float x);
 
-/** One of the scenes, from life.c's whims (not in focus mode). With the
- * LVGL lock held. */
-void behaviour_whim(const char *name);
 
-/** A snack from the host: a firefly comes in from the edge. False when
- * Yoru can't now (asleep, the menu, a request, a conversation, busy).
- * Takes the LVGL lock. */
-bool behaviour_feed(void);
 
 /** A short press of PWR (board_pmu.c's callback): to sleep and back, or
  * out of the menu. Takes the LVGL lock. */

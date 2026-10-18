@@ -1,7 +1,8 @@
 #pragma once
 
-/* The latest snapshot of the computer, as the host sends it (M4). For now
- * only pet.c reads it: PC data moves Yoru's mood, it isn't shown. From
+/* The latest snapshot of the computer, as the host sends it (M4). Yoru reads
+ * the host's clock and idle time (night brightness, sleep) and the Claude
+ * plan's limits (agents_ui.c); the rest isn't shown. From
  * DualEye's metrics_model.h, without the faces and the two screens. */
 
 #include <stdbool.h>
@@ -138,9 +139,9 @@ typedef struct {
     char artist[48];
 } metrics_music_t;
 
-/* What the host can tell of the person at the computer, for the pet's mood
- * (pet.c): the local time and how long since they last touched the mouse
- * or the keyboard. */
+/* What the host can tell of the person at the computer (behaviour.c): the
+ * local time and how long since they last touched the mouse or the
+ * keyboard. */
 typedef struct {
     bool valid;
     /* Minutes since local midnight, 0..1439. */

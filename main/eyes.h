@@ -11,10 +11,9 @@
  * at the glass). Far away it is smaller, dimmer and drawn towards the middle
  * of the screen; near it fills the disc. It moves along smooth paths through
  * that space, or follows a point like a spring, leaning into the motion with
- * its eyes leading the way. A firefly (a mote of light, its food) can float
- * in the same space. The pictures come
- * from look.c; this module only places and moves them. pet.c decides what Yoru feels and
- * behaviour.c turns it into calls here. All calls with the LVGL lock held. */
+ * its eyes leading the way. The pictures come from look.c; this module only
+ * places and moves them. behaviour.c and life.c decide what Yoru does and
+ * turn it into calls here. All calls with the LVGL lock held. */
 
 #include <stdbool.h>
 
@@ -136,8 +135,6 @@ void eyes_move_to(float x, float y, float z, uint32_t ms, eyes_path_t path);
 /** Follow a point like a spring, `stiffness` about 5 (lazy) .. 80 (snappy),
  * until the next move. */
 void eyes_follow(float x, float y, float z, float stiffness);
-/** Follow the firefly, mouth first: the chase. */
-void eyes_chase(float stiffness);
 /** A move is under way (a follow counts until it has nearly arrived). */
 bool eyes_moving(void);
 eyes_pos_t eyes_where(void);
@@ -145,17 +142,6 @@ eyes_pos_t eyes_where(void);
 eyes_pos_t eyes_unproject(int32_t x, int32_t y, float z);
 /** Screen point (x, y) is on Yoru's body. */
 bool eyes_hit(int32_t x, int32_t y);
-
-/** A firefly fades in at `at`, fluttering in place. */
-void eyes_mote_show(eyes_pos_t at);
-/** It flits to `to` in `ms`. */
-void eyes_mote_fly(eyes_pos_t to, uint32_t ms);
-/** Where it is; false when there is none. */
-bool eyes_mote(eyes_pos_t *where);
-/** Yoru gulps it down: it is drawn into the mouth and goes out. */
-void eyes_mote_eat(void);
-/** It fades away. */
-void eyes_mote_hide(void);
 
 #ifdef __cplusplus
 }

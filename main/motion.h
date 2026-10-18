@@ -2,8 +2,8 @@
 
 /* The QMI8658 at 0x6B: the whole case as an input (docs/ROADMAP.md, M2,
  * "Motion"). A task reads the accelerometer and the gyroscope 100 times a
- * second and turns them into a few gestures, handed to a callback the way
- * ears.c hands its sounds to pet.c, plus a lean for the gaze and the way
+ * second and turns them into a few gestures, handed to a callback
+ * (behaviour.c), plus a lean for the gaze and the way
  * the badge is held, for the automatic rotation. Nothing is recorded.
  *
  * Axes are the screen's, unrotated: x to the right, y down, z out of the

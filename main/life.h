@@ -1,19 +1,12 @@
 #pragma once
-
-/* Yoru's own life, when nothing else has its attention: what it does next
- * comes from what it needs (needs.c) and how it feels (pet.c), not from a
- * dice roll. Each thing it can do scores by how well it meets the pressing
- * needs, the way a Sims character picks; it keeps at it for a while, then
- * picks again. Hungry, it hunts a firefly in the dark, or comes up to the
- * glass to ask you for one; bored, it plays (hops along the bottom of the
- * screen, hides past the edge and peeks back, loops through the space);
- * curious, it goes exploring into the distance; lonely, it knocks on the
- * glass; tired, it yawns, finds a corner and drifts off to sleep, and wakes
- * once it is rested. Unhappy, it sulks by the edge. A tap on the black
- * drops a firefly there.
- * It only moves the eyes (eyes.c) and plays the pet's sounds; behaviour.c
- * says when it may, and puts it to sleep or wakes it when it asks. All
- * calls with the LVGL lock held. */
+/* What Yoru does when nothing else has its attention: it floats about near
+ * you, gets sleepy when nobody is around and drifts off to sleep; when a
+ * coding agent waits for you it comes up to the glass, knocks and points at
+ * the computer. No needs and no moods of its own for now: the pet comes back
+ * later (docs/ROADMAP.md).
+ * It only moves the eyes (eyes.c) and plays its sounds; behaviour.c says when
+ * it may, and puts it to sleep when it asks. All calls with the LVGL lock
+ * held. */
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -27,17 +20,12 @@ typedef struct {
      * finger on the screen. */
     bool free;
     bool asleep;
-    /* Do not disturb: it keeps to itself, quietly. */
+    /* Do not disturb, or an agent waits: it keeps still and quiet. */
     bool focus;
-    /* Someone is around (pet_alone_s() short). */
-    bool company;
-    /* Nobody for the "sleepy after" setting: only calm things. */
+    /* Nobody for the "sleepy after" setting: sleepy eyes, slower. */
     bool drowsy;
     /* Nobody for the "asleep after" setting: time for a nap. */
     bool lonely;
-    /* Night by the host's clock. */
-    bool night;
-    bool music;
     /* Its sounds for the coding agents are on (and not quiet). */
     bool agent_sounds;
 } life_ctx_t;
@@ -45,39 +33,23 @@ typedef struct {
 typedef enum {
     LIFE_NOTHING,
     LIFE_SLEEP, // it has settled down to sleep
-    LIFE_WAKE,  // rested, it wakes up on its own
 } life_want_t;
 
 void life_init(void);
-
 /** Every 100 ms. */
 life_want_t life_step(const life_ctx_t *ctx);
-
 /** Someone touched it, called it or a reaction plays: whatever it was doing
- * stops, and if it was far away it comes back. */
+ * stops, and it comes back to the middle. */
 void life_attend(void);
-
-/** It fell asleep (any way), or woke up: `natural` when it woke by itself. */
+/** It fell asleep (any way), or woke up. */
 void life_slept(void);
-void life_woke(bool natural);
-
-/** A tap on the black at (x, y), not on Yoru: a firefly drops there. False
- * if it can't now. */
-bool life_tap(int32_t x, int32_t y);
-
-/** A snack from the menu or the host: a firefly comes in from the edge.
- * False if it can't now (asleep, busy). */
-bool life_feed(void);
-
+void life_woke(void);
 /** A coding agent waits for you: it comes up to the glass, knocks and
- * points, as when it asks for itself. False if it can't now (asleep,
- * eating, already asking). */
+ * points. False if it can't now (asleep, settling down, already asking). */
 bool life_call(void);
-
 /** It is at the glass for an agent right now: a touch means "I'm coming". */
 bool life_calling(void);
-
-/** What it is doing, for get_pet. */
+/** What it is doing (lounge, call, nap, sleep, come), for get_state. */
 const char *life_activity(void);
 
 #ifdef __cplusplus

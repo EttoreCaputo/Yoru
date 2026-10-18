@@ -2,7 +2,7 @@
 
 Desk companion on the Waveshare ESP32-S3-Touch-AMOLED-1.75C. Character: `docs/CONCEPT.md`. Plan and pins: `docs/ROADMAP.md`. Sister project: `../esp32s3-dualeye-pcmonitor` (DualEye), where the voice, link and mood code come from. When copying from there, adapt the code; don't carry over DualEye's two-screen assumptions.
 
-Host program: `../companion-hub` (Companion Hub, https://github.com/EttoreCaputo/companion-hub), the desktop app, CLI and MCP server shared with DualEye. Yoru's host side lives there, not in this repository. A protocol change is made in both: `docs/protocol.md` here and the Yoru profile there. After a firmware build, `tools/fetch_firmware.sh` there copies the image into the app.
+Host program: `../yoru-app` (the Yoru app, https://github.com/EttoreCaputo/yoru-app, branch `yoru`), a fork of coucou; read its `YORU.md`. Yoru's host side lives there, not in this repository, and Companion Hub is no longer used. A protocol change is made in both: `docs/protocol.md` here and `NotchBuddy/Sources/Yoru/` there.
 
 ## Rule: every firmware change bumps the version and gets built
 
