@@ -105,10 +105,11 @@ The firmware side mostly exists (0.7.x); it is adapted to coucou's states and pi
 
 **F7. Windows and Linux.** The same Yoru module in the fork's Tauri app (`windows/src-tauri/src/yoru/`): the link, the agents and the voice, written for that app. Companion Hub is not used or shared.
 
-**F8. Retire Companion Hub.** Yoru no longer depends on it (2026-10-18).
-- Archive its GitHub repository (archive, not delete) and remove the local copy, once nothing else on this Mac uses it (Claude Code's status line still runs `companion-hub --claude-statusline`).
+**F8. Retire Companion Hub.** Done (2026-10-18).
+- Companion Hub was never on GitHub, so there was nothing to archive. Its local copy and `Companion Hub.app` went to the Trash, its MCP server left Claude Code's settings, and its hooks and status line left `~/.claude/settings.json`.
+- Yoru's hooks and status line are installed from the Yoru app.
 - DualEye is not touched: it has its own `host/`.
-- Update this repository's CLAUDE.md, `docs/protocol.md` and this roadmap.
+- This repository's CLAUDE.md and this roadmap no longer depend on Companion Hub.
 
 **Ongoing: keep up with coucou.** About once a week, `scripts/yoru_sync_upstream.sh` in the fork lists coucou's new commits and releases, merges them into `yoru` without committing, rebrands them, renders Yoru's sounds and icons again, checks that no coucou name or shared path came back, and builds. Each new feature is then hidden or adapted to Yoru before the merge is committed (`YORU.md`, "Merging upstream").
 
