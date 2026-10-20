@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "agents.h"
+#include "remote.h"
 #include "audio_selftest.h"
 #include "behaviour.h"
 #include "board_audio.h"
@@ -166,6 +167,7 @@ void app_main(void)
     board_settings_on_change(on_setting);
     metrics_model_init();
     agents_init();
+    remote_init();
 
     ESP_ERROR_CHECK(board_display_init(&s_lcd, lcd_fast()));
     if (board_touch_init() != ESP_OK) {

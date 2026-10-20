@@ -6,6 +6,8 @@ Yoru reuses what the [DualEye PC Monitor](../../esp32s3-dualeye-pcmonitor) alrea
 
 What is new is the character, the UI and the hardware. The computer side is not copied: it is [Companion Hub](https://github.com/EttoreCaputo/companion-hub) (`../companion-hub`), the host program DualEye's `host/` became, shared by both boards and able to drive several at once. The firmware parts are still copied, and fixes go to both.
 
+> **Change of direction (2026-10-19).** Yoru becomes a personal assistant that lives on the computer, with the board as its body: it connects to your services through MCP connectors (our own MCP client in Rust, with OAuth), tells you when something worth knowing happens, and answers when you ask. Its host goes back to Companion Hub, renamed Yoru Hub (`../yoru-hub`), made Yoru-only (DualEye leaves it) with a redone app. The plan is `docs/assistant.md` there; it wins over the 2026-10-18 plan below. The Yoru app (`../yoru-app`) stays in use until phase A2 of that plan works, then it is retired. On the board this plan adds an inbox (`show_notification`, phase A4).
+
 > **Change of direction (2026-10-18).** Yoru stops being a pet for now and becomes the physical side of the coding agents, like [coucou](https://github.com/louis-cfm/coucou) is on the screen. Its computer side becomes the **Yoru app**, a fork of coucou, instead of Companion Hub, which Yoru no longer uses at all. The plan is in [The Yoru app](#the-yoru-app-a-fork-of-coucou) below. Where the rest of this page says something different (Companion Hub, the needs, the moods, M4 and the pet parts of M5), this plan wins. The pet comes back later.
 
 ## The Yoru app: a fork of coucou
@@ -83,20 +85,14 @@ coucou already does all of this on the computer: the agents' hooks (Claude Code,
 
 The firmware side mostly exists (0.7.x); it is adapted to coucou's states and pills. Done when: an approval, a question and a jump to terminal work from Yoru with Claude Code and Codex.
 
-**F5. Voice.** First part built (2026-10-18), in the fork's `Sources/Yoru/YoruVoice.swift`. Checked on the board: "Alexa", then a sentence, is transcribed (the Mac's speech recognition, Italian) and sent with `claude -p --resume` to a test session. Prompt to an agent session is done. The voice assistant, dictation and spoken answers are still to do.
-- What it does now:
-  - assembles the `audio_up` frames (a dropped frame becomes silence);
-  - transcribes with Parakeet when its models are installed, else the Mac's speech recognition in the first two Automatic dictation languages, keeping the most confident result;
-  - sends the text to the session waiting for you, else the one active last, among those a prompt can reach. In its terminal it is pasted, then Return is sent (this needs Accessibility). Otherwise it goes in the background with `claude -p --resume` in its folder;
-  - shows thinking, then a toast.
-- Claude Desktop's own sessions can't be reached, so they are skipped.
-- Yoru's wake word or a touch opens the mic. `audio_up` goes into coucou's speech recognition (Parakeet or the Mac's own).
-- The text goes to one of three places:
-  1. **a prompt to an agent session**: coucou's "send the next instruction", which resumes the session in its own folder;
-  2. the voice assistant;
-  3. dictation where you type.
-- Answers are spoken through Yoru's speaker (`audio_down`).
-- Done when: "Hey Yoru, run the tests" reaches the chosen Claude Code session.
+**F5. Voice.** Built (2026-10-18), in the fork's `Sources/Yoru/YoruVoice.swift`, `YoruAssistant.swift` and `YoruSpeaker.swift`; no firmware change. Checked on the board: "Alexa", then a question, answered in Italian by the assistant and spoken by Yoru's speaker (5.2 s, no frame lost, no underrun). A prompt to an agent session was checked in the first part. Dictation, and the agent reached with "Claude, …", are still to be checked by voice.
+- Yoru's wake word or a touch opens the mic. `audio_up` goes into coucou's speech recognition (Parakeet, or the Mac's own in the first two dictation languages).
+- The text goes to one of three places, picked by its first word, then by the context:
+  1. **dictation** ("scrivi …", "type …"), typed where the focus is with coucou's `FlowPaste`;
+  2. **a prompt to an agent session** ("Claude …", "agente …", or no leading word while a session waits for you): pasted in its terminal, or `claude -p --resume` in its folder;
+  3. **the voice assistant**, for everything else: coucou's `ClaudeVoiceBrain` with an Anthropic key, else `claude -p` with Haiku and web search on the Claude plan. It answers in the language you spoke.
+- Answers are spoken through Yoru's speaker: the Mac's voice rendered to 16 kHz and streamed on `audio_down`. "Alexa" over the answer stops it, and an answer that asks something opens the mic again (`follow_up`).
+- Done when: "Hey Yoru, run the tests" reaches the chosen Claude Code session. Until a custom wake word exists it is "Alexa, Claude, run the tests".
 
 **F6. Firmware in the app.** Done (2026-10-18), in the fork's `Sources/Yoru/YoruFlasher.swift`. Checked on the board: the four parts written and verified in 33 s, and the board back on the link.
 - The firmware ships inside the app: `scripts/yoru_fetch_firmware.sh` in the fork copies the parts of the last build (`build/flasher_args.json`) into `NotchBuddy/Resources/firmware/`.
@@ -169,6 +165,8 @@ To check on the hardware: rendering time per frame (`!lvgl stats`), and the flas
 
 In 0.5.0: the menu (`menu.c`), motion (`motion.c`), the PMU (`board_pmu.c`), the sound's direction (`ears_dir.c`), and new eye moods and gestures for them (dizzy, scared, peek; hold, shoo, flail; knock and lean). Left for later: the Look items (name, colour, eye shape: M5, when there is more than one), pairing a computer from the menu (the host does it over USB), deep sleep with wake-on-motion on battery, and checking on the board which way the IMU's x and y and the two mics lie (`SCREEN_X`/`SCREEN_Y` in `motion.c`, `MIC_A_SIDE` in `ears_dir.c`).
 
+
+**The menu as a watch's (since 0.11.0).** The ring of icons became a honeycomb of round apps around Yoru, who peeks out from the middle: Notifications, Timers, Habits, Settings, Do not disturb and Agents, with badges and rings that say what is new. The items below are all under Settings, each category with its round icon. Timers and Habits come from the host (`set_timers`, `set_habits`); a host's connector call sends Yoru on an errand through a portal (`show_fetch`, `errand.c`).
 
 **Settings menu on the board.** It is a round menu, made for the circle, that opens without the app.
 - **Opening and closing.** Swipe down from the top edge to open it, swipe up or wait a few seconds to close it. Yoru peeks at the menu while it is open, eyes small and up at the edge. The gesture must not clash with poking and stroking the eyes.

@@ -1,5 +1,49 @@
 # Firmware changelog
 
+## 0.11.0
+
+The menu is a watch now: round apps around Yoru, your timers and habits on the board, and Yoru runs errands for its assistant.
+
+- **A menu like a watch's.** Swipe down from the top edge: six round apps fly out of Yoru, who stays in the middle and looks at the one under your finger. Notifications (with a red count of what's unread), Timers (its ring runs down with the next timer), Habits (today's three rings, as a watch's Activity), Settings, Do not disturb (tap the moon) and Agents (an orange count of the agents waiting for you). Tap one and it grows from its place to fill the screen. Tap Yoru or swipe up to close; it also closes by itself after a few seconds.
+- **Settings.** Everything that was on the old ring is under Settings, as a list with a coloured round icon for each part: Agents, Display, Sound, Behaviour, Voice, Connection, Battery, About. Tap the title or swipe right to go back.
+- **Timers.** Every timer and reminder from the computer, the next first: a ring that runs down and the time left in big digits (a reminder shows its time). Tap a timer to pause or resume it, hold it to cancel it. When one rings it glows orange, Yoru jumps like an alarm clock flapping its hands, the alarm sounds and a line at the bottom says which one; tap it in Timers to stop it. With an older computer app, only the next timer shows.
+- **Habits.** Today's habits, each with a circle to tick: tap it when it's done and it pops with a few sparkles; a habit you do several times a day fills a ring. The rings on top show the day, and the last one done throws confetti. Hold a habit to take a tick back. Each shows its streak ("7 days in a row").
+- **Yoru runs errands.** When its assistant on the computer looks something up in your mail, calendar, GitHub and so on, a little portal in that service's colour opens on the rim. Yoru looks at it, puts its hands together over its head, dives in and rummages about (the portal wobbles and sparkles). Then it hops back with a little parcel in its hands, comes home and opens it in a burst of sparkles. If nothing came of it, it comes back empty-handed, a little sad, in a puff of dust.
+- For the computer: the `timers`, `habits` and `fetch` capabilities, the `set_timers`, `set_habits` and `show_fetch` tools and the `timer_action` and `habit_check` notifications (`docs/protocol.md`, Timers, Habits, Fetch). `show_menu` opens the apps too (`inbox`, `timers`, `habits`, `settings`, `home`); the Inbox page of the old menu is gone. `get_state` reports `timers`, `habits` and `errand`. Yoru Hub has to send them before the timers list, the habits and the errands show.
+
+## 0.10.0
+
+Yoru gets an inbox: your computer can tell you, on the board, what is worth knowing from your mail, calendar and issues.
+
+- **An inbox on the board.** The newest 30 notifications, newest first, each with where it comes from, its title and how long ago it arrived. Unread ones are marked, and a small dot on the rim (top right) says something is unread. Tap one to read it in full, then Dismiss it, Open it on the computer, or use the buttons it brings (Reply, Snooze...).
+- **As loud as it matters.** Something minor only lights the dot. A normal one also shows a banner at the bottom for a few seconds, with a soft chirp; tap the banner to open it. An important one also wakes Yoru, which comes to the glass and knocks; touch Yoru to open the inbox. An urgent one also sounds the alarm and lights the screen even when it has gone dark.
+- **Do not disturb is respected.** With Do not disturb on, or the agents' quiet hour running, only urgent notifications get through; the rest wait quietly in the inbox.
+- **Where to find it.** Tap a banner, press BOOT when something is unread (an agent waiting for you still comes first), or open Inbox in the menu, next to Agents. Swipe right or down, or tap the title, to go back.
+- For the computer: the `inbox` capability, the `show_notification`, `hide_notification` and `clear_notifications` tools and the `notification_action` notification (`docs/protocol.md`, Inbox); `get_state` reports the inbox. A metrics snapshot no longer needs CPU or GPU temperatures: the computer's time is enough.
+
+## 0.9.2
+
+- **A cleaner chat.** The buttons under the chat are gone (Stop, On computer, Yes, Continue), so the conversation has the whole screen. Your messages are blue bubbles on the right, the agent's are dark on the left, edged in its colour. Messages from the same side sit closer together, and the list fades out at the top and bottom instead of being cut. While the agent works, its "..." bubble is animated. To stop an agent, hold it in the agents view as before.
+
+## 0.9.1
+
+- **The chat is a chat.** Tapping an agent now shows your conversation with it: your messages on the right, its answers on the left, in bubbles, the newest at the bottom. The steps it took are left out. While it works on an answer, a "..." bubble shows it.
+- **You see it listening.** While you hold PWR on a chat, the bottom line says "Listening...", then "Writing it down..." until your words come back to be checked and sent.
+- For the computer: `set_chat` now carries `messages` (`docs/protocol.md`, Remote, Chats).
+
+## 0.9.0
+
+Yoru becomes a remote for your coding agents: talk to them, read them, start them, from the board.
+
+- **Hold PWR to talk.** Hold the PWR key and speak: Yoru chimes and listens for as long as you hold it, and stops the moment you let go. No wake word, and a pause doesn't cut you off (up to a minute). A quick tap still puts Yoru to sleep and wakes it.
+- **Where your words go.** From a session's chat, they go to that session. From the "New" page, they start a new one. Anywhere else, they go to the voice assistant ("Claude ..." and "scrivi ..." still pick an agent or dictation).
+- **Read before it goes.** Whatever you say to an agent, with PWR or the wake word, comes back on the screen first, with Send and Cancel. Hold PWR over it to say it again.
+- **A chat for each session.** In the agents view a tap on a little Yoru opens its chat: what you asked, its last steps and its last reply, scrolling. "Hold: stop" interrupts it, "On computer" brings its terminal to the front, and "Yes" and "Continue" answer it in one tap. Holding a little Yoru still arms the interrupt.
+- **Start a new session.** "New" in the agents view lists the agents installed on the computer (Claude, Codex, Gemini) and your recent projects. Pick one of each, hold PWR and say what to do, then Send: it starts in a new Terminal window on the computer.
+- **The screen goes dark.** After a minute asleep the screen switches off completely and ignores touch, so nothing gets pressed by accident. Yoru stays connected and keeps up with the agents in the dark. Only PWR lights it again: a tap, or hold it to talk straight away.
+- Holding PWR no longer switches the board off. Use Battery → Power off in the menu.
+- For the computer: the `remote` capability, the `show_draft`, `hide_draft`, `set_chat` and `set_projects` tools, the `draft`, `chat` and `message` notifications, and `to` on `utterance_start` (`docs/protocol.md`, Remote). This needs the matching Yoru app.
+
 ## 0.8.0
 
 Yoru is no longer a Tamagotchi, for now: it becomes the companion of your coding agents, and the pet comes back later.

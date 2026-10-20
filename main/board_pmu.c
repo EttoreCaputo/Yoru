@@ -6,6 +6,7 @@
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/task.h"
@@ -21,23 +22,40 @@ static const char *TAG = "board_pmu";
 #define AXP_GAUGE_CTRL 0x18 // bit 3: fuel gauge on
 #define AXP_ADC_CTRL 0x30  // bit 0: battery voltage
 #define AXP_VBAT_H 0x34
-#define AXP_INTEN2 0x41    // bit 3: PWR short press
+#define AXP_PWROFF_EN 0x22 // bit 1: a long press of PWR powers off
+#define AXP_INTEN2 0x41    // bits 0, 1, 3: PWR let go, pressed, short press
 #define AXP_INTSTS2 0x49   // the same bits; write 1 to clear
 #define AXP_BAT_DET 0x68   // bit 0: battery detection on
 #define AXP_PERCENT 0xA4
 
 #define AXP2101_ID 0x4A
+/* PWRON is pulled low while PWR is pressed: the falling edge is the press,
+ * the rising edge letting go. */
+#define KEY_UP_BIT 0x01
+#define KEY_DOWN_BIT 0x02
 #define KEY_SHORT_BIT 0x08
-/* The key's flag is polled rather than wired to an interrupt: a read every
- * 150 ms costs nothing and a press still feels immediate. The battery
+#define KEY_BITS (KEY_UP_BIT | KEY_DOWN_BIT | KEY_SHORT_BIT)
+/* Held this long, a press is push-to-talk rather than a tap. */
+#define HOLD_MS 400
+/* The key's flags are polled rather than wired to an interrupt: a read every
+ * 150 ms costs nothing and a press still feels immediate; while the key is
+ * down, more often, so letting go ends the words promptly. The battery
  * changes slowly, so every few seconds is plenty. */
 #define POLL_MS 150
-#define BATTERY_EVERY 20
+#define POLL_DOWN_MS 40
+#define BATTERY_EVERY_MS 3000
 
 static i2c_master_dev_handle_t s_dev;
 static board_pmu_key_cb_t s_on_key;
 static board_pmu_state_t s_state;
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
+/* The key, as its edges said. Only the poll task touches it. */
+static struct {
+    bool down;
+    bool held;  // HOLD went off for this press
+    bool edges; // the chip reports edges: until then, short presses only
+    int64_t down_us;
+} s_key;
 
 static esp_err_t rd(uint8_t reg, uint8_t *out, size_t len)
 {
@@ -79,21 +97,58 @@ static void read_battery(void)
     portEXIT_CRITICAL(&s_mux);
 }
 
+static void key_event(board_pmu_key_t ev)
+{
+    ESP_LOGD(TAG, "key %d", ev);
+    if (s_on_key != NULL) {
+        s_on_key(ev);
+    }
+}
+
+static void poll_key(void)
+{
+    const int64_t now = esp_timer_get_time();
+    uint8_t irq = 0;
+    if (rd(AXP_INTSTS2, &irq, 1) == ESP_OK && (irq & KEY_BITS)) {
+        wr(AXP_INTSTS2, irq & KEY_BITS);
+        if (irq & (KEY_UP_BIT | KEY_DOWN_BIT)) {
+            s_key.edges = true;
+        }
+        if (!s_key.edges) {
+            if (irq & KEY_SHORT_BIT) {
+                key_event(BOARD_PMU_KEY_SHORT);
+            }
+            return;
+        }
+        if ((irq & KEY_DOWN_BIT) && !s_key.down) {
+            s_key.down = true;
+            s_key.held = false;
+            s_key.down_us = now;
+        }
+        // Pressed and let go between two reads is a tap.
+        if ((irq & KEY_UP_BIT) && s_key.down) {
+            s_key.down = false;
+            key_event(s_key.held ? BOARD_PMU_KEY_RELEASE : BOARD_PMU_KEY_SHORT);
+            return;
+        }
+    }
+    if (s_key.down && !s_key.held && now - s_key.down_us >= (int64_t) HOLD_MS * 1000) {
+        s_key.held = true;
+        key_event(BOARD_PMU_KEY_HOLD);
+    }
+}
+
 static void poll_task(void *arg)
 {
-    int n = 0;
+    int64_t battery_us = 0;
     while (true) {
-        uint8_t irq;
-        if (rd(AXP_INTSTS2, &irq, 1) == ESP_OK && (irq & KEY_SHORT_BIT)) {
-            wr(AXP_INTSTS2, KEY_SHORT_BIT);
-            if (s_on_key != NULL) {
-                s_on_key();
-            }
-        }
-        if (n++ % BATTERY_EVERY == 0) {
+        poll_key();
+        const int64_t now = esp_timer_get_time();
+        if (now - battery_us >= (int64_t) BATTERY_EVERY_MS * 1000) {
+            battery_us = now;
             read_battery();
         }
-        vTaskDelay(pdMS_TO_TICKS(POLL_MS));
+        vTaskDelay(pdMS_TO_TICKS(s_key.down ? POLL_DOWN_MS : POLL_MS));
     }
 }
 
@@ -119,8 +174,14 @@ esp_err_t board_pmu_init(board_pmu_key_cb_t on_key)
     set_bits(AXP_BAT_DET, 0x01);
     set_bits(AXP_ADC_CTRL, 0x01);
     set_bits(AXP_GAUGE_CTRL, 0x08);
-    set_bits(AXP_INTEN2, KEY_SHORT_BIT);
+    set_bits(AXP_INTEN2, KEY_BITS);
     wr(AXP_INTSTS2, 0xFF); // presses from before the boot don't count
+    // Holding PWR is push-to-talk now: it mustn't switch the board off
+    // mid-sentence. The menu's Power off still does.
+    uint8_t off = 0;
+    if (rd(AXP_PWROFF_EN, &off, 1) == ESP_OK && (off & 0x02)) {
+        wr(AXP_PWROFF_EN, off & (uint8_t) ~0x02);
+    }
     s_on_key = on_key;
     read_battery();
     board_pmu_state_t st;
@@ -128,7 +189,7 @@ esp_err_t board_pmu_init(board_pmu_key_cb_t on_key)
     ESP_LOGI(TAG, "AXP2101: battery %s %d%% %d mV, usb %d, charging %d", st.battery ? "yes" : "no", st.percent,
              st.mv, st.usb, st.charging);
     // Its stack is small and it never writes the flash: PSRAM is fine.
-    if (xTaskCreatePinnedToCoreWithCaps(poll_task, "pmu", 2560, NULL, 2, NULL, 0, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
+    if (xTaskCreatePinnedToCoreWithCaps(poll_task, "pmu", 4096, NULL, 2, NULL, 0, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT)
         != pdPASS) {
         return ESP_ERR_NO_MEM;
     }

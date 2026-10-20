@@ -97,7 +97,7 @@ It reacts *towards* things, never at random:
 - **Shaking:** it gets dizzy (spiral eyes) and then grumpy.
 - **Touch:** stroking the screen makes it happy and the sphere leans towards the finger. A tap is a poke: the ball squashes and wobbles; once is fine, three in a row annoy it. A long press puts it to sleep, or into focus mode.
 - **Music:** it bobs to the beat and the hands sway with it.
-- **Settings:** a swipe down from the top edge opens a round menu for brightness, volume, the microphone and more. Yoru rolls aside and peeks at it from the edge while it is open (see the roadmap, M2).
+- **Menu:** a swipe down from the top edge opens a menu like a watch's: round apps fly out of Yoru and settle in a honeycomb around it (notifications, timers, habits, settings, do not disturb, agents), and Yoru peeks at them from the middle, looking at the one under your finger (see the roadmap, M2).
 
 ### Moods from real life
 - Happy when builds and tests pass, or when Claude Code finishes a task.

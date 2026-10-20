@@ -14,7 +14,11 @@
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
+#include "errand.h"
 #include "eyes.h"
+#include "habits.h"
+#include "inbox.h"
+#include "inbox_ui.h"
 #include "life.h"
 #include "link.h"
 #include "lvgl_port.h"
@@ -24,6 +28,9 @@
 #include "net.h"
 #include "playback.h"
 #include "question.h"
+#include "draft.h"
+#include "remote.h"
+#include "timers.h"
 #include "voice.h"
 
 /* From DualEye's board_tools.c: one screen, no faces, and the settings as
@@ -383,6 +390,15 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
     cJSON_AddBoolToObject(a, "view", agents_ui_is_open());
     cJSON_AddBoolToObject(a, "question", question_is_open());
     cJSON_AddBoolToObject(a, "approval", approval_is_open());
+    cJSON *in = cJSON_AddObjectToObject(st, "inbox");
+    cJSON_AddNumberToObject(in, "count", inbox_count());
+    cJSON_AddNumberToObject(in, "unread", inbox_unread(NULL));
+    cJSON_AddBoolToObject(in, "view", inbox_ui_is_open());
+    cJSON_AddNumberToObject(st, "timers", timers_count());
+    cJSON *hb = cJSON_AddObjectToObject(st, "habits");
+    cJSON_AddNumberToObject(hb, "count", habits_count());
+    cJSON_AddNumberToObject(hb, "done", habits_done());
+    cJSON_AddBoolToObject(st, "errand", errand_busy());
     lvgl_port_unlock();
     *structured = st;
     // The text is filled in by the caller from `structured`.
@@ -589,11 +605,198 @@ static bool tool_hide_question(const cJSON *args, char *text, cJSON **structured
     return true;
 }
 
+static bool tool_show_draft(const cJSON *args, char *text, cJSON **structured)
+{
+    const cJSON *id = cJSON_GetObjectItemCaseSensitive(args, "id");
+    const cJSON *words = cJSON_GetObjectItemCaseSensitive(args, "text");
+    const cJSON *to = cJSON_GetObjectItemCaseSensitive(args, "to");
+    int seconds = 0;
+    if (!cJSON_IsString(id) || id->valuestring[0] == '\0' || strlen(id->valuestring) > DRAFT_ID_MAX) {
+        snprintf(text, TEXT_MAX, "id must be a string of 1 to %d bytes", DRAFT_ID_MAX);
+        return false;
+    }
+    if (!cJSON_IsString(words) || !cJSON_IsString(to)) {
+        snprintf(text, TEXT_MAX, "text and to must be strings");
+        return false;
+    }
+    if (!get_int(args, "seconds", &seconds, text)) {
+        return false;
+    }
+    lvgl_port_lock();
+    draft_show(id->valuestring, words->valuestring, to->valuestring, seconds);
+    lvgl_port_unlock();
+    snprintf(text, TEXT_MAX, "showing %s", id->valuestring);
+    return true;
+}
+
+static bool tool_hide_draft(const cJSON *args, char *text, cJSON **structured)
+{
+    const cJSON *id = cJSON_GetObjectItemCaseSensitive(args, "id");
+    if (!cJSON_IsString(id)) {
+        snprintf(text, TEXT_MAX, "id must be a string");
+        return false;
+    }
+    lvgl_port_lock();
+    const bool shown = draft_hide(id->valuestring);
+    lvgl_port_unlock();
+    snprintf(text, TEXT_MAX, shown ? "hidden" : "not shown");
+    return true;
+}
+
+static bool tool_set_chat(const cJSON *args, char *text, cJSON **structured)
+{
+    if (!remote_set_chat(args, text, TEXT_MAX)) {
+        return false;
+    }
+    snprintf(text, TEXT_MAX, "chat set");
+    return true;
+}
+
+static bool tool_set_projects(const cJSON *args, char *text, cJSON **structured)
+{
+    if (!remote_set_projects(args, text, TEXT_MAX)) {
+        return false;
+    }
+    snprintf(text, TEXT_MAX, "projects set");
+    return true;
+}
+
+/* A string argument within `max` bytes (`required`: present and not empty). */
+static bool get_str(const cJSON *args, const char *key, bool required, size_t max, const char **out, char *text)
+{
+    const cJSON *v = cJSON_GetObjectItemCaseSensitive(args, key);
+    if (v == NULL || cJSON_IsNull(v)) {
+        *out = "";
+        if (required) {
+            snprintf(text, TEXT_MAX, "%s is required", key);
+        }
+        return !required;
+    }
+    if (!cJSON_IsString(v) || (required && v->valuestring[0] == '\0') || (max > 0 && strlen(v->valuestring) > max)) {
+        snprintf(text, TEXT_MAX, "%s must be a string%s", key, required ? ", not empty" : "");
+        if (max > 0) {
+            snprintf(text + strlen(text), TEXT_MAX - strlen(text), ", at most %u bytes", (unsigned) max);
+        }
+        return false;
+    }
+    *out = v->valuestring;
+    return true;
+}
+
+static bool tool_show_notification(const cJSON *args, char *text, cJSON **structured)
+{
+    const char *id, *source, *title, *words;
+    if (!get_str(args, "id", true, INBOX_ID_MAX, &id, text) || !get_str(args, "source", false, 0, &source, text)
+        || !get_str(args, "title", true, 0, &title, text) || !get_str(args, "text", false, 0, &words, text)) {
+        return false;
+    }
+    inbox_urgency_t urgency = INBOX_NORMAL;
+    const cJSON *u = cJSON_GetObjectItemCaseSensitive(args, "urgency");
+    if (u != NULL && (!cJSON_IsString(u) || !inbox_urgency_from_name(u->valuestring, &urgency))) {
+        snprintf(text, TEXT_MAX, "urgency must be low, normal, high or urgent");
+        return false;
+    }
+    const cJSON *acts = cJSON_GetObjectItemCaseSensitive(args, "actions");
+    const char *labels[INBOX_ACTIONS_MAX];
+    int nacts = 0;
+    if (acts != NULL && !cJSON_IsNull(acts)) {
+        if (!cJSON_IsArray(acts) || cJSON_GetArraySize(acts) > INBOX_ACTIONS_MAX) {
+            snprintf(text, TEXT_MAX, "actions must be an array of at most %d strings", INBOX_ACTIONS_MAX);
+            return false;
+        }
+        const cJSON *a;
+        cJSON_ArrayForEach(a, acts)
+        {
+            if (!cJSON_IsString(a) || a->valuestring[0] == '\0') {
+                snprintf(text, TEXT_MAX, "each action must be a short label");
+                return false;
+            }
+            labels[nacts++] = a->valuestring;
+        }
+    }
+    lvgl_port_lock();
+    const inbox_urgency_t loud = inbox_add(id, source, title, words, labels, nacts, urgency);
+    inbox_ui_banner(loud);
+    const int n = inbox_count(), unread = inbox_unread(NULL);
+    lvgl_port_unlock();
+    static const char *const LOUD[] = {"low", "normal", "high", "urgent"};
+    snprintf(text, TEXT_MAX, "%s %s; %d in the inbox, %d unread", loud == INBOX_NONE ? "unchanged" : "shown",
+             loud == INBOX_NONE ? "" : LOUD[loud], n, unread);
+    return true;
+}
+
+static bool tool_hide_notification(const cJSON *args, char *text, cJSON **structured)
+{
+    const cJSON *id = cJSON_GetObjectItemCaseSensitive(args, "id");
+    if (!cJSON_IsString(id)) {
+        snprintf(text, TEXT_MAX, "id must be a string");
+        return false;
+    }
+    lvgl_port_lock();
+    const bool had = inbox_remove(id->valuestring);
+    lvgl_port_unlock();
+    // Not there is fine: dismissed here already, or pushed out.
+    snprintf(text, TEXT_MAX, had ? "removed" : "not in the inbox");
+    return true;
+}
+
+static bool tool_clear_notifications(const cJSON *args, char *text, cJSON **structured)
+{
+    lvgl_port_lock();
+    inbox_clear();
+    lvgl_port_unlock();
+    snprintf(text, TEXT_MAX, "inbox empty");
+    return true;
+}
+
+static bool tool_set_timers(const cJSON *args, char *text, cJSON **structured)
+{
+    lvgl_port_lock();
+    const bool ok = timers_set(args, text, TEXT_MAX);
+    const int n = timers_count();
+    lvgl_port_unlock();
+    if (ok) {
+        snprintf(text, TEXT_MAX, "%d timers", n);
+    }
+    return ok;
+}
+
+static bool tool_set_habits(const cJSON *args, char *text, cJSON **structured)
+{
+    lvgl_port_lock();
+    const bool ok = habits_set(args, text, TEXT_MAX);
+    const int n = habits_count(), done = habits_done();
+    lvgl_port_unlock();
+    if (ok) {
+        snprintf(text, TEXT_MAX, "%d habits, %d done", n, done);
+    }
+    return ok;
+}
+
+static bool tool_show_fetch(const cJSON *args, char *text, cJSON **structured)
+{
+    const char *id, *source, *state;
+    if (!get_str(args, "id", false, 23, &id, text) || !get_str(args, "source", false, 24, &source, text)
+        || !get_str(args, "state", true, 0, &state, text)) {
+        return false;
+    }
+    if (strcmp(state, "start") != 0 && strcmp(state, "done") != 0 && strcmp(state, "failed") != 0) {
+        snprintf(text, TEXT_MAX, "state must be start, done or failed");
+        return false;
+    }
+    lvgl_port_lock();
+    const bool out = behaviour_fetch(id, source, state);
+    lvgl_port_unlock();
+    snprintf(text, TEXT_MAX, out ? "Yoru is on the errand" : "not shown");
+    return true;
+}
+
 static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
-        .description = "Open or close the settings menu on Yoru's screen, on the ring of icons or straight on a page "
-                       "(agents, display, sound, behaviour, voice, connection, battery, about).",
+        .description = "Open or close the menu on Yoru's screen: on its home (the apps around Yoru), on an app "
+                       "(inbox, timers, habits, settings) or straight on a page of Settings (agents, display, sound, "
+                       "behaviour, voice, connection, battery, about).",
         .schema = "{\"type\":\"object\",\"properties\":{\"open\":{\"type\":\"boolean\"},"
                   "\"page\":{\"type\":\"string\"}}}",
         .fn = tool_show_menu,
@@ -662,6 +865,108 @@ static const tool_t TOOLS[] = {
         .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},"
                   "\"required\":[\"id\"]}",
         .fn = tool_hide_question,
+    },
+    {
+        .name = "show_draft",
+        .description = "Show what was said to an agent on Yoru, with Send and Cancel, before it goes; the answer "
+                       "comes back with the `draft` notification. The Yoru app sends these itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
+                  "\"text\":{\"type\":\"string\",\"maxLength\":400},\"to\":{\"type\":\"string\",\"maxLength\":40},"
+                  "\"seconds\":{\"type\":\"integer\",\"minimum\":1}},\"required\":[\"id\",\"text\",\"to\",\"seconds\"]}",
+        .fn = tool_show_draft,
+    },
+    {
+        .name = "hide_draft",
+        .description = "Take a draft off Yoru's screen, if that id is shown.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},"
+                  "\"required\":[\"id\"]}",
+        .fn = tool_hide_draft,
+    },
+    {
+        .name = "set_chat",
+        .description = "What the chat open on Yoru shows for a session: the prompt and the agent's last reply. "
+                       "The Yoru app sends it itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"session\":{\"type\":\"string\"},"
+                  "\"prompt\":{\"type\":\"string\",\"maxLength\":200},"
+                  "\"reply\":{\"type\":\"string\",\"maxLength\":1200}},\"required\":[\"session\"]}",
+        .fn = tool_set_chat,
+    },
+    {
+        .name = "set_projects",
+        .description = "Where a new agent session can start from Yoru: the agents installed and the recent "
+                       "projects. The Yoru app sends it itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"agents\":{\"type\":\"array\",\"maxItems\":4,"
+                  "\"items\":{\"type\":\"string\"}},\"projects\":{\"type\":\"array\",\"maxItems\":8,"
+                  "\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
+                  "\"name\":{\"type\":\"string\"}},\"required\":[\"id\",\"name\"]}}},"
+                  "\"required\":[\"agents\",\"projects\"]}",
+        .fn = tool_set_projects,
+    },
+    {
+        .name = "show_notification",
+        .description = "Put a notification in Yoru's inbox (newest first, at most 30), replacing one with the same "
+                       "id. `low` only marks it unread; `normal` also shows a banner with a soft sound; `high` also "
+                       "makes Yoru knock on the glass; `urgent` also lights a dark screen. Do not disturb and quiet "
+                       "turn all but urgent into low. What the user does comes back with `notification_action`. "
+                       "The host sends these itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\",\"maxLength\":47},"
+                  "\"source\":{\"type\":\"string\",\"maxLength\":24},\"title\":{\"type\":\"string\",\"maxLength\":60},"
+                  "\"text\":{\"type\":\"string\",\"maxLength\":200},"
+                  "\"urgency\":{\"type\":\"string\",\"enum\":[\"low\",\"normal\",\"high\",\"urgent\"]},"
+                  "\"actions\":{\"type\":\"array\",\"maxItems\":2,\"items\":{\"type\":\"string\",\"maxLength\":16}}},"
+                  "\"required\":[\"id\",\"title\"]}",
+        .fn = tool_show_notification,
+    },
+    {
+        .name = "hide_notification",
+        .description = "Take a notification out of Yoru's inbox, if that id is there.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},"
+                  "\"required\":[\"id\"]}",
+        .fn = tool_hide_notification,
+    },
+    {
+        .name = "clear_notifications",
+        .description = "Empty Yoru's inbox.",
+        .schema = "{\"type\":\"object\",\"properties\":{}}",
+        .fn = tool_clear_notifications,
+    },
+    {
+        .name = "set_timers",
+        .description = "Every timer and reminder the host keeps, for the Timers app on Yoru (at most 8). Send the "
+                       "whole list whenever it changes; the board counts them down. What the user does comes back "
+                       "with `timer_action`. The host sends it itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"timers\":{\"type\":\"array\",\"maxItems\":8,"
+                  "\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":[\"integer\",\"string\"]},"
+                  "\"kind\":{\"type\":\"string\",\"enum\":[\"timer\",\"work\",\"break\",\"reminder\"]},"
+                  "\"state\":{\"type\":\"string\",\"enum\":[\"run\",\"pause\",\"ring\"]},"
+                  "\"left_s\":{\"type\":\"number\",\"minimum\":0},\"total_s\":{\"type\":\"number\"},"
+                  "\"label\":{\"type\":\"string\"},\"at\":{\"type\":\"string\"}},"
+                  "\"required\":[\"id\",\"state\",\"left_s\",\"total_s\"]}}},\"required\":[\"timers\"]}",
+        .fn = tool_set_timers,
+    },
+    {
+        .name = "set_habits",
+        .description = "Today's habits, for the Habits app on Yoru (at most 8): how many times each is done of its "
+                       "goal and its streak. A tap on the board ticks one and comes back with `habit_check`. The "
+                       "host sends it itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"habits\":{\"type\":\"array\",\"maxItems\":8,"
+                  "\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
+                  "\"name\":{\"type\":\"string\"},\"done\":{\"type\":\"integer\"},"
+                  "\"goal\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":99},"
+                  "\"streak\":{\"type\":\"integer\"},\"color\":{\"type\":\"string\"}},"
+                  "\"required\":[\"id\",\"name\"]}}},\"required\":[\"habits\"]}",
+        .fn = tool_set_habits,
+    },
+    {
+        .name = "show_fetch",
+        .description = "The host's assistant calls one of its connectors: on `start` Yoru dives into a portal in "
+                       "the connector's colour, and on `done` (or `failed`) comes back with a parcel (or empty "
+                       "handed). `id` pairs a start with its end. The host sends it itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\",\"maxLength\":23},"
+                  "\"source\":{\"type\":\"string\",\"maxLength\":24},"
+                  "\"state\":{\"type\":\"string\",\"enum\":[\"start\",\"done\",\"failed\"]}},"
+                  "\"required\":[\"state\"]}",
+        .fn = tool_show_fetch,
     },
     {
         .name = "set_brightness",

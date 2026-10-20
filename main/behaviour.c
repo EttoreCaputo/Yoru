@@ -15,7 +15,10 @@
 #include "card.h"
 #include "esp_log.h"
 #include "esp_random.h"
+#include "errand.h"
 #include "eyes.h"
+#include "inbox.h"
+#include "inbox_ui.h"
 #include "life.h"
 #include "lvgl_port.h"
 #include "menu.h"
@@ -23,10 +26,18 @@
 #include "metrics_model.h"
 #include "playback.h"
 #include "question.h"
+#include "draft.h"
+#include "remote_ui.h"
+#include "timers.h"
 
 /* Often enough for life.c's moves. */
 #define TICK_MS 100
 #define BRIGHTNESS_ASLEEP 12
+/* Asleep this long, the screen goes dark; only PWR lights it again. The
+ * board keeps listening to the host meanwhile. */
+#define DARK_AFTER_MS 60000
+/* `to` of a push-to-talk utterance, as JSON text. */
+#define TO_MAX 160
 /* Three pokes closer than this make it grumpy. */
 #define POKE_WINDOW_MS 1500
 /* How much finger travel counts as stroking. */
@@ -165,6 +176,15 @@ static struct {
     bool agent_tint;
     bool agents_waiting;
     uint32_t next_call_ms;
+    /* A draft is up (draft.c). */
+    bool draft;
+    /* Asleep since then; the screen is dark (only PWR lights it). */
+    uint32_t asleep_ms;
+    bool dark;
+    /* PWR is held and its words stream. */
+    bool talking;
+    /* It came to the glass for a notification, not for an agent. */
+    bool inbox_call;
 } s;
 
 static void show_voice(voice_state_t state);
@@ -174,6 +194,9 @@ static void wait_for_answer(uint32_t now);
 
 static void set_brightness(int percent)
 {
+    if (s.dark) {
+        percent = 0;
+    }
     if (percent != s.brightness) {
         s.brightness = percent;
         board_display_set_brightness(percent);
@@ -258,6 +281,7 @@ static void fall_asleep(void)
 {
     if (!s.asleep) {
         ESP_LOGI(TAG, "asleep");
+        s.asleep_ms = lv_tick_get();
     }
     s.asleep = true;
     s.until_ms = 0;
@@ -279,9 +303,11 @@ static void wake_up(void)
     life_woke();
 }
 
-/* Something needs Yoru here: back to the middle, whatever it was doing. */
+/* Something needs Yoru here: back to the middle, whatever it was doing,
+ * out of an errand's portal too. */
 static void come_home(void)
 {
+    errand_abort();
     life_attend();
     eyes_move_to(0, 0, 1, HOME_MS, EYES_PATH_GLIDE);
 }
@@ -322,6 +348,12 @@ static void poke(uint32_t now)
         agents_summary(&sum);
         if (sum.waiting > 0 && sum.focus) {
             agents_ui_shortcut("focus", sum.wait_id);
+        } else if (s.inbox_call && inbox_unread(NULL) > 0) {
+            // It knocked for a notification: here it is.
+            s.inbox_call = false;
+            life_attend();
+            inbox_ui_open(NULL);
+            return;
         }
     }
     s.pokes = (now - s.last_poke_ms < POKE_WINDOW_MS) ? s.pokes + 1 : 1;
@@ -458,7 +490,8 @@ static life_ctx_t life_context(uint32_t now, bool playing)
     const uint32_t awake_ms = now - s.woke_ms;
     const uint32_t lonely_ms = alone_ms < awake_ms ? alone_ms : awake_ms;
     return (life_ctx_t) {
-        .free = !s.pressed && s.voice == VOICE_IDLE && !s.menu && !s.view && !card_up() && !s.face_down && !playing,
+        .free = !s.pressed && s.voice == VOICE_IDLE && !s.menu && !s.view && !card_up() && !s.face_down && !playing
+                && !errand_busy(),
         .asleep = s.asleep,
         // With an agent waiting, it keeps still.
         .focus = board_settings_on(SETTING_FOCUS) || s.agents_waiting,
@@ -470,7 +503,31 @@ static life_ctx_t life_context(uint32_t now, bool playing)
 
 static bool card_up(void)
 {
-    return s.approval || s.question;
+    return s.approval || s.question || s.draft;
+}
+
+/* Long asleep: the screen off and deaf to touch, the board still at work. */
+static void go_dark(void)
+{
+    ESP_LOGI(TAG, "screen dark");
+    s.dark = true;
+    set_brightness(0);
+    lvgl_port_set_touch(false);
+}
+
+static void light_up(void)
+{
+    ESP_LOGI(TAG, "screen lit");
+    s.dark = false;
+    lvgl_port_set_touch(true);
+    s.last_touch_ms = lv_tick_get();
+}
+
+/* Whichever view covers the screen: the agents' or the inbox. */
+static void close_views(void)
+{
+    agents_ui_close();
+    inbox_ui_close();
 }
 
 /* The agents' news (agents.c): a nod when a turn ends, a wince when it
@@ -531,8 +588,73 @@ static void agents_tick(uint32_t now)
     if (sum.waiting > 0 && !quiet && !busy && !s.asleep && (int32_t) (now - s.next_call_ms) >= 0) {
         if (life_call()) {
             s.next_call_ms = now + CALL_EVERY_MS;
+            s.inbox_call = false;
         }
     }
+}
+
+/* A notification came (inbox.c), as loud as inbox_add() said: normal
+ * chirps (inbox_ui.c shows its banner), high also wakes a dimmed screen and
+ * knocks on the glass once, urgent also lights a dark screen and sounds the
+ * alarm. While the screen is dark only urgent shows; face down, nothing. */
+static void inbox_tick(uint32_t now)
+{
+    const inbox_urgency_t u = inbox_take_alert();
+    if (u < INBOX_NORMAL || s.face_down || (s.dark && u < INBOX_URGENT)) {
+        return;
+    }
+    if (s.dark) {
+        light_up();
+    }
+    if (u >= INBOX_HIGH && s.asleep) {
+        s.last_touch_ms = now;
+        wake_up();
+    }
+    if (u == INBOX_URGENT) {
+        // Twice: longer and harder to miss than a chirp. An earcon, so it
+        // plays with Yoru's sounds off too.
+        playback_sound(SOUND_ALARM);
+        playback_sound(SOUND_ALARM);
+    } else {
+        playback_sound(SOUND_CHIRP);
+    }
+    const bool busy = card_up() || s.menu || s.view || s.voice != VOICE_IDLE;
+    if (u >= INBOX_HIGH && !busy && !s.asleep && life_call()) {
+        s.inbox_call = true;
+    }
+}
+
+/* A timer or a reminder rang (timers.c): Yoru jumps like an alarm clock,
+ * flapping its hands, with the alarm and a line saying which one. The host
+ * says it out loud too. */
+static void timers_tick(void)
+{
+    char label[TIMERS_LABEL_CHARS + 1];
+    if (!timers_take_ring(label, sizeof(label)) || s.face_down) {
+        return;
+    }
+    if (s.dark) {
+        light_up();
+    }
+    if (s.asleep) {
+        s.last_touch_ms = lv_tick_get();
+        wake_up();
+    }
+    playback_sound(SOUND_ALARM);
+    char text[48];
+    if (label[0] != '\0') {
+        snprintf(text, sizeof(text), "%s " LV_SYMBOL_BELL, label);
+    } else {
+        snprintf(text, sizeof(text), "%s", card_tr("Time's up! " LV_SYMBOL_BELL, "Tempo scaduto! " LV_SYMBOL_BELL));
+    }
+    agents_ui_toast(text, 6, TOAST_WAIT);
+    if (card_up() || s.menu || s.view || s.voice != VOICE_IDLE) {
+        return;
+    }
+    come_home();
+    eyes_knock(0, -0.7f); // a jump
+    eyes_gesture(EYES_GESTURE_FLAIL);
+    react(EYES_MOOD_SURPRISED, 1800);
 }
 
 static void tick_cb(lv_timer_t *timer)
@@ -545,6 +667,8 @@ static void tick_cb(lv_timer_t *timer)
     }
     apply_rotation();
     agents_tick(now);
+    inbox_tick(now);
+    timers_tick();
     if (card_up()) {
         wait_for_answer(now);
         return;
@@ -565,6 +689,9 @@ static void tick_cb(lv_timer_t *timer)
 
     if (s.asleep) {
         set_brightness(asleep_brightness()); // follows the menu's changes
+        if (!s.dark && s.voice == VOICE_IDLE && now - s.asleep_ms >= DARK_AFTER_MS) {
+            go_dark();
+        }
         const life_ctx_t ctx = life_context(now, false);
         life_step(&ctx);
         return;
@@ -668,7 +795,7 @@ static void on_motion(motion_event_t ev)
         if (s.menu) {
             menu_close();
         }
-        agents_ui_close();
+        close_views();
         eyes_look_around();
         fall_asleep();
         set_face_down(true);
@@ -871,21 +998,72 @@ void behaviour_heard_from(float x)
     lvgl_port_unlock();
 }
 
-void behaviour_power_key(void)
+/* A tap of PWR. */
+static void power_tap(void)
 {
-    lvgl_port_lock();
-    s.last_touch_ms = lv_tick_get();
-    if (card_up()) {
+    if (s.dark) {
+        light_up(); // whatever came meanwhile is on the screen now
+        if (s.asleep) {
+            wake_up();
+        }
+    } else if (card_up()) {
         // Not to sleep with a question waiting: the buttons answer it.
     } else if (s.menu) {
         menu_close();
     } else if (s.view) {
-        agents_ui_close();
+        close_views();
     } else if (s.asleep) {
         wake_up();
     } else if (s.voice == VOICE_IDLE) {
         eyes_look_around();
         fall_asleep();
+    }
+}
+
+/* PWR held: the words go where the page up says, or where the draft went. */
+static void power_hold(void)
+{
+    if (s.dark) {
+        light_up();
+    }
+    if (s.approval || s.question) {
+        return; // answered with the buttons
+    }
+    if (s.asleep) {
+        wake_up();
+    }
+    menu_close();
+    char to[TO_MAX] = "";
+    if (s.draft) {
+        draft_redo(); // the host keeps where it went
+    } else {
+        remote_ui_target(to, sizeof(to));
+    }
+    s.talking = voice_talk(to);
+    if (!s.talking) {
+        agents_ui_toast(voice_available() ? card_tr("The mic is muted", "Il microfono e' spento")
+                                          : card_tr("No voice on this board", "Niente voce su questa board"),
+                        3, TOAST_ERROR);
+    }
+}
+
+void behaviour_power_key(board_pmu_key_t ev)
+{
+    lvgl_port_lock();
+    s.last_touch_ms = lv_tick_get();
+    switch (ev) {
+    case BOARD_PMU_KEY_SHORT:
+        power_tap();
+        break;
+    case BOARD_PMU_KEY_HOLD:
+        power_hold();
+        break;
+    case BOARD_PMU_KEY_RELEASE:
+        if (s.talking) {
+            s.talking = false;
+            voice_talk_end();
+        }
+        break;
     }
     lvgl_port_unlock();
 }
@@ -978,6 +1156,9 @@ static void on_view(bool open)
     s.view = open;
     s.last_touch_ms = lv_tick_get();
     if (open) {
+        if (s.asleep) {
+            wake_up(); // a tap on the inbox's banner opens it while dimmed
+        }
         s.until_ms = 0;
         come_home();
     } else {
@@ -988,6 +1169,9 @@ static void on_view(bool open)
 
 void behaviour_boot_key(bool long_press)
 {
+    if (s.dark) {
+        return; // only PWR lights the screen
+    }
     s.last_touch_ms = lv_tick_get();
     if (!board_settings_on(SETTING_BOOT_KEY) || card_up()) {
         return; // a card is answered on the screen
@@ -1004,10 +1188,11 @@ void behaviour_boot_key(bool long_press)
         return;
     }
     if (s.view) {
-        agents_ui_close();
+        close_views();
         return;
     }
-    // The agent waiting on you first; otherwise what they're all doing.
+    // The agent waiting on you first; then what's unread in the inbox;
+    // otherwise what the agents are all doing.
     agents_summary_t sum;
     agents_summary(&sum);
     if (sum.waiting > 0 && sum.focus) {
@@ -1015,7 +1200,28 @@ void behaviour_boot_key(bool long_press)
         agents_ui_shortcut("focus", sum.wait_id);
         return;
     }
+    if (sum.waiting == 0 && inbox_unread(NULL) > 0) {
+        inbox_ui_open(NULL);
+        return;
+    }
     agents_ui_open();
+}
+
+static void on_draft(bool open, int sent)
+{
+    s.draft = open;
+    s.last_touch_ms = lv_tick_get();
+    if (open) {
+        card_opened(lv_tick_get());
+        return;
+    }
+    if (sent > 0) {
+        playback_sound(SOUND_YES);
+        react(EYES_MOOD_HAPPY, 1200);
+    } else {
+        eyes_blink();
+    }
+    eyes_look_around();
 }
 
 static void on_approval(bool open, int allow)
@@ -1042,6 +1248,39 @@ static void on_approval(bool open, int allow)
     eyes_look_around();
 }
 
+/* An errand ended: its happy (or sad) face stays a moment, then back to
+ * the conversation's, or to its own life. */
+static void on_errand(bool busy)
+{
+    const uint32_t now = lv_tick_get();
+    s.last_touch_ms = now;
+    if (busy) {
+        s.until_ms = 0;
+        s.gaze_ms = 0;
+        return;
+    }
+    if (s.voice != VOICE_IDLE) {
+        show_voice(s.voice);
+    } else {
+        s.until_ms = now + 1500;
+    }
+}
+
+bool behaviour_fetch(const char *id, const char *source, const char *state)
+{
+    if (strcmp(state, "start") != 0) {
+        errand_end(id, strcmp(state, "done") == 0);
+        return errand_busy();
+    }
+    // Only where it can be seen, and not over what you are doing.
+    if (s.asleep || s.dark || s.face_down || s.menu || s.view || card_up() || s.pressed
+        || (s.voice != VOICE_IDLE && s.voice != VOICE_THINKING)) {
+        return false;
+    }
+    errand_start(id, source);
+    return true;
+}
+
 void behaviour_start(lv_obj_t *face)
 {
     const uint32_t now = lv_tick_get();
@@ -1059,9 +1298,12 @@ void behaviour_start(lv_obj_t *face)
     lv_timer_create(tick_cb, TICK_MS, NULL);
     lv_timer_create(lean_cb, LEAN_MS, NULL);
     s.face = face;
+    errand_init(lv_obj_get_parent(face), on_errand);
     menu_init(face, on_menu);
     approval_init(on_approval);
     question_init(on_question);
+    draft_init(on_draft);
     agents_ui_init(face, on_view);
+    inbox_ui_init(face, on_view);
     board_button_init(behaviour_boot_key);
 }

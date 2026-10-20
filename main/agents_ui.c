@@ -11,12 +11,17 @@
 #include "card.h"
 #include "cJSON.h"
 #include "esp_attr.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "inbox_ui.h"
 #include "look.h"
 #include "menu.h"
 #include "metrics_model.h"
+#include "draft.h"
 #include "question.h"
+#include "remote.h"
+#include "remote_ui.h"
 #include "rpc.h"
 
 static const char *TAG = "agents_ui";
@@ -37,6 +42,7 @@ static const char *TAG = "agents_ui";
 #define TOAST_MAX_S 30
 /* The view. */
 #define VIEW_IDLE_MS 30000
+#define PAGE_IDLE_MS 90000
 #define VIEW_REFRESH_MS 5000
 #define VIEW_FRAME_MS 40
 /* The little Yorus sit around this point, clear of the title and the
@@ -102,7 +108,7 @@ static uint32_t now_ms(void)
     return lv_tick_get();
 }
 
-static lv_color_t state_color(agent_state_t st)
+lv_color_t agents_ui_state_color(agent_state_t st)
 {
     switch (st) {
     case AGENT_WORK:
@@ -124,7 +130,7 @@ static lv_color_t tone_color(toast_tone_t tone)
 }
 
 /* "edit agents.c +42 -3", with a symbol for the kind of step. */
-static void step_text(const agent_step_t *st, char *out, size_t len)
+void agents_ui_step_text(const agent_step_t *st, char *out, size_t len)
 {
     static const struct {
         const char *kind, *symbol;
@@ -194,7 +200,7 @@ static void place_dots(void)
         const float a = deg * 3.14159265f / 180.0f;
         lv_obj_set_size(dot, d, d);
         lv_obj_set_pos(dot, CX + (int32_t) (DOT_R * cosf(a)) - d / 2, CY + (int32_t) (DOT_R * sinf(a)) - d / 2);
-        lv_obj_set_style_bg_color(dot, state_color(st), 0);
+        lv_obj_set_style_bg_color(dot, agents_ui_state_color(st), 0);
         if (lv_obj_has_flag(dot, LV_OBJ_FLAG_HIDDEN) || s.dot_state[i] != st) {
             animate_dot(dot, st);
         }
@@ -235,7 +241,7 @@ static void update_ticker(void)
         if (a->state == AGENT_WORK && a->nsteps > 0) {
             const agent_step_t *st = &a->steps[a->nsteps - 1];
             char text[80];
-            step_text(st, text, sizeof(text));
+            agents_ui_step_text(st, text, sizeof(text));
             show_line(text, st->ok == 0 ? COL_ERROR : CARD_DIM);
             return;
         }
@@ -256,6 +262,16 @@ void agents_ui_toast(const char *text, int seconds, toast_tone_t tone)
     if (!s.hidden) {
         lv_obj_fade_in(s.line, 150, 0);
     }
+}
+
+bool agents_ui_toast_now(char *out, size_t len, lv_color_t *color)
+{
+    if (s.toast_until_ms == 0 || (int32_t) (now_ms() - s.toast_until_ms) >= 0) {
+        return false;
+    }
+    snprintf(out, len, "%s", s.toast);
+    *color = s.toast_color;
+    return true;
 }
 
 /* ---- The view --------------------------------------------------------------------- */
@@ -303,7 +319,7 @@ static const agent_session_t *session_of(lv_event_t *e)
 
 /* Each agent's colour, by the name the host gives it; others are pearl, as
  * Yoru itself. */
-static uint32_t agent_rgb(const char *agent)
+uint32_t agents_ui_agent_rgb(const char *agent)
 {
     static const struct {
         const char *name;
@@ -331,8 +347,8 @@ static uint32_t agent_rgb(const char *agent)
  * straight up under the title. */
 static void mini_place(int k, int n, int32_t *x, int32_t *y, int *r)
 {
-    static const int RADIUS[AGENTS_MAX + 1] = {0, 72, 60, 50, 46, 42, 40};
-    static const int RING[AGENTS_MAX + 1] = {0, 0, 108, 104, 108, 112, 114};
+    static const int RADIUS[AGENTS_MAX + 2] = {0, 72, 60, 50, 46, 42, 40, 36};
+    static const int RING[AGENTS_MAX + 2] = {0, 0, 108, 104, 108, 112, 114, 116};
     *r = RADIUS[n];
     const float deg = -90.0f + 180.0f / (float) n + 360.0f * (float) k / (float) n;
     const float a = deg * 3.14159265f / 180.0f;
@@ -596,11 +612,14 @@ static void mini_draw_cb(lv_event_t *e)
 static void mini_cb(lv_event_t *e)
 {
     const agent_session_t *a = session_of(e);
-    if (a == NULL || !s_view.focus) {
+    if (a == NULL) {
         return;
     }
     const int i = (int) (intptr_t) lv_event_get_user_data(e);
     if (lv_event_get_code(e) == LV_EVENT_LONG_PRESSED) {
+        if (!s_view.focus) {
+            return; // the host can't press Esc in its terminal
+        }
         // Armed: the next tap on it stops the agent.
         snprintf(s.armed, sizeof(s.armed), "%s", a->id);
         s.armed_ms = now_ms();
@@ -610,19 +629,23 @@ static void mini_cb(lv_event_t *e)
     }
     const bool armed = strcmp(s.armed, a->id) == 0 && now_ms() - s.armed_ms < ARM_MS;
     s.armed[0] = '\0';
-    char id[AGENTS_ID_MAX + 1];
-    snprintf(id, sizeof(id), "%s", a->id);
-    agents_ui_close(); // off to the computer
-    agents_ui_shortcut(armed ? "interrupt" : "focus", id);
+    if (armed) {
+        char id[AGENTS_ID_MAX + 1];
+        snprintf(id, sizeof(id), "%s", a->id);
+        agents_ui_close(); // off to the computer
+        agents_ui_shortcut("interrupt", id);
+        return;
+    }
+    remote_ui_chat_open(a->id);
 }
 
-static void add_mini(lv_obj_t *parent, int i)
+static void add_mini(lv_obj_t *parent, int i, int slots)
 {
     const agent_session_t *a = &s_view.sessions[i];
     mini_t *m = &s.minis[i];
     int32_t x, y;
-    mini_place(i, s_view.n, &x, &y, &m->r);
-    m->rgb = agent_rgb(a->agent);
+    mini_place(i, slots, &x, &y, &m->r);
+    m->rgb = agents_ui_agent_rgb(a->agent);
     // Out of step with each other, by the session's id.
     uint32_t h = 2166136261u;
     for (const char *c = a->id; *c; c++) {
@@ -637,11 +660,9 @@ static void add_mini(lv_obj_t *parent, int i)
     lv_obj_set_pos(m->obj, x - w / 2, y - m->r - MINI_TOP(m->r));
     lv_obj_remove_flag(m->obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(m->obj, mini_draw_cb, LV_EVENT_DRAW_MAIN, (void *) (intptr_t) i);
-    if (s_view.focus) {
-        lv_obj_add_flag(m->obj, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_event_cb(m->obj, mini_cb, LV_EVENT_SHORT_CLICKED, (void *) (intptr_t) i);
-        lv_obj_add_event_cb(m->obj, mini_cb, LV_EVENT_LONG_PRESSED, (void *) (intptr_t) i);
-    }
+    lv_obj_add_flag(m->obj, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(m->obj, mini_cb, LV_EVENT_SHORT_CLICKED, (void *) (intptr_t) i);
+    lv_obj_add_event_cb(m->obj, mini_cb, LV_EVENT_LONG_PRESSED, (void *) (intptr_t) i);
 
     // Its project underneath, amber while it waits for you.
     char name[20];
@@ -654,6 +675,51 @@ static void add_mini(lv_obj_t *parent, int i)
     lv_obj_set_width(m->label, 2 * m->r + 36 > 120 ? 120 : 2 * m->r + 36);
     lv_obj_set_style_text_align(m->label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(m->label, x - lv_obj_get_style_width(m->label, 0) / 2, y + m->r + 6);
+}
+
+/* "New": a hollow Yoru with a plus, in the last place of the ring. */
+static void new_draw_cb(lv_event_t *e)
+{
+    lv_obj_t *obj = lv_event_get_target_obj(e);
+    lv_layer_t *layer = lv_event_get_layer(e);
+    const int r = (int) (intptr_t) lv_event_get_user_data(e);
+    lv_area_t box;
+    lv_obj_get_coords(obj, &box);
+    const float x = (float) (box.x1 + box.x2 + 1) / 2, y = (float) box.y1 + MINI_TOP(r) + r;
+    const lv_color_t c = lv_obj_has_state(obj, LV_STATE_PRESSED) ? CARD_TEXT : CARD_DIM;
+    ring(layer, x, y, (float) r, 3, c, LV_OPA_COVER);
+    const float k = 0.38f * (float) r;
+    bar(layer, x - k, y, x + k, y, 4, c, LV_OPA_COVER);
+    bar(layer, x, y - k, x, y + k, 4, c, LV_OPA_COVER);
+}
+
+static void new_cb(lv_event_t *e)
+{
+    remote_ui_new_open();
+}
+
+static void add_new(lv_obj_t *parent, int k, int slots)
+{
+    int32_t x, y;
+    int r;
+    mini_place(k, slots, &x, &y, &r);
+    if (slots == 1) {
+        r = 46; // alone, under "No agents running"
+        y += 34;
+    }
+    const int32_t w = 2 * r + 2 * MINI_SIDE(r), h = MINI_TOP(r) + 2 * r + MINI_BOTTOM(r);
+    lv_obj_t *o = lv_obj_create(parent);
+    lv_obj_remove_style_all(o);
+    lv_obj_set_size(o, w, h);
+    lv_obj_set_pos(o, x - w / 2, y - r - MINI_TOP(r));
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(o, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(o, new_draw_cb, LV_EVENT_DRAW_MAIN, (void *) (intptr_t) r);
+    lv_obj_add_event_cb(o, new_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_t *l = card_label(parent, &lv_font_montserrat_14, CARD_DIM, card_tr("New", "Nuova"));
+    lv_obj_set_width(l, 120);
+    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_pos(l, x - 60, y + r + 6);
 }
 
 static void anim_cb(lv_timer_t *t)
@@ -706,19 +772,33 @@ static void build_list(void)
     lv_obj_remove_flag(list, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(list, LV_OBJ_FLAG_CLICKABLE); // the view takes the swipes
 
+    // "New" takes the last place when the host listed where to start one.
+    remote_projects_t *pr = heap_caps_malloc(sizeof(*pr), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    bool can_new = false;
+    if (pr != NULL) {
+        remote_get_projects(pr);
+        can_new = pr->valid && pr->nagents > 0 && pr->nprojects > 0;
+        free(pr);
+    }
+    const int slots = s_view.n + (can_new ? 1 : 0);
     if (s_view.n == 0) {
         lv_obj_t *none = card_label(list, &lv_font_montserrat_20, CARD_DIM,
                                     !s_view.valid ? card_tr("No word from the computer", "Nessuna notizia dal PC")
                                                   : card_tr("No agents running", "Nessun agente al lavoro"));
-        lv_obj_align(none, LV_ALIGN_CENTER, 0, -16);
-        lv_obj_t *hint = card_label(list, &lv_font_montserrat_14, CARD_DIM,
-                                    card_tr("Connect agents in Companion Hub", "Collega gli agenti in Companion Hub"));
-        lv_obj_align(hint, LV_ALIGN_CENTER, 0, 16);
+        lv_obj_align(none, LV_ALIGN_CENTER, 0, can_new ? -96 : -16);
+        if (!can_new) {
+            lv_obj_t *hint = card_label(list, &lv_font_montserrat_14, CARD_DIM,
+                                        card_tr("Connect agents in the Yoru app", "Collega gli agenti nell'app Yoru"));
+            lv_obj_align(hint, LV_ALIGN_CENTER, 0, 16);
+        }
     }
     for (int i = 0; i < s_view.n; i++) {
-        add_mini(list, i);
+        add_mini(list, i, slots);
     }
     s.nminis = s_view.n;
+    if (can_new) {
+        add_new(list, s_view.n, slots);
+    }
 
     // Do not disturb, as the host keeps it.
     lv_obj_t *quiet = lv_obj_create(list);
@@ -748,6 +828,7 @@ void agents_ui_open(void)
         return;
     }
     menu_close();
+    inbox_ui_close(); // one view at a time
     agents_get(&s_view);
     s.version = agents_version();
     s.armed[0] = '\0';
@@ -778,6 +859,7 @@ void agents_ui_close(void)
     if (s.view == NULL) {
         return;
     }
+    remote_ui_close();
     lv_timer_delete(s.anim);
     s.anim = NULL;
     lv_obj_delete_async(s.view);
@@ -802,7 +884,9 @@ bool agents_ui_is_open(void)
 static void poll_cb(lv_timer_t *t)
 {
     // Out of the way of whatever else has the screen.
-    const bool hidden = s.view != NULL || menu_is_open() || approval_is_open() || question_is_open();
+    const bool hidden =
+        s.view != NULL || menu_is_open() || approval_is_open() || question_is_open() || draft_is_open()
+        || inbox_ui_is_open();
     const uint32_t v = agents_version();
     const bool changed = v != s.version;
     if (changed) {
@@ -815,8 +899,12 @@ static void poll_cb(lv_timer_t *t)
     }
     update_ticker();
     if (s.view != NULL) {
-        if (lv_display_get_inactive_time(NULL) >= VIEW_IDLE_MS) {
+        // A chat takes longer to read than the list.
+        const uint32_t idle_ms = remote_ui_is_open() ? PAGE_IDLE_MS : VIEW_IDLE_MS;
+        if (lv_display_get_inactive_time(NULL) >= idle_ms && !draft_is_open()) {
             agents_ui_close();
+        } else if (remote_ui_is_open()) {
+            remote_ui_poll(&s_view);
         } else if (s.armed[0] != '\0' && now_ms() - s.armed_ms >= ARM_MS) {
             s.armed[0] = '\0'; // not stopped in time: back to its name
             build_list();

@@ -16,25 +16,41 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "eyes.h"
+#include "habits.h"
+#include "habits_ui.h"
+#include "inbox.h"
+#include "inbox_ui.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "link.h"
 #include "lvgl_port.h"
 #include "net.h"
 #include "nvs_flash.h"
+#include "playback.h"
+#include "timers.h"
+#include "timers_ui.h"
 #include "voice.h"
 
 static const char *TAG = "menu";
 
 #define CX (BOARD_LCD_H_RES / 2)
 #define CY (BOARD_LCD_V_RES / 2)
-/* The ring of icons sits this far out, clear of Yoru and its hands. */
-#define RING_R 176
-#define ICON_D 66
-/* Closes by itself after this long untouched: shorter on the ring, where
+/* The home: round apps in a honeycomb around Yoru, as on a watch. Six
+ * around the middle, where Yoru is, each this big and this far out. */
+#define HEX_R 152
+#define ICON_D 112
+#define BADGE_D 34
+/* The apps fly out of Yoru one after the other. */
+#define POP_MS 420
+#define POP_STAGGER_MS 40
+/* A tapped app grows from its place to the whole screen as it opens. */
+#define ZOOM_MS 300
+/* Closes by itself after this long untouched: shorter on the home, where
  * there is little to read. */
-#define IDLE_RING_MS 6000
+#define IDLE_HOME_MS 8000
 #define IDLE_PAGE_MS 15000
+#define IDLE_APP_MS 30000
 #define ROW_W 360
 #define ROW_H 76
 #define MAX_ROWS 12
@@ -76,6 +92,7 @@ typedef struct {
 typedef struct {
     const char *en, *it;
     const char *icon;
+    uint32_t rgb;
     const item_t *items;
     int n;
 } category_t;
@@ -167,27 +184,56 @@ static const item_t ABOUT_ITEMS[] = {
     ACT("Factory reset", "Ripristino", K_HOLD, act_factory_reset, info_hold),
 };
 
-#define CAT(en, it, icon, items) {en, it, icon, items, sizeof(items) / sizeof(items[0])}
+/* Under Settings, each with its round icon in its colour, as a watch's. */
+#define CAT(en, it, icon, rgb, items) {en, it, icon, rgb, items, sizeof(items) / sizeof(items[0])}
 static const category_t CATEGORIES[] = {
-    CAT("Agents", "Agenti", LV_SYMBOL_KEYBOARD, AGENTS_ITEMS),
-    CAT("Display", "Schermo", LV_SYMBOL_IMAGE, DISPLAY_ITEMS),
-    CAT("Sound", "Suono", LV_SYMBOL_VOLUME_MAX, SOUND_ITEMS),
-    CAT("Behaviour", "Carattere", LV_SYMBOL_EYE_OPEN, BEHAVIOUR_ITEMS),
-    CAT("Voice", "Voce", LV_SYMBOL_AUDIO, VOICE_ITEMS),
-    CAT("Connection", "Connessione", LV_SYMBOL_WIFI, CONNECTION_ITEMS),
-    CAT("Battery", "Batteria", LV_SYMBOL_BATTERY_FULL, BATTERY_ITEMS),
-    CAT("About", "Info", LV_SYMBOL_SETTINGS, ABOUT_ITEMS),
+    CAT("Agents", "Agenti", LV_SYMBOL_KEYBOARD, 0x5E5CE6, AGENTS_ITEMS),
+    CAT("Display", "Schermo", LV_SYMBOL_IMAGE, 0x0A84FF, DISPLAY_ITEMS),
+    CAT("Sound", "Suono", LV_SYMBOL_VOLUME_MAX, 0xFF375F, SOUND_ITEMS),
+    CAT("Behaviour", "Carattere", LV_SYMBOL_EYE_OPEN, 0xFF9F0A, BEHAVIOUR_ITEMS),
+    CAT("Voice", "Voce", LV_SYMBOL_AUDIO, 0xFF453A, VOICE_ITEMS),
+    CAT("Connection", "Connessione", LV_SYMBOL_WIFI, 0x30B0C7, CONNECTION_ITEMS),
+    CAT("Battery", "Batteria", LV_SYMBOL_BATTERY_FULL, 0x30D158, BATTERY_ITEMS),
+    CAT("About", "Info", LV_SYMBOL_SETTINGS, 0x8E8E93, ABOUT_ITEMS),
 };
 #define CAT_N ((int) (sizeof(CATEGORIES) / sizeof(CATEGORIES[0])))
 
 /* ---- State ------------------------------------------------------------------ */
 
+/* The apps on the home, clockwise from the top. */
+typedef enum { APP_INBOX, APP_TIMERS, APP_HABITS, APP_SETTINGS, APP_FOCUS, APP_AGENTS, APP_COUNT } app_t;
+
+typedef struct {
+    const char *en, *it;
+    /* The icon's gradient, top to bottom. */
+    uint32_t top, bottom;
+    const char *glyph;
+} app_def_t;
+
+static const app_def_t APPS[APP_COUNT] = {
+    [APP_INBOX] = {"Notifications", "Notifiche", 0xFF6B6B, 0xE0262F, LV_SYMBOL_ENVELOPE},
+    [APP_TIMERS] = {"Timers", "Timer", 0xFFB340, 0xF07800, NULL},
+    [APP_HABITS] = {"Habits", "Abitudini", 0x2A2D36, 0x101114, NULL},
+    [APP_SETTINGS] = {"Settings", "Impostazioni", 0x9A9AA2, 0x55555D, LV_SYMBOL_SETTINGS},
+    [APP_FOCUS] = {"Do not disturb", "Non disturbare", 0x8E8CF8, 0x4B48D6, NULL},
+    [APP_AGENTS] = {"Agents", "Agenti", 0x5AB0FF, 0x0A6CDF, LV_SYMBOL_KEYBOARD},
+};
+
+/* What each app's icon shows live: a badge, a ring, the moon. */
+typedef struct {
+    lv_obj_t *icon, *badge, *badge_text;
+    lv_obj_t *arcs[3];
+    lv_obj_t *glyph;
+} app_icon_t;
+
 static struct {
     lv_obj_t *face;
     menu_cb_t cb;
-    /* One of the three is up at a time; the ring stays under the others. */
-    lv_obj_t *ring, *page, *editor;
+    /* One of these is up at a time: the home (see-through, Yoru in the
+     * middle), Settings, a category's page, the arc, or an app's page. */
+    lv_obj_t *home, *settings, *page, *editor, *app;
     lv_obj_t *hint;
+    app_icon_t icons[APP_COUNT];
     int cat;
     const item_t *edit;
     lv_obj_t *edit_value;
@@ -507,7 +553,8 @@ static void show_face(bool show)
 }
 
 static void build_page(int cat);
-static void build_ring(void);
+static void build_home(bool pop);
+static void build_settings(void);
 
 /* The direction of a swipe, once: the release after it is not a tap too. */
 static lv_dir_t swipe_dir(void)
@@ -616,6 +663,27 @@ static void list_scroll_cb(lv_event_t *e)
         const int32_t opa = d < 110 ? 255 : LV_MAX(0, 255 - (d - 110) * 255 / 110);
         lv_obj_set_style_opa(row, (lv_opa_t) opa, 0);
     }
+}
+
+/* A column of rows under the title that scrolls, snapping a row to the
+ * middle, its rows fading towards the rim. */
+static lv_obj_t *round_list(lv_obj_t *parent)
+{
+    lv_obj_t *list = lv_obj_create(parent);
+    lv_obj_remove_style_all(list);
+    lv_obj_set_size(list, BOARD_LCD_H_RES, BOARD_LCD_V_RES - 86);
+    lv_obj_align(list, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(list, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(list, 10, 0);
+    // Room above and below, so the first and the last row reach the middle.
+    lv_obj_set_style_pad_top(list, 50, 0);
+    lv_obj_set_style_pad_bottom(list, 170, 0);
+    lv_obj_set_scroll_dir(list, LV_DIR_VER);
+    lv_obj_set_scroll_snap_y(list, LV_SCROLL_SNAP_CENTER);
+    lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_OFF);
+    lv_obj_add_event_cb(list, list_scroll_cb, LV_EVENT_SCROLL, list);
+    return list;
 }
 
 static void refresh_values(void)
@@ -739,7 +807,7 @@ static void page_back_cb(lv_event_t *e)
     }
     drop(&s.page);
     s.nvalues = 0;
-    build_ring();
+    build_settings();
 }
 
 static void build_page(int cat)
@@ -748,7 +816,8 @@ static void build_page(int cat)
     s.cat = cat;
     s.nvalues = 0;
     drop(&s.page);
-    drop(&s.ring);
+    drop(&s.settings);
+    drop(&s.home);
     show_face(false);
     s.page = full_screen(true);
     lv_obj_add_event_cb(s.page, page_back_cb, LV_EVENT_GESTURE, NULL);
@@ -762,20 +831,7 @@ static void build_page(int cat)
     lv_obj_set_ext_click_area(back, 24);
     lv_obj_add_event_cb(back, page_back_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *list = lv_obj_create(s.page);
-    lv_obj_remove_style_all(list);
-    lv_obj_set_size(list, BOARD_LCD_H_RES, BOARD_LCD_V_RES - 86);
-    lv_obj_align(list, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(list, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(list, 10, 0);
-    // Room above and below, so the first and the last row reach the middle.
-    lv_obj_set_style_pad_top(list, 50, 0);
-    lv_obj_set_style_pad_bottom(list, 170, 0);
-    lv_obj_set_scroll_dir(list, LV_DIR_VER);
-    lv_obj_set_scroll_snap_y(list, LV_SCROLL_SNAP_CENTER);
-    lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_add_event_cb(list, list_scroll_cb, LV_EVENT_SCROLL, list);
+    lv_obj_t *list = round_list(s.page);
     for (int i = 0; i < c->n; i++) {
         add_row(list, &c->items[i]);
     }
@@ -783,52 +839,415 @@ static void build_page(int cat)
     lv_obj_send_event(list, LV_EVENT_SCROLL, NULL);
 }
 
-/* ---- The ring ------------------------------------------------------------------------------ */
+/* ---- Settings -------------------------------------------------------------------- */
 
-static void icon_cb(lv_event_t *e)
+static lv_obj_t *circle(lv_obj_t *parent, int32_t d, uint32_t rgb)
 {
-    const int cat = (int) (intptr_t) lv_event_get_user_data(e);
-    if (lv_event_get_code(e) == LV_EVENT_PRESSED) {
-        lv_label_set_text(s.hint, tr(CATEGORIES[cat].en, CATEGORIES[cat].it));
-        return;
-    }
-    build_page(cat);
+    lv_obj_t *o = lv_obj_create(parent);
+    lv_obj_remove_style_all(o);
+    lv_obj_set_size(o, d, d);
+    lv_obj_set_style_radius(o, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(o, lv_color_hex(rgb), 0);
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
+    return o;
 }
 
-static void ring_gesture_cb(lv_event_t *e)
+static void category_cb(lv_event_t *e)
 {
-    if (swipe_dir() == LV_DIR_TOP) {
+    build_page((int) (intptr_t) lv_event_get_user_data(e));
+}
+
+static void settings_back_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_GESTURE && swipe_dir() != LV_DIR_RIGHT) {
+        return;
+    }
+    drop(&s.settings);
+    build_home(true);
+}
+
+/* The categories, each a row with its round icon, as a watch's Settings. */
+static void build_settings(void)
+{
+    drop(&s.home);
+    drop(&s.page);
+    drop(&s.settings);
+    s.nvalues = 0;
+    show_face(false);
+    s.settings = full_screen(true);
+    lv_obj_add_event_cb(s.settings, settings_back_cb, LV_EVENT_GESTURE, NULL);
+
+    char title[40];
+    snprintf(title, sizeof(title), LV_SYMBOL_LEFT "  %s", tr("Settings", "Impostazioni"));
+    lv_obj_t *back = label(s.settings, &lv_font_montserrat_28, COL_ACCENT, title);
+    lv_obj_align(back, LV_ALIGN_TOP_MID, 0, 34);
+    lv_obj_add_flag(back, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_ext_click_area(back, 24);
+    lv_obj_add_event_cb(back, settings_back_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *list = round_list(s.settings);
+    for (int i = 0; i < CAT_N; i++) {
+        const category_t *c = &CATEGORIES[i];
+        lv_obj_t *row = lv_obj_create(list);
+        lv_obj_remove_style_all(row);
+        lv_obj_set_size(row, ROW_W, ROW_H);
+        lv_obj_set_style_radius(row, ROW_H / 2, 0);
+        lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(row, COL_ROW, 0);
+        lv_obj_set_style_bg_color(row, COL_ROW_PRESSED, LV_STATE_PRESSED);
+        lv_obj_set_style_pad_hor(row, 14, 0);
+        lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(row, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_flag(row, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+        lv_obj_add_event_cb(row, category_cb, LV_EVENT_CLICKED, (void *) (intptr_t) i);
+        lv_obj_t *dot = circle(row, 50, c->rgb);
+        lv_obj_align(dot, LV_ALIGN_LEFT_MID, 0, 0);
+        lv_obj_center(label(dot, &lv_font_montserrat_24, COL_TEXT, c->icon));
+        lv_obj_t *name = label(row, &lv_font_montserrat_24, COL_TEXT, tr(c->en, c->it));
+        lv_obj_align(name, LV_ALIGN_LEFT_MID, 66, 0);
+        lv_obj_t *more = label(row, &lv_font_montserrat_20, COL_DIM, LV_SYMBOL_RIGHT);
+        lv_obj_align(more, LV_ALIGN_RIGHT_MID, -12, 0);
+    }
+    lv_obj_update_layout(list);
+    lv_obj_send_event(list, LV_EVENT_SCROLL, NULL);
+}
+
+/* ---- The home ------------------------------------------------------------------- */
+
+/* Where the i-th app sits: the top-left corner of its icon. */
+static void icon_pos(int i, int32_t *x, int32_t *y)
+{
+    const float a = (-90.0f + 60.0f * (float) i) * 3.14159265f / 180.0f;
+    *x = CX + (int32_t) lroundf(HEX_R * cosf(a)) - ICON_D / 2;
+    *y = CY + (int32_t) lroundf(HEX_R * sinf(a)) - ICON_D / 2;
+}
+
+/* A ring that fills up, inside an icon (the timer's, the habits'). */
+static lv_obj_t *ring_arc(lv_obj_t *parent, int32_t d, int32_t w, lv_color_t color, lv_color_t track)
+{
+    lv_obj_t *arc = lv_arc_create(parent);
+    lv_obj_remove_style_all(arc);
+    lv_obj_set_size(arc, d, d);
+    lv_obj_center(arc);
+    lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE);
+    lv_arc_set_rotation(arc, 270);
+    lv_arc_set_bg_angles(arc, 0, 360);
+    lv_arc_set_range(arc, 0, 1000);
+    lv_arc_set_value(arc, 0);
+    lv_obj_set_style_arc_width(arc, w, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(arc, track, LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(arc, w, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(arc, color, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_rounded(arc, true, LV_PART_INDICATOR);
+    return arc;
+}
+
+static void set_arc(lv_obj_t *arc, float k)
+{
+    const int32_t v = (int32_t) lroundf(LV_CLAMP(0.0f, k, 1.0f) * 1000);
+    if (lv_arc_get_value(arc) != v) {
+        lv_arc_set_value(arc, v);
+    }
+}
+
+static void set_badge(app_icon_t *ic, int n, lv_color_t color)
+{
+    if (n <= 0) {
+        lv_obj_add_flag(ic->badge, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    char text[8];
+    snprintf(text, sizeof(text), n > 9 ? "9+" : "%d", n);
+    if (strcmp(lv_label_get_text(ic->badge_text), text) != 0) {
+        lv_label_set_text(ic->badge_text, text);
+    }
+    lv_obj_set_style_bg_color(ic->badge, color, 0);
+    lv_obj_remove_flag(ic->badge, LV_OBJ_FLAG_HIDDEN);
+}
+
+/* The moon: a pale disc with a bite out of it in the icon's own colour. */
+static void paint_focus(app_icon_t *ic)
+{
+    const bool on = board_settings_on(SETTING_FOCUS);
+    const lv_color_t bg = lv_color_hex(on ? 0x5E5CE6 : 0x2C2C34);
+    lv_obj_set_style_bg_color(ic->icon, bg, 0);
+    lv_obj_set_style_bg_grad_dir(ic->icon, LV_GRAD_DIR_NONE, 0);
+    lv_obj_set_style_bg_color(ic->arcs[0], on ? COL_TEXT : lv_color_hex(0x8E8E93), 0);
+    lv_obj_set_style_bg_color(ic->arcs[1], bg, 0);
+}
+
+/* What the icons say now: what is unread, waiting, running, done today. */
+static void refresh_home(void)
+{
+    app_icon_t *ic = s.icons;
+    set_badge(&ic[APP_INBOX], inbox_unread(NULL), lv_color_hex(0xFF3B30));
+
+    agents_summary_t sum;
+    agents_summary(&sum);
+    set_badge(&ic[APP_AGENTS], sum.waiting, lv_color_hex(0xFF9F0A));
+
+    timer_view_t tv;
+    const int nt = timers_count();
+    const bool timer = timers_at(0, &tv);
+    set_arc(ic[APP_TIMERS].arcs[0], timer ? tv.left_s / tv.total_s : 0);
+    set_badge(&ic[APP_TIMERS], nt > 1 ? nt : 0, lv_color_hex(0xFF3B30));
+
+    for (int i = 0; i < 3; i++) {
+        const habit_t *h = habits_at(i);
+        set_arc(ic[APP_HABITS].arcs[i], h != NULL ? (float) h->done / (float) h->goal : 0);
+    }
+    paint_focus(&ic[APP_FOCUS]);
+}
+
+static void pop_cb(void *var, int32_t v)
+{
+    lv_obj_t *o = var;
+    int32_t x, y;
+    icon_pos((int) (intptr_t) lv_obj_get_user_data(o), &x, &y);
+    const int32_t x0 = CX - ICON_D / 2, y0 = CY - ICON_D / 2;
+    lv_obj_set_pos(o, x0 + (x - x0) * v / 1024, y0 + (y - y0) * v / 1024);
+}
+
+static void pop_start_cb(lv_anim_t *a)
+{
+    lv_obj_remove_flag(a->var, LV_OBJ_FLAG_HIDDEN);
+}
+
+/* Out of Yoru, one after the other, with a little bounce. */
+static void pop_out(lv_obj_t *o, int i)
+{
+    lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+    pop_cb(o, 0);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, o);
+    lv_anim_set_exec_cb(&a, pop_cb);
+    lv_anim_set_values(&a, 0, 1024);
+    lv_anim_set_duration(&a, POP_MS);
+    lv_anim_set_delay(&a, (uint32_t) i * POP_STAGGER_MS);
+    lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
+    lv_anim_set_start_cb(&a, pop_start_cb);
+    lv_anim_start(&a);
+}
+
+/* ---- Opening an app: it grows from its icon to the whole screen ---------- */
+
+static struct {
+    lv_obj_t *obj;
+    int32_t x, y; // where it starts, its centre
+} z;
+
+static void zoom_cb(void *var, int32_t v)
+{
+    const int32_t full = BOARD_LCD_H_RES * 3 / 2; // past the corners
+    const int32_t d = ICON_D + (full - ICON_D) * v / 1024;
+    const int32_t x = z.x + (CX - z.x) * v / 1024, y = z.y + (CY - z.y) * v / 1024;
+    lv_obj_set_size(var, d, d);
+    lv_obj_set_pos(var, x - d / 2, y - d / 2);
+    // Solid as it grows, then it melts into the page under it.
+    lv_obj_set_style_bg_opa(var, (lv_opa_t) (v < 400 ? 255 : 255 - (v - 400) * 255 / 624), 0);
+}
+
+static void zoom_done_cb(lv_anim_t *a)
+{
+    lv_obj_delete(a->var);
+    if (z.obj == a->var) {
+        z.obj = NULL;
+    }
+}
+
+static void zoom(int32_t x, int32_t y, uint32_t rgb)
+{
+    if (z.obj != NULL) {
+        lv_anim_delete(z.obj, zoom_cb);
+        lv_obj_delete(z.obj);
+    }
+    z.x = x;
+    z.y = y;
+    z.obj = circle(lv_layer_top(), ICON_D, rgb);
+    zoom_cb(z.obj, 0);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, z.obj);
+    lv_anim_set_exec_cb(&a, zoom_cb);
+    lv_anim_set_values(&a, 0, 1024);
+    lv_anim_set_duration(&a, ZOOM_MS);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_set_completed_cb(&a, zoom_done_cb);
+    lv_anim_start(&a);
+}
+
+static void app_back(void)
+{
+    drop(&s.app);
+    build_home(true);
+}
+
+static void open_app(lv_obj_t *(*build)(void (*back)(void)))
+{
+    drop(&s.home);
+    show_face(false);
+    s.app = build(app_back);
+}
+
+static void toggle_focus(void)
+{
+    const bool on = !board_settings_on(SETTING_FOCUS);
+    board_settings_set(SETTING_FOCUS, on);
+    playback_sound(on ? SOUND_YAWN : SOUND_CHIRP);
+    paint_focus(&s.icons[APP_FOCUS]);
+    lv_label_set_text(s.hint, on ? tr("Shh... do not disturb", "Shh... non disturbare")
+                                 : tr("Back to normal", "Si torna a parlare"));
+    // A little bounce, so the tap is felt.
+    pop_out(s.icons[APP_FOCUS].icon, 0);
+}
+
+static void launch(app_t app)
+{
+    if (app == APP_FOCUS) {
+        toggle_focus();
+        return;
+    }
+    int32_t x, y;
+    icon_pos(app, &x, &y);
+    const uint32_t rgb = app == APP_HABITS ? 0x30D158 : APPS[app].bottom;
+    switch (app) {
+    case APP_INBOX:
+        inbox_ui_open(NULL); // the menu goes as the view comes
+        break;
+    case APP_AGENTS:
+        agents_ui_open();
+        break;
+    case APP_SETTINGS:
+        build_settings();
+        break;
+    case APP_TIMERS:
+        open_app(timers_ui_build);
+        break;
+    case APP_HABITS:
+        open_app(habits_ui_build);
+        break;
+    default:
+        return;
+    }
+    zoom(x + ICON_D / 2, y + ICON_D / 2, rgb);
+}
+
+static void app_cb(lv_event_t *e)
+{
+    const app_t app = (app_t) (intptr_t) lv_event_get_user_data(e);
+    if (lv_event_get_code(e) == LV_EVENT_PRESSED) {
+        lv_label_set_text(s.hint, tr(APPS[app].en, APPS[app].it));
+        // Yoru looks at the one under your finger.
+        int32_t x, y;
+        icon_pos(app, &x, &y);
+        eyes_look_at((float) (x + ICON_D / 2 - CX) / HEX_R, (float) (y + ICON_D / 2 - CY) / HEX_R);
+        return;
+    }
+    launch(app);
+}
+
+static void home_cb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_GESTURE) {
+        if (swipe_dir() == LV_DIR_TOP) {
+            menu_close();
+        }
+        return;
+    }
+    // A tap on Yoru in the middle: back to it.
+    lv_point_t p;
+    lv_indev_get_point(lv_indev_active(), &p);
+    if (LV_ABS(p.x - CX) < 70 && LV_ABS(p.y - CY) < 70) {
         menu_close();
     }
 }
 
-static void build_ring(void)
+static void add_badge(lv_obj_t *icon, app_icon_t *ic)
+{
+    ic->badge = circle(icon, BADGE_D, 0xFF3B30);
+    lv_obj_set_style_border_color(ic->badge, COL_BG, 0);
+    lv_obj_set_style_border_width(ic->badge, 3, 0);
+    lv_obj_align(ic->badge, LV_ALIGN_TOP_RIGHT, 6, -4);
+    ic->badge_text = label(ic->badge, &lv_font_montserrat_20, COL_TEXT, "");
+    lv_obj_center(ic->badge_text);
+    lv_obj_add_flag(ic->badge, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void build_icon(int i)
+{
+    const app_def_t *d = &APPS[i];
+    app_icon_t *ic = &s.icons[i];
+    memset(ic, 0, sizeof(*ic));
+    lv_obj_t *b = circle(s.home, ICON_D, d->bottom);
+    ic->icon = b;
+    lv_obj_set_user_data(b, (void *) (intptr_t) i);
+    lv_obj_set_style_bg_grad_color(b, lv_color_hex(d->bottom), 0);
+    lv_obj_set_style_bg_color(b, lv_color_hex(d->top), 0);
+    lv_obj_set_style_bg_grad_dir(b, LV_GRAD_DIR_VER, 0);
+    // Pressed, it sinks a little, as a watch's does.
+    lv_obj_set_style_transform_width(b, -5, LV_STATE_PRESSED);
+    lv_obj_set_style_transform_height(b, -5, LV_STATE_PRESSED);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(b, LV_OBJ_FLAG_OVERFLOW_VISIBLE); // the badge sticks out
+    lv_obj_add_event_cb(b, app_cb, LV_EVENT_CLICKED, (void *) (intptr_t) i);
+    lv_obj_add_event_cb(b, app_cb, LV_EVENT_PRESSED, (void *) (intptr_t) i);
+
+    switch (i) {
+    case APP_TIMERS:
+        ic->arcs[0] = ring_arc(b, ICON_D - 18, 8, COL_TEXT, lv_color_hex(0xB85A00));
+        ic->glyph = label(b, &lv_font_montserrat_28, COL_TEXT, LV_SYMBOL_BELL);
+        lv_obj_center(ic->glyph);
+        break;
+    case APP_HABITS:
+        // The day's first three habits as rings, as a watch's Activity.
+        for (int k = 0; k < 3; k++) {
+            const habit_t *h = habits_at(k);
+            static const uint32_t RGB[] = {0xFF375F, 0x30D158, 0x40C8E0};
+            const lv_color_t c = lv_color_hex(h != NULL ? h->rgb : RGB[k]);
+            ic->arcs[k] = ring_arc(b, ICON_D - 14 - 26 * k, 11, c, lv_color_mix(c, lv_color_black(), 60));
+        }
+        break;
+    case APP_FOCUS: {
+        lv_obj_t *moon = circle(b, 46, 0xF2F2F5);
+        lv_obj_align(moon, LV_ALIGN_CENTER, -4, 2);
+        lv_obj_t *bite = circle(b, 40, 0x5E5CE6);
+        lv_obj_align(bite, LV_ALIGN_CENTER, 12, -10);
+        ic->arcs[0] = moon;
+        ic->arcs[1] = bite;
+        break;
+    }
+    default:
+        ic->glyph = label(b, &lv_font_montserrat_40, COL_TEXT, d->glyph);
+        lv_obj_center(ic->glyph);
+        break;
+    }
+    // Every icon has one, hidden until it has something to count.
+    add_badge(b, ic);
+}
+
+/* Six round apps around Yoru, who peeks out from the middle. */
+static void build_home(bool pop)
 {
     show_face(true);
-    // See-through: Yoru stays in the middle, looking up at the icons.
-    s.ring = full_screen(false);
-    lv_obj_add_event_cb(s.ring, ring_gesture_cb, LV_EVENT_GESTURE, NULL);
-    for (int i = 0; i < CAT_N; i++) {
-        const float a = (-90.0f + 360.0f * (float) i / CAT_N) * 3.14159265f / 180.0f;
-        lv_obj_t *b = lv_obj_create(s.ring);
-        lv_obj_remove_style_all(b);
-        lv_obj_set_size(b, ICON_D, ICON_D);
-        lv_obj_set_style_radius(b, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
-        lv_obj_set_style_bg_color(b, COL_ROW, 0);
-        lv_obj_set_style_bg_color(b, COL_ROW_PRESSED, LV_STATE_PRESSED);
-        lv_obj_set_style_border_color(b, lv_color_hex(0x2C2E3A), 0);
-        lv_obj_set_style_border_width(b, 2, 0);
-        lv_obj_set_pos(b, CX + (int32_t) (RING_R * cosf(a)) - ICON_D / 2, CY + (int32_t) (RING_R * sinf(a)) - ICON_D / 2);
-        lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_add_event_cb(b, icon_cb, LV_EVENT_CLICKED, (void *) (intptr_t) i);
-        lv_obj_add_event_cb(b, icon_cb, LV_EVENT_PRESSED, (void *) (intptr_t) i);
-        lv_obj_t *icon = label(b, &lv_font_montserrat_28, COL_TEXT, CATEGORIES[i].icon);
-        lv_obj_center(icon);
+    s.home = full_screen(false); // see-through: Yoru is the middle one
+    lv_obj_add_event_cb(s.home, home_cb, LV_EVENT_GESTURE, NULL);
+    lv_obj_add_event_cb(s.home, home_cb, LV_EVENT_CLICKED, NULL);
+    for (int i = 0; i < APP_COUNT; i++) {
+        build_icon(i);
+        if (pop) {
+            pop_out(s.icons[i].icon, i);
+        } else {
+            pop_cb(s.icons[i].icon, 1024);
+        }
     }
-    s.hint = label(s.ring, &lv_font_montserrat_20, COL_DIM, tr("Swipe up to close", "Scorri su per chiudere"));
-    lv_obj_align(s.hint, LV_ALIGN_CENTER, 0, 128);
+    refresh_home();
+    s.hint = label(s.home, &lv_font_montserrat_20, COL_TEXT, "");
+    lv_obj_align(s.hint, LV_ALIGN_CENTER, 0, 80);
 }
 
 /* ---- Open and close -------------------------------------------------------------------------- */
@@ -836,12 +1255,20 @@ static void build_ring(void)
 static void idle_cb(lv_timer_t *t)
 {
     const uint32_t idle = lv_display_get_inactive_time(NULL);
-    if (idle >= (s.ring != NULL ? IDLE_RING_MS : IDLE_PAGE_MS)) {
+    const uint32_t limit = s.home != NULL ? IDLE_HOME_MS : s.app != NULL ? IDLE_APP_MS : IDLE_PAGE_MS;
+    if (idle >= limit) {
         menu_close();
         return;
     }
     if (s.page != NULL) {
         refresh_values();
+    }
+    if (s.home != NULL) {
+        refresh_home();
+    }
+    if (s.app != NULL) {
+        timers_ui_refresh();
+        habits_ui_refresh();
     }
 }
 
@@ -857,10 +1284,10 @@ void menu_open(void)
         return;
     }
     agents_ui_close(); // one thing over the eyes at a time
+    inbox_ui_close();
     s.open = true;
     lv_display_trigger_activity(NULL);
-    build_ring();
-    lv_obj_fade_in(s.ring, 180, 0);
+    build_home(true);
     s.timer = lv_timer_create(idle_cb, 1000, NULL);
     ESP_LOGI(TAG, "open");
     if (s.cb != NULL) {
@@ -874,9 +1301,11 @@ void menu_close(void)
         return;
     }
     s.open = false;
-    drop(&s.ring);
+    drop(&s.home);
+    drop(&s.settings);
     drop(&s.page);
     drop(&s.editor);
+    drop(&s.app);
     s.nvalues = 0;
     show_face(true);
     if (s.timer != NULL) {
@@ -891,6 +1320,18 @@ void menu_close(void)
 
 bool menu_open_page(const char *name)
 {
+    static const char *const APP_NAMES[APP_COUNT] = {"inbox", "timers", "habits", "settings", NULL, NULL};
+    if (strcasecmp(name, "home") == 0) {
+        menu_open();
+        return true;
+    }
+    for (int i = 0; i < APP_COUNT; i++) {
+        if (APP_NAMES[i] != NULL && strcasecmp(name, APP_NAMES[i]) == 0) {
+            menu_open();
+            launch((app_t) i);
+            return true;
+        }
+    }
     for (int i = 0; i < CAT_N; i++) {
         if (strcasecmp(name, CATEGORIES[i].en) == 0) {
             menu_open();

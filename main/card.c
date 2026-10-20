@@ -35,7 +35,7 @@ static int32_t decode(const unsigned char *p, int *len)
     return cp;
 }
 
-void card_ascii(const char *in, char *out, size_t chars)
+static void ascii(const char *in, char *out, size_t chars, bool lines)
 {
     const unsigned char *p = (const unsigned char *) (in != NULL ? in : "");
     size_t n = 0;
@@ -48,6 +48,10 @@ void card_ascii(const char *in, char *out, size_t chars)
         if (cp >= 0x20 && cp < 0x7F) {
             one[0] = (char) cp;
             rep = one;
+        } else if (lines && cp == '\n') {
+            rep = "\n";
+        } else if (lines && cp == '\r') {
+            rep = "";
         } else if (cp == '\t' || cp == '\n' || cp == '\r' || cp == 0xA0) {
             rep = " ";
         } else if (cp >= 0xC0 && cp <= 0xFF) {
@@ -74,6 +78,16 @@ void card_ascii(const char *in, char *out, size_t chars)
         memcpy(out + n - 3, "...", 3);
     }
     out[n] = '\0';
+}
+
+void card_ascii(const char *in, char *out, size_t chars)
+{
+    ascii(in, out, chars, false);
+}
+
+void card_ascii_lines(const char *in, char *out, size_t chars)
+{
+    ascii(in, out, chars, true);
 }
 
 bool card_italian(void)

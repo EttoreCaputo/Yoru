@@ -17,6 +17,10 @@ esp_err_t lvgl_port_init(const board_lcd_t *lcd, lv_display_t **out_display);
 void lvgl_port_set_rotation(int quarter);
 int lvgl_port_rotation(void);
 
+/** Take touches or not (off while the screen is dark). With the LVGL lock
+ * held. */
+void lvgl_port_set_touch(bool on);
+
 void lvgl_port_lock(void);
 void lvgl_port_unlock(void);
 

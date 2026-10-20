@@ -11,14 +11,17 @@
  *   Gemini yellow, Codex blue, Cursor green...), acting out its state:
  *   bobbing with thinking dots while it works, hopping with a "!" while it
  *   waits for you, ^ ^ when done, x x and a shiver on an error, dozing when
- *   idle. Its project underneath; tap one to bring its terminal to the
- *   front, hold it to interrupt the agent; "Quiet 1 h" and the plan's
- *   limits at the bottom.
+ *   idle. Its project underneath; tap one for its chat (remote_ui.c), hold
+ *   it to interrupt the agent; "New" to start a session in a project;
+ *   "Quiet 1 h" and the plan's limits at the bottom.
  * The dots and the line keep out of the way of the menu and the cards. All
  * calls with the LVGL lock held. */
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
+#include "agents.h"
 #include "lvgl.h"
 
 #ifdef __cplusplus
@@ -44,6 +47,15 @@ bool agents_ui_is_open(void);
  * `interrupt` or `quiet`; `session` NULL for none. False, with a toast, when
  * no host is listening. */
 bool agents_ui_shortcut(const char *name, const char *session);
+
+/** The toast up now, if any, for pages that cover the line (remote_ui.c). */
+bool agents_ui_toast_now(char *out, size_t len, lv_color_t *color);
+
+/** What the view and its pages share: a state's colour, an agent's colour
+ * by its name, a step as "edit agents.c  +42 -3". */
+lv_color_t agents_ui_state_color(agent_state_t st);
+uint32_t agents_ui_agent_rgb(const char *agent);
+void agents_ui_step_text(const agent_step_t *st, char *out, size_t len);
 
 #ifdef __cplusplus
 }

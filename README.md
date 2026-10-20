@@ -15,7 +15,7 @@ Status: early development (firmware 0.3.0, milestone M3: voice and link).
 
 ## Host program
 
-On the computer, Yoru is driven by [Companion Hub](https://github.com/EttoreCaputo/companion-hub), the desktop app and CLI it shares with DualEye. It runs the voice assistant (local or API models), sends the computer's state for the pet's mood, flashes and updates the firmware, pairs Yoru over WiFi and lets Claude use it over MCP. It is meant to drive several boards at once. Yoru support there is in progress (milestone M4).
+On the computer, Yoru is driven by Yoru Hub (`../yoru-hub`), its desktop app and CLI: a personal assistant that reaches your services through MCP connectors, tells you what is worth knowing, answers by voice, flashes and updates the firmware, pairs Yoru over WiFi and lets Claude use it over MCP.
 
 The app carries this firmware: after a change, build it here and run `tools/fetch_firmware.sh` in Companion Hub.
 
@@ -47,4 +47,4 @@ Say "Alexa" (or "Hi ESP", with `set_wake_word`) and Yoru listens: its eyes open 
 
 ## Credits
 
-Pins and the panel init sequence come from Waveshare's BSP and examples, xiaozhi-esp32, and Meta's [muse-gadget-sdk](https://github.com/facebookincubator/muse-gadget-sdk) (Apache-2.0). Voice, link and mood come from [DualEye PC Monitor](https://github.com/EttoreCaputo/esp32s3-dualeye-pcmonitor); the host program is [Companion Hub](https://github.com/EttoreCaputo/companion-hub).
+Pins and the panel init sequence come from Waveshare's BSP and examples, xiaozhi-esp32, and Meta's [muse-gadget-sdk](https://github.com/facebookincubator/muse-gadget-sdk) (Apache-2.0). Voice, link and mood come from [DualEye PC Monitor](https://github.com/EttoreCaputo/esp32s3-dualeye-pcmonitor); the host program is Yoru Hub (`../yoru-hub`).

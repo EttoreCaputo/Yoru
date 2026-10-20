@@ -37,6 +37,7 @@
 static const char *TAG = "lvgl_port";
 static _lock_t s_lvgl_lock;
 static lv_display_t *s_disp;
+static lv_indev_t *s_touch;
 static uint16_t *s_fb;
 static uint16_t *s_bounce[2];
 static size_t s_bounce_px;
@@ -394,6 +395,7 @@ esp_err_t lvgl_port_init(const board_lcd_t *lcd, lv_display_t **out_display)
     te_init();
 
     lv_indev_t *touch = lv_indev_create();
+    s_touch = touch;
     lv_indev_set_type(touch, LV_INDEV_TYPE_POINTER);
     lv_indev_set_read_cb(touch, touch_read_cb);
     lv_indev_set_display(touch, disp);
@@ -413,4 +415,11 @@ esp_err_t lvgl_port_init(const board_lcd_t *lcd, lv_display_t **out_display)
 
     *out_display = disp;
     return ESP_OK;
+}
+
+void lvgl_port_set_touch(bool on)
+{
+    if (s_touch != NULL) {
+        lv_indev_enable(s_touch, on);
+    }
 }

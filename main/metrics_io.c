@@ -14,5 +14,5 @@ void metrics_io_handle(uint8_t *payload, size_t len)
         return;
     }
     metrics_model_set(&snap);
-    ESP_LOGD(TAG, "cpu %dC gpu %dC", (int) (snap.cpu.temp_c + 0.5f), (int) (snap.gpu.temp_c + 0.5f));
+    ESP_LOGD(TAG, "host %s, plan %s", snap.host.valid ? "yes" : "no", snap.claude.valid ? "yes" : "no");
 }

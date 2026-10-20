@@ -728,7 +728,9 @@ esp_err_t metrics_parse_line(const char *line, metrics_snapshot_t *out)
         object_sep(&j);
     }
 
-    if (!out->cpu.valid && !out->gpu.valid) {
+    // Since 0.10.0 the host may send no sensors at all (Yoru shows none):
+    // its time and idle time are enough to make a snapshot worth keeping.
+    if (!out->cpu.valid && !out->gpu.valid && !out->host.valid) {
         return ESP_ERR_INVALID_ARG;
     }
     return ESP_OK;

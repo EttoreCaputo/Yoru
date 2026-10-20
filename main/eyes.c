@@ -197,6 +197,22 @@ static const hand_key_t FLAIL[] = {
     {870, {-160, -120, 1}, {160, -110, 1}},
     {1150, TUCK_L, TUCK_R},
 };
+/* Ready to jump in: the hands meet over its head, and stay there a moment. */
+static const hand_key_t DIVE[] = {
+    {0, TUCK_L, TUCK_R},
+    {220, {-70, -110, 1}, {70, -110, 1}},
+    {420, {-20, -166, 1.05f}, {20, -166, 1.05f}},
+    {800, {-20, -172, 1.05f}, {20, -172, 1.05f}},
+    {1000, TUCK_L, TUCK_R},
+};
+/* Bringing something back: both hands low in front, as if holding a box. */
+#define CARRY_HOLD_MS 2300
+static const hand_key_t CARRY[] = {
+    {0, TUCK_L, TUCK_R},
+    {260, {-46, 112, 1}, {46, 112, 1}},
+    {CARRY_HOLD_MS, {-46, 112, 1}, {46, 112, 1}},
+    {CARRY_HOLD_MS + 300, TUCK_L, TUCK_R},
+};
 static const hand_key_t STRETCH[] = {
     {0, TUCK_L, TUCK_R},
     {500, {-206, -34, 1.1f}, {206, -34, 1.1f}},
@@ -224,6 +240,8 @@ static const gesture_t s_gestures[EYES_GESTURE_COUNT] = {
     [EYES_GESTURE_HOLD] = GESTURE("hold", HOLD, false),
     [EYES_GESTURE_SHOO] = GESTURE("shoo", SHOO, true),
     [EYES_GESTURE_FLAIL] = GESTURE("flail", FLAIL, false),
+    [EYES_GESTURE_DIVE] = GESTURE("dive", DIVE, false),
+    [EYES_GESTURE_CARRY] = GESTURE("carry", CARRY, true),
 };
 
 /* Something that moves through the space: along a path, or after a point. */
@@ -323,6 +341,10 @@ static struct {
     float badge_scale;
     lv_area_t over_drawn[MAX_OVERLAY_RECTS];
     int over_count;
+    /* The parcel in its hands (0: none), and where it was drawn. */
+    uint32_t carry_rgb;
+    lv_area_t carry_drawn;
+    bool carry_shown;
 } s;
 
 static float lerp(float a, float b, float k)
@@ -667,6 +689,49 @@ static void draw_heart(lv_layer_t *layer, float x, float y, lv_color_t color, lv
     fill_triangle(layer, x - 13, y + 1, x + 13, y + 1, x, y + 16, color, opa);
 }
 
+static lv_area_t box(float x, float y, float l, float t, float r, float b);
+
+/* The parcel: in the hands while they carry it, once they are out. */
+#define PARCEL_Y 112
+#define PARCEL_HALF 30
+
+static bool parcel_up(void)
+{
+    return s.carry_rgb != 0 && s.gesture == EYES_GESTURE_CARRY && s.gesture_ms >= 200 && s.gesture_ms < CARRY_HOLD_MS;
+}
+
+static void parcel_box(float *x, float *y, float *half)
+{
+    const float d = s.body.dist;
+    *x = (float) s.body.bx;
+    *y = (float) s.body.by + PARCEL_Y * K * d;
+    *half = PARCEL_HALF * K * d;
+}
+
+/* A little box in the errand's colour, a pale ribbon across it and a bow. */
+static void draw_parcel(lv_layer_t *layer)
+{
+    if (!parcel_up()) {
+        return;
+    }
+    float x, y, h;
+    parcel_box(&x, &y, &h);
+    const lv_opa_t opa = (lv_opa_t) (255 * s.near * s.body.fog);
+    const lv_color_t ribbon = lv_color_hex(0xFFF4E0);
+    fill_rect(layer, x - h, y - h * 0.8f, x + h, y + h, lv_color_hex(s.carry_rgb), (int32_t) (h * 0.3f), opa);
+    fill_rect(layer, x - h * 0.16f, y - h * 0.8f, x + h * 0.16f, y + h, ribbon, 0, opa);
+    fill_rect(layer, x - h, y - h * 0.05f, x + h, y + h * 0.27f, ribbon, 0, opa);
+    draw_disc(layer, x - h * 0.32f, y - h * 0.95f, h * 0.3f, ribbon, opa);
+    draw_disc(layer, x + h * 0.32f, y - h * 0.95f, h * 0.3f, ribbon, opa);
+}
+
+static lv_area_t parcel_area(void)
+{
+    float x, y, h;
+    parcel_box(&x, &y, &h);
+    return box(x, y, h + 3, h * 1.3f + 3, h + 3, h + 3);
+}
+
 /* Where the overlays sit: next to the sphere, never over the eyes, following
  * it wherever it floats. Offsets at the resting distance. */
 #define DOTS_DY (176 * K)
@@ -807,6 +872,7 @@ static void draw_cb(lv_event_t *e)
         look_draw(layer, &s.eye_sp[i].sp, (int32_t) lroundf(s.eye[i].x), (int32_t) lroundf(s.eye[i].y), 1, 1, 0,
                   LV_OPA_COVER, black);
     }
+    draw_parcel(layer);
     if (s.hands_front) {
         draw_hands(layer);
     }
@@ -1262,6 +1328,19 @@ static void frame_cb(lv_timer_t *timer)
         }
     }
 
+    // The parcel goes where the body goes, and once more as it disappears.
+    const bool parcel = parcel_up();
+    if (parcel || s.carry_shown) {
+        lv_area_t now = parcel_area();
+        if (s.carry_shown) {
+            invalidate_move(&s.carry_drawn, &now);
+        } else {
+            lv_obj_invalidate_area(s.obj, &now);
+        }
+        s.carry_drawn = now;
+        s.carry_shown = parcel;
+    }
+
     // The badge breathes without redrawing the whole sphere.
     if (s.status == EYES_STATUS_THINKING && s.tint > 0.01f) {
         lv_area_t now = badge_area();
@@ -1419,6 +1498,11 @@ void eyes_gesture(eyes_gesture_t gesture)
     s.hand_from[1] = s.hand[1];
     s.gesture = gesture;
     s.gesture_ms = 0;
+}
+
+void eyes_carry(uint32_t rgb)
+{
+    s.carry_rgb = rgb;
 }
 
 const char *eyes_gesture_name(eyes_gesture_t gesture)

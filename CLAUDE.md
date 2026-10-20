@@ -2,7 +2,7 @@
 
 Desk companion on the Waveshare ESP32-S3-Touch-AMOLED-1.75C. Character: `docs/CONCEPT.md`. Plan and pins: `docs/ROADMAP.md`. Sister project: `../esp32s3-dualeye-pcmonitor` (DualEye), where the voice, link and mood code come from. When copying from there, adapt the code; don't carry over DualEye's two-screen assumptions.
 
-Host program: `../yoru-app` (the Yoru app, https://github.com/EttoreCaputo/yoru-app, branch `yoru`), a fork of coucou; read its `YORU.md`. Yoru's host side lives there, not in this repository, and Companion Hub is no longer used. A protocol change is made in both: `docs/protocol.md` here and `NotchBuddy/Sources/Yoru/` there.
+Host program: `../yoru-hub` (formerly Companion Hub), Yoru's personal assistant (Yoru only, no DualEye); the plan is its `docs/assistant.md`. It is the only host and ships the firmware: the Yoru app (`../yoru-app`, a fork of coucou) was retired on 2026-10-19. A protocol change is made here (`docs/protocol.md`) and in Yoru Hub's `core/src/`.
 
 ## Rule: every firmware change bumps the version and gets built
 
@@ -10,7 +10,7 @@ Host program: `../yoru-app` (the Yoru app, https://github.com/EttoreCaputo/yoru-
 2. Add a `## <version>` section at the top of `FIRMWARE_CHANGELOG.md`, written for the person using the board.
 3. Build: `source ~/.espressif/tools/activate_idf_v6.1.sh && idf.py build merge-bin`. If it fails, fix it or report it clearly.
 4. Flash the board once the build passes: `idf.py -p <port> flash` (the port is `/dev/cu.usbmodem*`). If no board is connected or flashing fails, say so.
-5. Copy the build into the Yoru app, which ships it: `../yoru-app/scripts/yoru_fetch_firmware.sh`.
+5. Copy the build into Yoru Hub, which ships it: `../yoru-hub/tools/fetch_firmware.sh`.
 
 Report the new version, the build result, the flash result and the copy into the app when done.
 

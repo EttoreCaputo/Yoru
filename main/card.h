@@ -33,6 +33,8 @@ extern "C" {
  * (`out` holds chars + 1), with "..." when it had more: the built-in fonts
  * are ASCII, so accents go and what can't be spelt shows as `?`. */
 void card_ascii(const char *in, char *out, size_t chars);
+/** The same, keeping the line breaks: a reply's paragraphs. */
+void card_ascii_lines(const char *in, char *out, size_t chars);
 
 /** The labels' language: SETTING_LANGUAGE is Italian. */
 bool card_italian(void);

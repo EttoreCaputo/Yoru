@@ -29,8 +29,16 @@
  *   you it knocks on the glass, and a touch then brings its terminal up;
  *   their permission requests and questions (approval.c, question.c) wake it
  *   and it waits with you; a swipe up from the bottom edge, or BOOT, opens
- *   the agents view (agents_ui.c). */
+ *   the agents view (agents_ui.c);
+ * - the inbox (inbox.c): a chirp as a notification comes, a knock on the
+ *   glass for a high one (a touch then opens the inbox), the alarm and a
+ *   lit screen for an urgent one;
+ * - a timer or reminder that rings (timers.c): it jumps like an alarm
+ *   clock, flapping its hands;
+ * - the host's assistant calling a connector: it runs the errand
+ *   (errand.c), diving into a portal and coming back with a parcel. */
 
+#include "board_pmu.h"
 #include "lvgl.h"
 #include "motion.h"
 #include "voice.h"
@@ -60,14 +68,22 @@ void behaviour_heard_from(float x);
 
 
 
-/** A short press of PWR (board_pmu.c's callback): to sleep and back, or
- * out of the menu. Takes the LVGL lock. */
-void behaviour_power_key(void);
+/** PWR (board_pmu.c's callback). A tap: to sleep and back, out of the menu
+ * or the view, and the only way to light a dark screen again. Held:
+ * push-to-talk to where the page up says (remote_ui.c), or the draft said
+ * again. Takes the LVGL lock. */
+void behaviour_power_key(board_pmu_key_t ev);
 
 /** BOOT pressed (board_button.c): the terminal of the agent waiting on you,
- * else the agents view; held, the host's "do not disturb agents". With the
- * LVGL lock held. */
+ * else the inbox when something in it is unread, else the agents view;
+ * held, the host's "do not disturb agents". With the LVGL lock held. */
 void behaviour_boot_key(bool long_press);
+
+/** The host's assistant called a connector (`show_fetch`): `state` is
+ * `start`, `done` or `failed`; `id` pairs a start with its end. A start
+ * shows only while Yoru is awake, on the screen and free or thinking.
+ * Returns whether Yoru is on the errand. With the LVGL lock held. */
+bool behaviour_fetch(const char *id, const char *source, const char *state);
 
 /** Where the host's pointer is, -1..1 each way (rpc.c's eyes/gaze). Safe
  * from any task. */

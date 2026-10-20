@@ -71,6 +71,8 @@ typedef enum {
     EYES_GESTURE_HOLD,    // both hands at the sides of its head, wobbling (dizzy)
     EYES_GESTURE_SHOO,    // one hand pushes you away, twice (annoyed)
     EYES_GESTURE_FLAIL,   // both hands up, flapping (falling)
+    EYES_GESTURE_DIVE,    // both hands together over its head, a diver about to jump
+    EYES_GESTURE_CARRY,   // both hands low in front, holding what eyes_carry() gave it
     EYES_GESTURE_COUNT,
 } eyes_gesture_t;
 
@@ -127,6 +129,11 @@ eyes_status_t eyes_get_status(void);
 /** Play a gesture now, replacing the one playing. */
 void eyes_gesture(eyes_gesture_t gesture);
 const char *eyes_gesture_name(eyes_gesture_t gesture);
+
+/** What the hands hold during EYES_GESTURE_CARRY: a little parcel in `rgb`
+ * (0xRRGGBB) with a ribbon, brought back from an errand (errand.c). 0: none,
+ * and the parcel goes at once. */
+void eyes_carry(uint32_t rgb);
 
 /** Move along a smooth curve through `pts` (from where it is) in `ms`;
  * 0 ms jumps there. Replaces any move or follow. */

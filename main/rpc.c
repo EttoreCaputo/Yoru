@@ -110,6 +110,15 @@ static cJSON *identity(void)
     cJSON_AddItemToArray(caps, cJSON_CreateString("wifi"));
     // The coding agents' tools and notifications (docs/protocol.md, Agents).
     cJSON_AddItemToArray(caps, cJSON_CreateString("agents"));
+    // Push-to-talk, drafts, chats and new sessions (docs/protocol.md, Remote).
+    cJSON_AddItemToArray(caps, cJSON_CreateString("remote"));
+    // The inbox: show_notification and notification_action (docs/protocol.md, Inbox).
+    cJSON_AddItemToArray(caps, cJSON_CreateString("inbox"));
+    // The menu's Timers and Habits apps, and the errands (docs/protocol.md,
+    // Timers, Habits, Fetch).
+    cJSON_AddItemToArray(caps, cJSON_CreateString("timers"));
+    cJSON_AddItemToArray(caps, cJSON_CreateString("habits"));
+    cJSON_AddItemToArray(caps, cJSON_CreateString("fetch"));
     if (voice_available()) {
         cJSON_AddItemToArray(channels, cJSON_CreateString("audio_up"));
         cJSON_AddItemToArray(caps, cJSON_CreateString("voice"));
