@@ -929,6 +929,9 @@ void behaviour_voice(voice_state_t state)
         }
         return;
     }
+    if (s.dark) {
+        light_up(); // called by name: the screen comes back to listen
+    }
     if (s.asleep) {
         // The wake word wakes it.
         s.asleep = false;

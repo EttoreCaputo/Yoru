@@ -1,5 +1,9 @@
 # Firmware changelog
 
+## 0.11.3
+
+- **"Yoru" lights the screen again.** After a minute asleep the screen goes dark; now calling Yoru by its wake word turns it back on, and Yoru wakes up to listen, as when you pick it up or press PWR.
+
 ## 0.11.2
 
 - **24-bit colour, if you want it.** Settings → Display → 24-bit colour switches the screen from 65 thousand colours to 16 million: smoother gradients and shadows, no bands in dark shades. Yoru restarts to apply it. It sends half as much data again to the screen, so big animations (opening the menu, full-screen pages) can be a little less fluid. Off by default.

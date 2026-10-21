@@ -12,7 +12,18 @@ Host program: `../yoru-hub` (formerly Companion Hub), Yoru's personal assistant 
 4. Flash the board once the build passes: `idf.py -p <port> flash` (the port is `/dev/cu.usbmodem*`). If no board is connected or flashing fails, say so.
 5. Copy the build into Yoru Hub, which ships it: `../yoru-hub/tools/fetch_firmware.sh`.
 
+6. Build and install Yoru Hub (see below), so the app on the Mac ships the new build.
+
 Report the new version, the build result, the flash result and the copy into the app when done.
+
+## Rule: every change ends with Yoru Hub built and installed
+
+At the end of any piece of work (firmware or Yoru Hub), build the app and install it:
+
+1. `../yoru-hub/tools/build_app.sh` (signed, no sidecars, like the installed copy).
+2. Quit the running Yoru (`osascript -e 'tell application "Yoru" to quit'`), replace `/Applications/Yoru.app` with `../yoru-hub/target/release/bundle/macos/Yoru.app` (`ditto`), and open it again.
+
+Report the build and install result.
 
 ## Rule: the user makes the commits
 
