@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "agents.h"
-#include "agents_ui.h"
 #include "approval.h"
 #include "behaviour.h"
 #include "board_pmu.h"
@@ -27,10 +25,8 @@
 #include "motion.h"
 #include "net.h"
 #include "playback.h"
-#include "question.h"
-#include "draft.h"
-#include "remote.h"
 #include "timers.h"
+#include "toast.h"
 #include "voice.h"
 
 /* From DualEye's board_tools.c: one screen, no faces, and the settings as
@@ -379,17 +375,8 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
         cJSON_AddNumberToObject(mo, "lean_y", round2(ly));
         cJSON_AddNumberToObject(mo, "upright", motion_upright());
     }
-    agents_summary_t ag;
-    agents_summary(&ag);
-    cJSON *a = cJSON_AddObjectToObject(st, "agents");
-    cJSON_AddNumberToObject(a, "sessions", ag.n);
-    cJSON_AddNumberToObject(a, "working", ag.working);
-    cJSON_AddNumberToObject(a, "waiting", ag.waiting);
-    cJSON_AddNumberToObject(a, "quiet_min", ag.quiet_min);
     lvgl_port_lock();
-    cJSON_AddBoolToObject(a, "view", agents_ui_is_open());
-    cJSON_AddBoolToObject(a, "question", question_is_open());
-    cJSON_AddBoolToObject(a, "approval", approval_is_open());
+    cJSON_AddBoolToObject(st, "approval", approval_is_open());
     cJSON *in = cJSON_AddObjectToObject(st, "inbox");
     cJSON_AddNumberToObject(in, "count", inbox_count());
     cJSON_AddNumberToObject(in, "unread", inbox_unread(NULL));
@@ -412,9 +399,9 @@ static bool tool_show_menu(const cJSON *args, char *text, cJSON **structured)
     const cJSON *page = cJSON_GetObjectItemCaseSensitive(args, "page");
     bool ok = true;
     lvgl_port_lock();
-    if ((approval_is_open() || question_is_open()) && !cJSON_IsFalse(open)) {
+    if (approval_is_open() && !cJSON_IsFalse(open)) {
         lvgl_port_unlock();
-        snprintf(text, TEXT_MAX, "a permission request is on the screen");
+        snprintf(text, TEXT_MAX, "a confirmation is on the screen");
         return false;
     }
     if (cJSON_IsFalse(open)) {
@@ -479,17 +466,6 @@ static bool tool_hide_approval(const cJSON *args, char *text, cJSON **structured
     return true;
 }
 
-static bool tool_set_agents(const cJSON *args, char *text, cJSON **structured)
-{
-    if (!agents_set(args, text, TEXT_MAX)) {
-        return false;
-    }
-    agents_summary_t sum;
-    agents_summary(&sum);
-    snprintf(text, TEXT_MAX, "%d session(s), %d waiting", sum.n, sum.waiting);
-    return true;
-}
-
 static bool tool_show_toast(const cJSON *args, char *text, cJSON **structured)
 {
     static const char *const TONES[] = {"info", "done", "wait", "error"};
@@ -518,146 +494,9 @@ static bool tool_show_toast(const cJSON *args, char *text, cJSON **structured)
         }
     }
     lvgl_port_lock();
-    agents_ui_toast(what->valuestring, seconds, t);
+    toast_show(what->valuestring, seconds, t);
     lvgl_port_unlock();
     snprintf(text, TEXT_MAX, "shown");
-    return true;
-}
-
-/* One question of `show_question`, checked against the protocol's limits. */
-static bool parse_question(const cJSON *j, question_t *q, char *text)
-{
-    const cJSON *question = cJSON_GetObjectItemCaseSensitive(j, "question");
-    const cJSON *header = cJSON_GetObjectItemCaseSensitive(j, "header");
-    const cJSON *options = cJSON_GetObjectItemCaseSensitive(j, "options");
-    if (!cJSON_IsObject(j) || !cJSON_IsString(question) || !cJSON_IsArray(options)) {
-        snprintf(text, TEXT_MAX, "each question needs question and options");
-        return false;
-    }
-    q->n = cJSON_GetArraySize(options);
-    if (q->n < 2 || q->n > QUESTION_OPTIONS_MAX) {
-        snprintf(text, TEXT_MAX, "a question has 2 to %d options", QUESTION_OPTIONS_MAX);
-        return false;
-    }
-    card_ascii(question->valuestring, q->text, QUESTION_TEXT_CHARS);
-    card_ascii(cJSON_IsString(header) ? header->valuestring : "", q->header, QUESTION_HEADER_CHARS);
-    q->multi = cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j, "multi"));
-    for (int i = 0; i < q->n; i++) {
-        const cJSON *o = cJSON_GetArrayItem(options, i);
-        if (!cJSON_IsString(o)) {
-            snprintf(text, TEXT_MAX, "options must be strings");
-            return false;
-        }
-        card_ascii(o->valuestring, q->options[i], QUESTION_OPTION_CHARS);
-    }
-    return true;
-}
-
-static bool tool_show_question(const cJSON *args, char *text, cJSON **structured)
-{
-    const cJSON *id = cJSON_GetObjectItemCaseSensitive(args, "id");
-    const cJSON *project = cJSON_GetObjectItemCaseSensitive(args, "project");
-    const cJSON *questions = cJSON_GetObjectItemCaseSensitive(args, "questions");
-    int seconds = 0;
-    if (!cJSON_IsString(id) || id->valuestring[0] == '\0' || strlen(id->valuestring) > QUESTION_ID_MAX) {
-        snprintf(text, TEXT_MAX, "id must be a string of 1 to %d bytes", QUESTION_ID_MAX);
-        return false;
-    }
-    if (!get_int(args, "seconds", &seconds, text)) {
-        return false;
-    }
-    const int n = cJSON_IsArray(questions) ? cJSON_GetArraySize(questions) : 0;
-    if (n < 1 || n > QUESTION_MAX) {
-        snprintf(text, TEXT_MAX, "questions must be an array of 1 to %d", QUESTION_MAX);
-        return false;
-    }
-    question_t *qs = heap_caps_calloc(QUESTION_MAX, sizeof(question_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (qs == NULL) {
-        snprintf(text, TEXT_MAX, "out of memory");
-        return false;
-    }
-    bool ok = true;
-    for (int i = 0; i < n && ok; i++) {
-        ok = parse_question(cJSON_GetArrayItem(questions, i), &qs[i], text);
-    }
-    if (ok) {
-        lvgl_port_lock();
-        question_show(id->valuestring, cJSON_IsString(project) ? project->valuestring : "", seconds < 1 ? 1 : seconds,
-                      qs, n);
-        lvgl_port_unlock();
-        snprintf(text, TEXT_MAX, "showing %s", id->valuestring);
-    }
-    free(qs);
-    return ok;
-}
-
-static bool tool_hide_question(const cJSON *args, char *text, cJSON **structured)
-{
-    const cJSON *id = cJSON_GetObjectItemCaseSensitive(args, "id");
-    if (!cJSON_IsString(id)) {
-        snprintf(text, TEXT_MAX, "id must be a string");
-        return false;
-    }
-    lvgl_port_lock();
-    const bool shown = question_hide(id->valuestring);
-    lvgl_port_unlock();
-    snprintf(text, TEXT_MAX, shown ? "hidden" : "not shown");
-    return true;
-}
-
-static bool tool_show_draft(const cJSON *args, char *text, cJSON **structured)
-{
-    const cJSON *id = cJSON_GetObjectItemCaseSensitive(args, "id");
-    const cJSON *words = cJSON_GetObjectItemCaseSensitive(args, "text");
-    const cJSON *to = cJSON_GetObjectItemCaseSensitive(args, "to");
-    int seconds = 0;
-    if (!cJSON_IsString(id) || id->valuestring[0] == '\0' || strlen(id->valuestring) > DRAFT_ID_MAX) {
-        snprintf(text, TEXT_MAX, "id must be a string of 1 to %d bytes", DRAFT_ID_MAX);
-        return false;
-    }
-    if (!cJSON_IsString(words) || !cJSON_IsString(to)) {
-        snprintf(text, TEXT_MAX, "text and to must be strings");
-        return false;
-    }
-    if (!get_int(args, "seconds", &seconds, text)) {
-        return false;
-    }
-    lvgl_port_lock();
-    draft_show(id->valuestring, words->valuestring, to->valuestring, seconds);
-    lvgl_port_unlock();
-    snprintf(text, TEXT_MAX, "showing %s", id->valuestring);
-    return true;
-}
-
-static bool tool_hide_draft(const cJSON *args, char *text, cJSON **structured)
-{
-    const cJSON *id = cJSON_GetObjectItemCaseSensitive(args, "id");
-    if (!cJSON_IsString(id)) {
-        snprintf(text, TEXT_MAX, "id must be a string");
-        return false;
-    }
-    lvgl_port_lock();
-    const bool shown = draft_hide(id->valuestring);
-    lvgl_port_unlock();
-    snprintf(text, TEXT_MAX, shown ? "hidden" : "not shown");
-    return true;
-}
-
-static bool tool_set_chat(const cJSON *args, char *text, cJSON **structured)
-{
-    if (!remote_set_chat(args, text, TEXT_MAX)) {
-        return false;
-    }
-    snprintf(text, TEXT_MAX, "chat set");
-    return true;
-}
-
-static bool tool_set_projects(const cJSON *args, char *text, cJSON **structured)
-{
-    if (!remote_set_projects(args, text, TEXT_MAX)) {
-        return false;
-    }
-    snprintf(text, TEXT_MAX, "projects set");
     return true;
 }
 
@@ -795,7 +634,7 @@ static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
         .description = "Open or close the menu on Yoru's screen: on its home (the apps around Yoru), on an app "
-                       "(inbox, timers, habits, settings) or straight on a page of Settings (agents, display, sound, "
+                       "(inbox, timers, habits, settings) or straight on a page of Settings (display, sound, "
                        "behaviour, voice, connection, battery, about).",
         .schema = "{\"type\":\"object\",\"properties\":{\"open\":{\"type\":\"boolean\"},"
                   "\"page\":{\"type\":\"string\"}}}",
@@ -803,9 +642,9 @@ static const tool_t TOOLS[] = {
     },
     {
         .name = "show_approval",
-        .description = "Show an agent's permission request on Yoru's screen with Allow and Deny (and Always when "
+        .description = "Show Yoru asking before it acts for the user with Allow and Deny (and Always when "
                        "`always`; only Deny when `full` is false), counting down `seconds`; a tap sends the "
-                       "`approval` notification. A second call replaces it. Companion Hub sends these itself.",
+                       "`approval` notification. A second call replaces it. Yoru Hub sends these itself.",
         .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
                   "\"tool\":{\"type\":\"string\"},\"text\":{\"type\":\"string\",\"maxLength\":72},"
                   "\"project\":{\"type\":\"string\"},\"seconds\":{\"type\":\"integer\",\"minimum\":1},"
@@ -815,29 +654,15 @@ static const tool_t TOOLS[] = {
     },
     {
         .name = "hide_approval",
-        .description = "Take a permission request off Yoru's screen, if that id is shown.",
+        .description = "Take a confirmation off Yoru's screen, if that id is shown.",
         .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},"
                   "\"required\":[\"id\"]}",
         .fn = tool_hide_approval,
     },
     {
-        .name = "set_agents",
-        .description = "Tell Yoru what every coding agent session is doing (docs/protocol.md, Agents): a dot per "
-                       "session on the rim, the step ticker and the agents view. Companion Hub sends it itself.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"sessions\":{\"type\":\"array\",\"maxItems\":6,"
-                  "\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
-                  "\"agent\":{\"type\":\"string\"},\"project\":{\"type\":\"string\"},"
-                  "\"state\":{\"type\":\"string\",\"enum\":[\"idle\",\"work\",\"wait\",\"done\",\"error\"]},"
-                  "\"task\":{\"type\":\"string\"},\"since_s\":{\"type\":\"integer\"},"
-                  "\"steps\":{\"type\":\"array\"}},\"required\":[\"id\",\"state\"]}},"
-                  "\"quiet_min\":{\"type\":\"integer\"},\"focus\":{\"type\":\"boolean\"}},"
-                  "\"required\":[\"sessions\"]}",
-        .fn = tool_set_agents,
-    },
-    {
         .name = "show_toast",
-        .description = "Show one short line over the bottom of Yoru's screen for a few seconds: an agent finished, "
-                       "needs you, the plan's limits. A second call replaces it.",
+        .description = "Show one short line over the bottom of Yoru's screen for a few seconds. A second call "
+                       "replaces it.",
         .schema = "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\",\"maxLength\":72},"
                   "\"seconds\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":30},"
                   "\"tone\":{\"type\":\"string\",\"enum\":[\"info\",\"done\",\"wait\",\"error\"]}},"
@@ -845,69 +670,11 @@ static const tool_t TOOLS[] = {
         .fn = tool_show_toast,
     },
     {
-        .name = "show_question",
-        .description = "Show an agent's question with its choices on Yoru (1-4 questions, 2-4 options each); the "
-                       "picks come back with the `answer` notification. A second call replaces it. Companion Hub "
-                       "sends these itself.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
-                  "\"project\":{\"type\":\"string\"},\"seconds\":{\"type\":\"integer\",\"minimum\":1},"
-                  "\"questions\":{\"type\":\"array\",\"minItems\":1,\"maxItems\":4,\"items\":{"
-                  "\"type\":\"object\",\"properties\":{\"header\":{\"type\":\"string\"},"
-                  "\"question\":{\"type\":\"string\"},\"multi\":{\"type\":\"boolean\"},"
-                  "\"options\":{\"type\":\"array\",\"minItems\":2,\"maxItems\":4,"
-                  "\"items\":{\"type\":\"string\"}}},\"required\":[\"question\",\"options\"]}}},"
-                  "\"required\":[\"id\",\"seconds\",\"questions\"]}",
-        .fn = tool_show_question,
-    },
-    {
-        .name = "hide_question",
-        .description = "Take an agent's question off Yoru's screen, if that id is shown.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},"
-                  "\"required\":[\"id\"]}",
-        .fn = tool_hide_question,
-    },
-    {
-        .name = "show_draft",
-        .description = "Show what was said to an agent on Yoru, with Send and Cancel, before it goes; the answer "
-                       "comes back with the `draft` notification. The Yoru app sends these itself.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
-                  "\"text\":{\"type\":\"string\",\"maxLength\":400},\"to\":{\"type\":\"string\",\"maxLength\":40},"
-                  "\"seconds\":{\"type\":\"integer\",\"minimum\":1}},\"required\":[\"id\",\"text\",\"to\",\"seconds\"]}",
-        .fn = tool_show_draft,
-    },
-    {
-        .name = "hide_draft",
-        .description = "Take a draft off Yoru's screen, if that id is shown.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},"
-                  "\"required\":[\"id\"]}",
-        .fn = tool_hide_draft,
-    },
-    {
-        .name = "set_chat",
-        .description = "What the chat open on Yoru shows for a session: the prompt and the agent's last reply. "
-                       "The Yoru app sends it itself.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"session\":{\"type\":\"string\"},"
-                  "\"prompt\":{\"type\":\"string\",\"maxLength\":200},"
-                  "\"reply\":{\"type\":\"string\",\"maxLength\":1200}},\"required\":[\"session\"]}",
-        .fn = tool_set_chat,
-    },
-    {
-        .name = "set_projects",
-        .description = "Where a new agent session can start from Yoru: the agents installed and the recent "
-                       "projects. The Yoru app sends it itself.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"agents\":{\"type\":\"array\",\"maxItems\":4,"
-                  "\"items\":{\"type\":\"string\"}},\"projects\":{\"type\":\"array\",\"maxItems\":8,"
-                  "\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
-                  "\"name\":{\"type\":\"string\"}},\"required\":[\"id\",\"name\"]}}},"
-                  "\"required\":[\"agents\",\"projects\"]}",
-        .fn = tool_set_projects,
-    },
-    {
         .name = "show_notification",
         .description = "Put a notification in Yoru's inbox (newest first, at most 30), replacing one with the same "
                        "id. `low` only marks it unread; `normal` also shows a banner with a soft sound; `high` also "
-                       "makes Yoru knock on the glass; `urgent` also lights a dark screen. Do not disturb and quiet "
-                       "turn all but urgent into low. What the user does comes back with `notification_action`. "
+                       "makes Yoru knock on the glass; `urgent` also lights a dark screen. Do not disturb "
+                       "turns all but urgent into low. What the user does comes back with `notification_action`. "
                        "The host sends these itself.",
         .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\",\"maxLength\":47},"
                   "\"source\":{\"type\":\"string\",\"maxLength\":24},\"title\":{\"type\":\"string\",\"maxLength\":60},"

@@ -59,10 +59,9 @@ void voice_pause(bool pause);
  * voice or muted. */
 bool voice_listen(bool follow_up);
 /** Push-to-talk: stream what's said until voice_talk_end() (PWR let go) or
- * 60 s, with `trigger` "button" and `to` (a JSON object as text, NULL or ""
- * for none) on `utterance_start` (docs/protocol.md, Remote). Ends what was
- * being heard and stops the speaker. False without voice or muted. */
-bool voice_talk(const char *to);
+ * 60 s, with `trigger` "button" on `utterance_start`. Ends what was being
+ * heard and stops the speaker. False without voice or muted. */
+bool voice_talk(void);
 void voice_talk_end(void);
 
 /** End the utterance being streamed, if any. */

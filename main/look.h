@@ -49,11 +49,6 @@ esp_err_t look_init(void);
  * valid until the next call with `frame` changed. NULL if memory runs out. */
 const look_sprite_t *look_ball(int rx, int ry, uint32_t frame);
 
-/** The sphere in another colour (`rgb`, 0xRRGGBB) with radii `rx` x `ry`:
- * the agents view's little Yorus, one per agent. Kept while it is drawn (a
- * few dozen at most); NULL if memory runs out. */
-const look_sprite_t *look_tinted_ball(int rx, int ry, uint32_t rgb);
-
 const look_t *look_get(void);
 
 /** Draw a sprite with its anchor at (x, y), scaled and turned (degrees)

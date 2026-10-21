@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "agents.h"
 #include "board_settings.h"
 #include "card.h"
 #include "cJSON.h"
@@ -73,14 +72,10 @@ static bool same(const inbox_item_t *a, const inbox_item_t *b)
     return true;
 }
 
-/* Do not disturb (the board's) and quiet (the host's, for the agents) hold
- * back all but the urgent. */
+/* Do not disturb holds back all but the urgent. */
 static inbox_urgency_t loudness(inbox_urgency_t u)
 {
-    agents_summary_t sum;
-    agents_summary(&sum);
-    const bool hushed = board_settings_on(SETTING_FOCUS) || sum.quiet_min > 0;
-    return hushed && u != INBOX_URGENT ? INBOX_LOW : u;
+    return board_settings_on(SETTING_FOCUS) && u != INBOX_URGENT ? INBOX_LOW : u;
 }
 
 inbox_urgency_t inbox_add(const char *id, const char *source, const char *title, const char *text,

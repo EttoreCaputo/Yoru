@@ -45,7 +45,7 @@ bool inbox_urgency_from_name(const char *name, inbox_urgency_t *out);
 
 /** Add `item` (UTF-8 fields, made ASCII here) on top, replacing one with the
  * same id. Returns how loudly it arrives: its urgency, `low` under do not
- * disturb or the agents' quiet unless it is urgent, and INBOX_NONE when it
+ * disturb unless it is urgent, and INBOX_NONE when it
  * was already there as it is (a host sending its inbox again). */
 inbox_urgency_t inbox_add(const char *id, const char *source, const char *title, const char *text,
                           const char *const *actions, int nactions, inbox_urgency_t urgency);

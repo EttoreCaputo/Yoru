@@ -9,7 +9,7 @@
  *   list, newest first, with each one's source, title and age, the unread
  *   marked; a tap opens one: its whole text, the host's actions, Dismiss
  *   and Open (on the computer). Swipe right or down, or tap the title, to
- *   go back, as in the agents view.
+ *   go back.
  * The dot and the banner keep out of the way of the menu, the views and the
  * cards. All calls with the LVGL lock held. */
 
@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-/** Told when the view opens and closes (the same as the agents view's). */
+/** Told when the view opens and closes. */
 typedef void (*inbox_ui_cb_t)(bool open);
 
 /** `face` is hidden while the view covers the screen, so it isn't drawn. */

@@ -1,5 +1,16 @@
 # Firmware changelog
 
+## 0.11.5
+
+- **Only Yoru.** Yoru no longer follows coding agents. The Agents app is gone from the menu, along with its little Yorus, the dots on the rim, the steps at the bottom, the chats and the "New session" page. Claude Code's permission requests and questions no longer appear on the screen: answer them on the computer. When Yoru itself asks before acting for you (sending a mail, creating an event), the Allow and Deny card still comes.
+- **PWR talks to Yoru.** Holding PWR is push-to-talk with Yoru, without the wake word; it no longer sends words to an agent.
+- **BOOT opens your notifications.** A press of BOOT opens the inbox (or closes it, or the menu). The BOOT button switch moved to Settings → Behaviour.
+- Yoru still comes to the glass and knocks, but only for an important notification.
+
+## 0.11.4
+
+- **Lighter thinking, done and error.** While Yoru turns blue (thinking), green (done) or red (something went wrong), it steps back a little, a bit smaller, and its glow is a soft ring just around it instead of a haze over the whole screen. The board only redraws around Yoru meanwhile, so these moments are smoother.
+
 ## 0.11.3
 
 - **"Yoru" lights the screen again.** After a minute asleep the screen goes dark; now calling Yoru by its wake word turns it back on, and Yoru wakes up to listen, as when you pick it up or press PWR.

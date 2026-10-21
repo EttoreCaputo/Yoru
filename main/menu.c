@@ -5,8 +5,6 @@
 #include <string.h>
 #include <strings.h>
 
-#include "agents.h"
-#include "agents_ui.h"
 #include "board.h"
 #include "board_pmu.h"
 #include "board_settings.h"
@@ -135,10 +133,6 @@ static void info_memory(char *out, size_t len);
 static void info_flash(char *out, size_t len);
 static void info_load(char *out, size_t len);
 static void info_hold(char *out, size_t len);
-static void info_agents(char *out, size_t len);
-static void info_quiet(char *out, size_t len);
-static void act_agents(void);
-static void act_quiet(void);
 static void act_power_off(void);
 static void act_restart(void);
 static void act_factory_reset(void);
@@ -148,15 +142,6 @@ static void act_factory_reset(void);
 #define ACT(en, it, kind, fn, info) {en, it, kind, SETTING_COUNT, F_NONE, info, fn}
 
 /* Italian without accents: the built-in fonts only have ASCII. */
-/* What the coding agents on the computer do, on Yoru (agents_ui.c). */
-static const item_t AGENTS_ITEMS[] = {
-    ACT("Open the agents", "Apri gli agenti", K_TAP, act_agents, info_agents),
-    ACT("Quiet for 1 hour", "Silenzio per 1 ora", K_TAP, act_quiet, info_quiet),
-    SET("Dots on the rim", "Puntini sul bordo", K_SWITCH, SETTING_AGENTS_RING, F_NONE),
-    SET("Steps at the bottom", "Passi in basso", K_SWITCH, SETTING_AGENTS_TICKER, F_NONE),
-    SET("Agent sounds", "Suoni degli agenti", K_SWITCH, SETTING_AGENTS_SOUNDS, F_NONE),
-    SET("BOOT button", "Tasto BOOT", K_SWITCH, SETTING_BOOT_KEY, F_NONE),
-};
 static const item_t DISPLAY_ITEMS[] = {
     SET("Brightness", "Luce", K_ARC, SETTING_BRIGHTNESS, F_PCT),
     SET("Night brightness", "Luce di notte", K_ARC, SETTING_NIGHT_BRIGHTNESS, F_PCT),
@@ -179,6 +164,7 @@ static const item_t BEHAVIOUR_ITEMS[] = {
     SET("Touch reactions", "Reazioni al tocco", K_SWITCH, SETTING_TOUCH_REACTIONS, F_NONE),
     SET("Motion reactions", "Reazioni al moto", K_SWITCH, SETTING_MOTION_REACTIONS, F_NONE),
     SET("Turns to sounds", "Si gira ai suoni", K_SWITCH, SETTING_PET_HEARING, F_NONE),
+    SET("BOOT button", "Tasto BOOT", K_SWITCH, SETTING_BOOT_KEY, F_NONE),
 };
 static const item_t VOICE_ITEMS[] = {
     SET("Wake word", "Parola d'attivazione", K_SWITCH, SETTING_WAKE_WORD_ON, F_NONE),
@@ -210,7 +196,6 @@ static const item_t ABOUT_ITEMS[] = {
 /* Under Settings, each with its round icon in its colour, as a watch's. */
 #define CAT(en, it, icon, rgb, items) {en, it, icon, rgb, items, sizeof(items) / sizeof(items[0])}
 static const category_t CATEGORIES[] = {
-    CAT("Agents", "Agenti", LV_SYMBOL_KEYBOARD, 0x5E5CE6, AGENTS_ITEMS),
     CAT("Display", "Schermo", LV_SYMBOL_IMAGE, 0x0A84FF, DISPLAY_ITEMS),
     CAT("Sound", "Suono", LV_SYMBOL_VOLUME_MAX, 0xFF375F, SOUND_ITEMS),
     CAT("Behaviour", "Carattere", LV_SYMBOL_EYE_OPEN, 0xFF9F0A, BEHAVIOUR_ITEMS),
@@ -228,7 +213,6 @@ static const category_t CATEGORIES[] = {
 typedef enum {
     APP_INBOX,
     APP_YORU,
-    APP_AGENTS,
     APP_TIMERS,
     APP_HABITS,
     APP_SETTINGS,
@@ -246,7 +230,6 @@ typedef struct {
 static const app_def_t APPS[APP_COUNT] = {
     [APP_INBOX] = {"Notifications", "Notifiche", 0xFF6B6B, 0xE0262F, LV_SYMBOL_ENVELOPE},
     [APP_YORU] = {"Yoru", "Yoru", 0, 0, NULL},
-    [APP_AGENTS] = {"Agents", "Agenti", 0x5AB0FF, 0x0A6CDF, LV_SYMBOL_KEYBOARD},
     [APP_TIMERS] = {"Timers", "Timer", 0xFFB340, 0xF07800, NULL},
     [APP_HABITS] = {"Habits", "Abitudini", 0x2A2D36, 0x101114, NULL},
     [APP_SETTINGS] = {"Settings", "Impostazioni", 0x9A9AA2, 0x55555D, LV_SYMBOL_SETTINGS},
@@ -490,41 +473,6 @@ static void info_hold(char *out, size_t len)
 }
 
 /* ---- Actions ---------------------------------------------------------------------- */
-
-static void info_agents(char *out, size_t len)
-{
-    agents_summary_t sum;
-    agents_summary(&sum);
-    if (sum.n == 0) {
-        snprintf(out, len, "%s", tr("None running", "Nessuno al lavoro"));
-    } else if (sum.waiting > 0) {
-        snprintf(out, len, tr("%d, %d waiting for you", "%d, %d ti aspettano"), sum.n, sum.waiting);
-    } else {
-        snprintf(out, len, tr("%d, %d working", "%d, %d al lavoro"), sum.n, sum.working);
-    }
-}
-
-static void info_quiet(char *out, size_t len)
-{
-    agents_summary_t sum;
-    agents_summary(&sum);
-    if (sum.quiet_min > 0) {
-        snprintf(out, len, tr("On, %d min left: tap to end", "Attivo, %d min: tocca per finire"), sum.quiet_min);
-    } else {
-        out[0] = '\0';
-    }
-}
-
-static void act_agents(void)
-{
-    // The menu goes as the view comes (agents_ui_open closes it).
-    agents_ui_open();
-}
-
-static void act_quiet(void)
-{
-    agents_ui_shortcut("quiet", NULL);
-}
 
 static void restart_cb(lv_timer_t *t)
 {
@@ -1373,10 +1321,6 @@ static void refresh_home(void)
     memset(&v, 0, sizeof(v));
     v.badge[APP_INBOX] = inbox_unread(NULL);
     v.badge_rgb[APP_INBOX] = 0xFF3B30;
-    agents_summary_t sum;
-    agents_summary(&sum);
-    v.badge[APP_AGENTS] = sum.waiting;
-    v.badge_rgb[APP_AGENTS] = 0xFF9F0A;
     timer_view_t tv;
     const int nt = timers_count();
     v.timer = timers_at(0, &tv) && tv.total_s > 0 ? tv.left_s / tv.total_s : 0;
@@ -1794,9 +1738,6 @@ static void open_target(app_t app)
     case APP_INBOX:
         inbox_ui_open(NULL); // the menu goes as the view comes
         break;
-    case APP_AGENTS:
-        agents_ui_open();
-        break;
     case APP_SETTINGS:
         build_settings();
         break;
@@ -1848,8 +1789,7 @@ void menu_open(void)
     if (s.open) {
         return;
     }
-    agents_ui_close(); // one thing over the eyes at a time
-    inbox_ui_close();
+    inbox_ui_close(); // one thing over the eyes at a time
     s.open = true;
     lv_display_trigger_activity(NULL);
     h.ox = h.oy = 0;

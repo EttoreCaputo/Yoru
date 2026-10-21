@@ -1,9 +1,10 @@
 #pragma once
 
-/* An agent's permission request on the board (docs/protocol.md,
- * Approvals): a card around Yoru with the tool and what it would do on
- * top, Deny and Allow below (and Always, when the agent offers to remember
- * it) with the project and the seconds left, and a ring along the rim that
+/* Yoru asking before it acts for you (docs/protocol.md, Confirmations): the
+ * host's assistant is about to send, create or delete something with one of
+ * your services. A card around Yoru with the tool and what it would do on
+ * top, Deny and Allow below (and Always, when the host offers to remember
+ * it) with where it comes from and the seconds left, and a ring along the rim that
  * runs them down. A request cut to fit can only be denied here: allowing it
  * takes the computer, where all of it shows. A tap answers with the `approval`
  * notification; the card also goes when the host takes it away or the time

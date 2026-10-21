@@ -54,8 +54,6 @@ static const char *TAG = "voice";
 #define MAX_TALK_MS 60000
 /* Shorter than this, a press of PWR said nothing worth sending. */
 #define MIN_TALK_MS 300
-/* `to` of a push-to-talk utterance, as JSON text. */
-#define TO_MAX 160
 /* Frame header: utterance id, flags (none yet), sequence number (u16 LE). */
 #define AUDIO_HEADER 4
 /* The fetch task mustn't stall on a host that doesn't read. */
@@ -169,10 +167,6 @@ static bool s_paused;
 
 /* Wake words before this are ignored: the speaker is (or just was) on. */
 static volatile int64_t s_speaker_until_us;
-
-/* Where the next push-to-talk goes (voice_talk()), for the fetch task. */
-static portMUX_TYPE s_to_mux = portMUX_INITIALIZER_UNLOCKED;
-static char s_to[TO_MAX];
 
 static SemaphoreHandle_t s_state_lock;
 static voice_state_t s_state;
@@ -366,7 +360,7 @@ void voice_set_state(voice_state_t state)
 
 /** `ignore_ms`: VAD speech this early isn't the command (the wake word's
  * tail, the speaker's echo). */
-static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms, const char *to)
+static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms)
 {
     stream_t *st = &s_stream;
     st->active = true;
@@ -389,12 +383,6 @@ static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms, c
     cJSON_AddStringToObject(params, "trigger", trigger);
     cJSON_AddNumberToObject(params, "rate", 16000);
     cJSON_AddStringToObject(params, "format", "s16le");
-    cJSON *where = to != NULL && to[0] != '\0' ? cJSON_Parse(to) : NULL;
-    if (cJSON_IsObject(where)) {
-        cJSON_AddItemToObject(params, "to", where);
-    } else {
-        cJSON_Delete(where);
-    }
     rpc_notify("utterance_start", params);
     voice_set_state(VOICE_LISTENING);
 }
@@ -487,7 +475,7 @@ static void on_wake(const afe_fetch_result_t *res)
         // WAKE_TAIL_MS anyway.
         playback_sound(SOUND_WAKE);
     }
-    stream_start("wake", WAKE_TAIL_MS, NO_SPEECH_MS, NULL);
+    stream_start("wake", WAKE_TAIL_MS, NO_SPEECH_MS);
 }
 
 static void feed_task(void *arg)
@@ -532,22 +520,18 @@ static void fetch_task(void *arg)
                 stream_end(END_HOST);
             }
             if (req & TALK_BIT) {
-                // PWR wins over whatever was being heard: it says where to.
+                // PWR wins over whatever was being heard.
                 stream_end(END_HOST);
-                char to[TO_MAX];
-                portENTER_CRITICAL(&s_to_mux);
-                memcpy(to, s_to, sizeof(to));
-                portEXIT_CRITICAL(&s_to_mux);
-                stream_start("button", 0, MAX_TALK_MS, to);
+                stream_start("button", 0, MAX_TALK_MS);
             }
             if ((req & RELEASE_BIT) && s_stream.button) {
                 stream_end(END_RELEASED);
             }
             if ((req & LISTEN_BIT) && !s_stream.active) {
                 if (req & FOLLOW_UP_BIT) {
-                    stream_start("follow_up", FOLLOW_UP_TAIL_MS, FOLLOW_UP_NO_SPEECH_MS, NULL);
+                    stream_start("follow_up", FOLLOW_UP_TAIL_MS, FOLLOW_UP_NO_SPEECH_MS);
                 } else {
-                    stream_start("host", 0, NO_SPEECH_MS, NULL);
+                    stream_start("host", 0, NO_SPEECH_MS);
                 }
             }
             if (!s_stream.active && s_wakenet_on != s_wake_on) {
@@ -595,14 +579,11 @@ bool voice_listen(bool follow_up)
     return true;
 }
 
-bool voice_talk(const char *to)
+bool voice_talk(void)
 {
     if (!s_available || s_muted) {
         return false;
     }
-    portENTER_CRITICAL(&s_to_mux);
-    snprintf(s_to, sizeof(s_to), "%s", to != NULL ? to : "");
-    portEXIT_CRITICAL(&s_to_mux);
     if (esp_timer_get_time() < s_speaker_until_us) {
         // Talking over the board's own voice stops it.
         playback_barge_in();

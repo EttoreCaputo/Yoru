@@ -1,6 +1,6 @@
 #pragma once
 
-/* What the cards over the eyes share (approval.c, question.c, agents_ui.c):
+/* What the cards over the eyes share (approval.c, inbox_ui.c, timers_ui.c...):
  * the palette, text the built-in fonts can draw, a see-through root that
  * takes every touch, the countdown along the rim and the pill buttons. All
  * calls with the LVGL lock held. */

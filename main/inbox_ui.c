@@ -4,23 +4,20 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "agents_ui.h"
-#include "approval.h"
 #include "board.h"
 #include "card.h"
-#include "draft.h"
 #include "esp_attr.h"
 #include "esp_log.h"
+#include "approval.h"
 #include "menu.h"
-#include "question.h"
+#include "toast.h"
 
 static const char *TAG = "inbox_ui";
 
 #define CX (BOARD_LCD_H_RES / 2)
 #define CY (BOARD_LCD_V_RES / 2)
 #define POLL_MS 200
-/* The unread dot: on the rim at the top right, clear of the agents' dots
- * (at most 22.5 degrees either side of the top). */
+/* The unread dot: on the rim at the top right. */
 #define DOT_R 222
 #define DOT_DEG (-54.0f)
 #define DOT_D 12
@@ -380,7 +377,7 @@ static void button_cb(lv_event_t *e)
     } else if (b == BTN_OPEN) {
         inbox_act(id, "open");
         inbox_ui_close(); // off to the computer
-        agents_ui_toast(card_tr("Opening it on the computer", "La apro sul computer"), 3, TOAST_INFO);
+        toast_show(card_tr("Opening it on the computer", "La apro sul computer"), 3, TOAST_INFO);
     } else {
         char index[4];
         snprintf(index, sizeof(index), "%d", b);
@@ -463,8 +460,7 @@ static void show_detail(const char *id)
 void inbox_ui_open(const char *id)
 {
     if (s.view == NULL) {
-        menu_close();
-        agents_ui_close(); // one view at a time
+        menu_close(); // one view at a time
         s.view = card_root(true);
         lv_obj_add_event_cb(s.view, view_gesture_cb, LV_EVENT_GESTURE, NULL);
         s.page = s.list = NULL;
@@ -531,8 +527,7 @@ static void keep_view(void)
 
 static void poll_cb(lv_timer_t *t)
 {
-    const bool hidden = s.view != NULL || agents_ui_is_open() || menu_is_open() || approval_is_open()
-                        || question_is_open() || draft_is_open();
+    const bool hidden = s.view != NULL || menu_is_open() || approval_is_open();
     if (hidden != s.hidden) {
         s.hidden = hidden;
         s.dot_stale = true;

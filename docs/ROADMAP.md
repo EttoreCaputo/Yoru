@@ -6,6 +6,8 @@ Yoru reuses what the [DualEye PC Monitor](../../esp32s3-dualeye-pcmonitor) alrea
 
 What is new is the character, the UI and the hardware. The computer side is not copied: it is [Companion Hub](https://github.com/EttoreCaputo/companion-hub) (`../companion-hub`), the host program DualEye's `host/` became, shared by both boards and able to drive several at once. The firmware parts are still copied, and fixes go to both.
 
+> **Change of direction (2026-10-21).** Yoru has a story of its own (`docs/CONCEPT.md`, Who Yoru is) and is the only character: no coding agents on the board. Firmware 0.11.5 removes the agents view and its little Yorus, the remote (push-to-talk to a session, chats, new sessions, drafts), Claude Code's permission requests and questions, the `shortcut` notification and the `agents` and `remote` capabilities; Yoru Hub drops Claude Code's hooks, alerts, status line and session tracking. PWR held talks to Yoru; BOOT opens the inbox. M4b below is history.
+
 > **Change of direction (2026-10-19).** Yoru becomes a personal assistant that lives on the computer, with the board as its body: it connects to your services through MCP connectors (our own MCP client in Rust, with OAuth), tells you when something worth knowing happens, and answers when you ask. Its host goes back to Companion Hub, renamed Yoru Hub (`../yoru-hub`), made Yoru-only (DualEye leaves it) with a redone app. The plan is `docs/assistant.md` there; it wins over the 2026-10-18 plan below. The Yoru app (`../yoru-app`) stays in use until phase A2 of that plan works, then it is retired. On the board this plan adds an inbox (`show_notification`, phase A4).
 
 > **Change of direction (2026-10-18).** Yoru stops being a pet for now and becomes the physical side of the coding agents, like [coucou](https://github.com/louis-cfm/coucou) is on the screen. Its computer side becomes the **Yoru app**, a fork of coucou, instead of Companion Hub, which Yoru no longer uses at all. The plan is in [The Yoru app](#the-yoru-app-a-fork-of-coucou) below. Where the rest of this page says something different (Companion Hub, the needs, the moods, M4 and the pet parts of M5), this plan wins. The pet comes back later.
@@ -237,7 +239,7 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 - PC data and Claude Code usage drive moods.
 - MCP tools: react, say, show a message.
 
-### M4b: the agents' companion (in since 0.7.0)
+### M4b: the agents' companion (0.7.0 to 0.11.4, removed in 0.11.5)
 
 Yoru is the physical side of the coding agents on the computer, the way the coucou notch app is on the screen: it shows what they are doing, lets them be answered without going back to the terminal, and gets you to the right terminal. Nothing else (no chat, no service pills): the host does the agents' bookkeeping, Yoru shows it.
 - On the board: a dot per session on the rim (`agents_ui.c`), coloured by its state; the step ticker over the bottom rim and the host's toasts; the agents view (swipe up from the bottom edge, BOOT, the menu): a little Yoru per session in its agent's colour (Claude orange, Gemini yellow, Codex blue, Cursor green...), animated by its state, tap for its terminal, hold to interrupt, quiet for an hour, and the plan's limits.

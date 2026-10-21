@@ -56,12 +56,7 @@ typedef enum {
     /* A test: the screen's bus at 80 MHz instead of 40, from the next boot.
      * Over the CO5300's 50 MHz write limit (datasheet 6.4). */
     SETTING_LCD_FAST,
-    /* Coding agents (agents_ui.c): a dot per session on the rim, the step
-     * ticker over the bottom rim, Yoru's sounds for them, and the BOOT
-     * button's shortcut. */
-    SETTING_AGENTS_RING,
-    SETTING_AGENTS_TICKER,
-    SETTING_AGENTS_SOUNDS,
+    /* BOOT opens the inbox (behaviour.c). */
     SETTING_BOOT_KEY,
     /* 24-bit colour (RGB888) instead of 16 (RGB565), from the next boot:
      * smoother gradients, half as many bytes again on the screen's bus. */

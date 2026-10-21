@@ -5,9 +5,9 @@
 
 #include "board.h"
 #include "card.h"
+#include "inbox_ui.h"
 #include "cJSON.h"
 #include "esp_log.h"
-#include "agents_ui.h"
 #include "menu.h"
 #include "rpc.h"
 
@@ -196,9 +196,9 @@ void approval_show(const char *id, const char *tool, const char *text, const cha
         s.timer = NULL;
         ESP_LOGI(TAG, "%s replaced", s.id);
     }
-    // The card takes the screen: the menu and the agents view go.
+    // The card takes the screen: the menu and the inbox go.
     menu_close();
-    agents_ui_close();
+    inbox_ui_close();
     snprintf(s.id, sizeof(s.id), "%s", id);
     s.total_ms = (uint32_t) (seconds < 1 ? 1 : seconds > SECONDS_MAX ? SECONDS_MAX : seconds) * 1000;
     s.start_ms = lv_tick_get();

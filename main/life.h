@@ -1,8 +1,7 @@
 #pragma once
 /* What Yoru does when nothing else has its attention: it floats about near
- * you, gets sleepy when nobody is around and drifts off to sleep; when a
- * coding agent waits for you it comes up to the glass, knocks and points at
- * the computer. No needs and no moods of its own for now: the pet comes back
+ * you, gets sleepy when nobody is around and drifts off to sleep; when
+ * something important arrives for you it comes up to the glass and knocks. No needs and no moods of its own for now: the pet comes back
  * later (docs/ROADMAP.md).
  * It only moves the eyes (eyes.c) and plays its sounds; behaviour.c says when
  * it may, and puts it to sleep when it asks. All calls with the LVGL lock
@@ -20,14 +19,12 @@ typedef struct {
      * finger on the screen. */
     bool free;
     bool asleep;
-    /* Do not disturb, or an agent waits: it keeps still and quiet. */
+    /* Do not disturb: it keeps still and quiet. */
     bool focus;
     /* Nobody for the "sleepy after" setting: sleepy eyes, slower. */
     bool drowsy;
     /* Nobody for the "asleep after" setting: time for a nap. */
     bool lonely;
-    /* Its sounds for the coding agents are on (and not quiet). */
-    bool agent_sounds;
 } life_ctx_t;
 
 typedef enum {
@@ -44,10 +41,10 @@ void life_attend(void);
 /** It fell asleep (any way), or woke up. */
 void life_slept(void);
 void life_woke(void);
-/** A coding agent waits for you: it comes up to the glass, knocks and
+/** Something important waits for you: it comes up to the glass, knocks and
  * points. False if it can't now (asleep, settling down, already asking). */
 bool life_call(void);
-/** It is at the glass for an agent right now: a touch means "I'm coming". */
+/** It is at the glass for you right now: a touch means "I'm coming". */
 bool life_calling(void);
 /** What it is doing (lounge, call, nap, sleep, come), for get_state. */
 const char *life_activity(void);

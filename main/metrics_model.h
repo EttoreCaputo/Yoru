@@ -1,8 +1,8 @@
 #pragma once
 
 /* The latest snapshot of the computer, as the host sends it (M4). Yoru reads
- * the host's clock and idle time (night brightness, sleep) and the Claude
- * plan's limits (agents_ui.c); the rest isn't shown. From
+ * the host's clock and idle time (night brightness, sleep); the rest isn't
+ * shown. From
  * DualEye's metrics_model.h, without the faces and the two screens. */
 
 #include <stdbool.h>

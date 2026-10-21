@@ -17,7 +17,7 @@ static const char *TAG = "life";
 
 typedef enum {
     ACT_LOUNGE, // floating about near you
-    ACT_CALL,   // up at the glass: an agent waits for you
+    ACT_CALL,   // up at the glass: something waits for you
     ACT_NAP,    // yawns, finds a corner, settles down
     ACT_SLEEP,
     ACT_COME,   // called or touched: back to you
@@ -109,14 +109,12 @@ static void call(void)
             return;
         }
         eyes_look_at(0, -0.12f);
-        // Knock, knock: two taps on the glass, then pointing back at the
-        // computer, where something needs you.
+        // Knock, knock: two taps on the glass, then pointing at what
+        // waits for you.
         const eyes_pos_t taps[] = {at(0, 22, 0.54f), at(0, 22, CALL_Z), at(0, 22, 0.54f), at(0, 22, CALL_Z)};
         eyes_move(taps, 4, 700, EYES_PATH_GLIDE);
         eyes_gesture(EYES_GESTURE_POINT);
-        if (L.ctx.agent_sounds) {
-            playback_sound(SOUND_HMM);
-        }
+        playback_sound(SOUND_HMM);
         wait_ms(CALL_WAIT_MS + (uint32_t) frange(0, 4000));
         next(2);
         break;

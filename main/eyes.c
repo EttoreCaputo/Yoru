@@ -51,6 +51,8 @@
  * the icons or the card, in this long. */
 #define MENU_SIZE 0.62f
 #define MENU_SIZE_MS 220
+/* Tinted (thinking, done, error) Yoru steps back a little, inside its halo. */
+#define STATUS_SIZE 0.86f
 /* The most pieces an overlay has (three z's, three dots). */
 #define MAX_OVERLAY_RECTS 3
 /* The eye sprites: the largest eye (surprised, swelling, stretched) fits
@@ -310,7 +312,7 @@ static struct {
     int32_t dt_ms;        // how long since, for this frame's step
     float frames;         // the same in 33 ms frames, for the easing
     float near;
-    float size;           // 1, or MENU_SIZE with the menu open
+    float size;           // 1, MENU_SIZE with the menu open, STATUS_SIZE tinted
     eyes_status_t status;
     float tint;
     float tint_rgb[3];
@@ -886,12 +888,15 @@ static void draw_cb(lv_event_t *e)
 
 static lv_area_t body_area(const body_vis_t *v)
 {
-    // The halo reaches most of the screen.
-    if (v->tint > 0.01f) {
-        return (lv_area_t) {0, 0, BOARD_LCD_H_RES - 1, BOARD_LCD_V_RES - 1};
-    }
     const int32_t rx = v->rx + 4, ry = v->ry + 4;
-    return (lv_area_t) {v->bx - rx, v->by - ry, v->bx + rx, v->by + ry};
+    lv_area_t a = {v->bx - rx, v->by - ry, v->bx + rx, v->by + ry};
+    if (v->tint > 0.01f) {
+        // The halo, a little wider than the sphere.
+        const float d = fminf(1, v->dist);
+        const lv_area_t h = look_area(&look_get()->halo, v->bx, v->by, d, d, false);
+        a = (lv_area_t) {LV_MIN(a.x1, h.x1), LV_MIN(a.y1, h.y1), LV_MAX(a.x2, h.x2), LV_MAX(a.y2, h.y2)};
+    }
+    return a;
 }
 
 static lv_area_t eye_area(int i)
@@ -1223,7 +1228,9 @@ static bool step(void)
     } else {
         s.near = fminf(1, s.near + (float) s.dt_ms / SLEEP_BACK_MS);
     }
-    const float want_size = s.mood == EYES_MOOD_PEEK || s.mood == EYES_MOOD_WAITING ? MENU_SIZE : 1;
+    const float want_size = s.mood == EYES_MOOD_PEEK || s.mood == EYES_MOOD_WAITING ? MENU_SIZE
+                            : s.status != EYES_STATUS_IDLE                         ? STATUS_SIZE
+                                                                                   : 1;
     const float size_step = (float) s.dt_ms * (1 - MENU_SIZE) / MENU_SIZE_MS;
     s.size = want_size < s.size ? fmaxf(want_size, s.size - size_step) : fminf(want_size, s.size + size_step);
     const float want_tint = s.status == EYES_STATUS_IDLE ? 0 : 1;
