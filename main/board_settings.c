@@ -47,6 +47,7 @@ static const setting_info_t INFO[SETTING_COUNT] = {
     [SETTING_AGENTS_TICKER] = {"agents_ticker", 0, 1, 1},
     [SETTING_AGENTS_SOUNDS] = {"agents_sounds", 0, 1, 1},
     [SETTING_BOOT_KEY] = {"boot_key", 0, 1, 1},
+    [SETTING_COLOR_24] = {"color_24bit", 0, 1, 0},
 };
 
 static SemaphoreHandle_t s_lock;

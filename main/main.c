@@ -119,6 +119,10 @@ static void on_setting(setting_t id, int32_t value)
         fast_boots(0);
         xTimerStart(xTimerCreate("restart", pdMS_TO_TICKS(400), pdFALSE, NULL, restart_cb), 0);
         break;
+    case SETTING_COLOR_24:
+        // The panel's format and the frame buffer are set up at boot too.
+        xTimerStart(xTimerCreate("restart", pdMS_TO_TICKS(400), pdFALSE, NULL, restart_cb), 0);
+        break;
     default:
         break;
     }
@@ -169,11 +173,12 @@ void app_main(void)
     agents_init();
     remote_init();
 
-    ESP_ERROR_CHECK(board_display_init(&s_lcd, lcd_fast()));
+    const bool deep = board_settings_on(SETTING_COLOR_24);
+    ESP_ERROR_CHECK(board_display_init(&s_lcd, lcd_fast(), deep));
     if (board_touch_init() != ESP_OK) {
         ESP_LOGE(TAG, "touch init failed, continuing without touch");
     }
-    ESP_ERROR_CHECK(lvgl_port_init(&s_lcd, &s_display));
+    ESP_ERROR_CHECK(lvgl_port_init(&s_lcd, deep, &s_display));
 
     // The sphere and the hands, rendered once into PSRAM.
     ESP_ERROR_CHECK(look_init());

@@ -9,8 +9,9 @@ extern "C" {
 #endif
 
 /** LVGL on the panel, with the touch screen as its pointer. Runs LVGL in
- * its own task on core 0. */
-esp_err_t lvgl_port_init(const board_lcd_t *lcd, lv_display_t **out_display);
+ * its own task on core 0. Draws in RGB565, or RGB888 when `deep` (as the
+ * panel was set up by board_display_init()). */
+esp_err_t lvgl_port_init(const board_lcd_t *lcd, bool deep, lv_display_t **out_display);
 
 /** Turn what's drawn by `quarter` turns (0..3, LVGL's rotation: 1 is 90°
  * clockwise). Touch follows. With the LVGL lock held. */

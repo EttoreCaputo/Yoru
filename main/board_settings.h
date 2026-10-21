@@ -63,6 +63,9 @@ typedef enum {
     SETTING_AGENTS_TICKER,
     SETTING_AGENTS_SOUNDS,
     SETTING_BOOT_KEY,
+    /* 24-bit colour (RGB888) instead of 16 (RGB565), from the next boot:
+     * smoother gradients, half as many bytes again on the screen's bus. */
+    SETTING_COLOR_24,
     SETTING_COUNT,
 } setting_t;
 

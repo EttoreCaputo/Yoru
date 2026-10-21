@@ -1,5 +1,19 @@
 # Firmware changelog
 
+## 0.11.2
+
+- **24-bit colour, if you want it.** Settings → Display → 24-bit colour switches the screen from 65 thousand colours to 16 million: smoother gradients and shadows, no bands in dark shades. Yoru restarts to apply it. It sends half as much data again to the screen, so big animations (opening the menu, full-screen pages) can be a little less fluid. Off by default.
+
+## 0.11.1
+
+A lighter, prettier menu.
+
+- **Yoru is one of the bubbles.** The apps are no longer a ring around Yoru: they are small round bubbles in a honeycomb, as on a watch, and Yoru is one of them, at the top left, with Notifications in the middle. When the menu opens Yoru shrinks into its bubble and the others bloom out one after the other; Yoru blinks and looks at the bubble under your finger.
+- **Smaller bubbles, room for more.** The bubbles are a quarter smaller. Drag the honeycomb to move it around (it springs back at the edges); towards the rim the bubbles shrink, so more apps will fit as they come. The name of the bubble in the middle, or of the one you touch, shows at the bottom.
+- **Smoother.** Only the bubbles that move are redrawn, Yoru's face no longer redraws under the menu, and opening an app no longer fades the whole screen: its bubble grows over the screen, darkening into the page. Coming back, the page shrinks back into its bubble.
+- **To close it:** tap Yoru's bubble, swipe up from the bottom edge, or wait a few seconds. Yoru flies back to the middle and the face takes over.
+- The processor already runs at its top speed (240 MHz on both cores).
+
 ## 0.11.0
 
 The menu is a watch now: round apps around Yoru, your timers and habits on the board, and Yoru runs errands for its assistant.

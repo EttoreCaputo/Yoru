@@ -1,14 +1,15 @@
 #pragma once
 
 /* The menu on the board (docs/ROADMAP.md, M2), made for the round screen as
- * a watch's: a honeycomb of round apps around Yoru, who peeks out from the
- * middle. They fly out of it as the menu opens, and badges and rings on them
- * say what is new: Notifications (the inbox), Timers, Habits (today's, as
+ * a watch's: a honeycomb of small round bubbles, Yoru one of them, that you
+ * can drag around, shrinking towards the rim. Yoru shrinks into its bubble
+ * as the menu opens and the others bloom out; badges and rings on them say
+ * what is new: Notifications (the inbox), Timers, Habits (today's, as
  * rings), Settings (every setting, in categories with round icons), Do not
- * disturb (a moon to tap) and Agents. A tapped app grows from its icon to
- * the whole screen. Changes apply at once and are saved by board_settings.c.
- * Tap Yoru or swipe up on the home to close, tap a title or swipe right to
- * go back, or wait, and it closes. Labels in English or Italian
+ * disturb (a moon to tap) and Agents. A tapped bubble grows over the screen
+ * into its app. Changes apply at once and are saved by board_settings.c.
+ * Tap Yoru or swipe up from the bottom edge to close, tap a title or swipe
+ * right to go back, or wait, and it closes. Labels in English or Italian
  * (SETTING_LANGUAGE). All calls with the LVGL lock held. */
 
 #include <stdbool.h>

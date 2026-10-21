@@ -8,11 +8,15 @@
 
 static const char *TAG = "board_display";
 
-/* The largest transfer is one LVGL draw buffer (lvgl_port.c). */
+/* The largest transfer is one bounce buffer (lvgl_port.c), whatever the
+ * colour depth. */
 #define LCD_MAX_TRANSFER (BOARD_LCD_H_RES * 48 * 2)
 
 /* QSPI command words: 0x02 = write, the DCS command in bits 8..15. */
 #define LCD_QSPI_CMD(cmd) ((0x02u << 24) | ((uint32_t) (cmd) << 8))
+
+/* The pixel format (0x3A): 0x55 RGB565, 0x77 RGB888. Set before init. */
+static uint8_t s_colmod[] = {0x55};
 
 /* Waveshare's sequence for this panel (BSP and xiaozhi agree). Brightness
  * (0x51) starts at 0 here, unlike theirs: the screen stays black until
@@ -23,7 +27,7 @@ static const co5300_lcd_init_cmd_t s_init_cmds[] = {
     {0x1C, (uint8_t[]) {0xA0}, 1, 0},
     {0xFE, (uint8_t[]) {0x00}, 1, 0},
     {0xC4, (uint8_t[]) {0x80}, 1, 0},
-    {0x3A, (uint8_t[]) {0x55}, 1, 0},       // RGB565
+    {0x3A, s_colmod, 1, 0},               // pixel format
     {0x35, (uint8_t[]) {0x00}, 1, 0},       // TE on V-blank
     {0x53, (uint8_t[]) {0x20}, 1, 0},
     {0x51, (uint8_t[]) {0x00}, 1, 0},       // brightness
@@ -36,8 +40,9 @@ static const co5300_lcd_init_cmd_t s_init_cmds[] = {
 
 static esp_lcd_panel_io_handle_t s_io;
 
-esp_err_t board_display_init(board_lcd_t *out, bool fast)
+esp_err_t board_display_init(board_lcd_t *out, bool fast, bool deep)
 {
+    s_colmod[0] = deep ? 0x77 : 0x55;
     const spi_bus_config_t bus = CO5300_PANEL_BUS_QSPI_CONFIG(
         BOARD_LCD_CLK_GPIO, BOARD_LCD_D0_GPIO, BOARD_LCD_D1_GPIO, BOARD_LCD_D2_GPIO, BOARD_LCD_D3_GPIO,
         LCD_MAX_TRANSFER);
@@ -61,7 +66,7 @@ esp_err_t board_display_init(board_lcd_t *out, bool fast)
     const esp_lcd_panel_dev_config_t panel_cfg = {
         .reset_gpio_num = BOARD_LCD_RST_GPIO,
         .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
-        .bits_per_pixel = 16,
+        .bits_per_pixel = deep ? 24 : 16,
         .vendor_config = (void *) &vendor,
     };
     esp_lcd_panel_handle_t panel = NULL;
@@ -74,7 +79,8 @@ esp_err_t board_display_init(board_lcd_t *out, bool fast)
 
     out->panel = panel;
     out->io = s_io;
-    ESP_LOGI(TAG, "CO5300 %dx%d ready, bus at %d MHz", BOARD_LCD_H_RES, BOARD_LCD_V_RES, fast ? 80 : 40);
+    ESP_LOGI(TAG, "CO5300 %dx%d ready, bus at %d MHz, %d-bit colour", BOARD_LCD_H_RES, BOARD_LCD_V_RES,
+             fast ? 80 : 40, deep ? 24 : 16);
     return ESP_OK;
 }
 

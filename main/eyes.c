@@ -859,6 +859,9 @@ static void draw_cb(lv_event_t *e)
         draw_hands(layer);
     }
     const lv_opa_t body_opa = (lv_opa_t) (255 * v->fog);
+    if (s.ball == NULL) {
+        s.ball = look_ball(v->rx, v->ry, s.frame); // shown again before the next frame
+    }
     if (s.ball != NULL) {
         look_draw(layer, s.ball, v->bx, v->by, 1, 1, 0, body_opa, black);
     } else {
@@ -1282,7 +1285,9 @@ static void frame_cb(lv_timer_t *timer)
     body_layout(&s.body);
     eye_layout();
     s.frame++;
-    s.ball = look_ball(s.body.rx, s.body.ry, s.frame);
+    // Hidden under the menu or the dark it isn't drawn: no new sizes to
+    // render (the menu draws its own Yoru meanwhile).
+    s.ball = lv_obj_has_flag(s.obj, LV_OBJ_FLAG_HIDDEN) ? NULL : look_ball(s.body.rx, s.body.ry, s.frame);
 
     // The body: the sphere, the tint, the halo.
     const bool body_changed = !s.body_valid || memcmp(&was, &s.body, sizeof(was)) != 0;

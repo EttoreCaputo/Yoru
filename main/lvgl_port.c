@@ -18,12 +18,13 @@
 /* Against tearing, a frame reaches the panel all at once, right after it
  * starts scanning out (the TE pin):
  * - LVGL draws the whole frame first, into a screen-sized buffer in PSRAM
- *   (direct mode, 424 KB), instead of 20-line strips sent while the next
- *   ones are still being drawn, over several of the panel's refreshes.
+ *   (direct mode, 424 KB, 636 KB in 24-bit colour), instead of 20-line
+ *   strips sent while the next ones are still being drawn, over several of
+ *   the panel's refreshes.
  * - On the frame's last area flush_cb waits for TE and sends every changed
  *   area, top to bottom, through two small bounce buffers in internal DMA
  *   RAM (18 KB each, no larger than the panel's biggest transfer,
- *   board_display.c): swapped to big-endian and turned on the way.
+ *   board_display.c): put in the panel's byte order and turned on the way.
  * Started at TE, the writes run ahead of the scan for Yoru-sized areas and
  * behind it for full-width ones, so either way each area shows whole. */
 #define LVGL_BOUNCE_LINES 20
@@ -38,9 +39,11 @@ static const char *TAG = "lvgl_port";
 static _lock_t s_lvgl_lock;
 static lv_display_t *s_disp;
 static lv_indev_t *s_touch;
-static uint16_t *s_fb;
-static uint16_t *s_bounce[2];
+static uint8_t *s_fb;
+static uint8_t *s_bounce[2];
 static size_t s_bounce_px;
+/* Bytes a pixel: 2 (RGB565) or 3 (RGB888), the same in LVGL and the panel. */
+static uint32_t s_px;
 static int s_next_bounce;
 /* A bounce buffer free to fill: given back when its transfer is done. */
 static SemaphoreHandle_t s_bounce_free;
@@ -134,14 +137,36 @@ static void wait_te(void)
 /* Copy `w` x `h` pixels from the frame buffer at (x, y) to `dst`, swapped
  * to big-endian. Rows start even and are an even number of pixels wide
  * (the rounder), so they go two pixels at a time. */
-static void copy_swapped(uint16_t *dst, int32_t x, int32_t y, int32_t w, int32_t h)
+static void copy_swapped(uint8_t *dst, int32_t x, int32_t y, int32_t w, int32_t h)
 {
     uint32_t *d = (uint32_t *) dst;
     for (int32_t row = 0; row < h; row++) {
-        const uint32_t *src = (const uint32_t *) (s_fb + (y + row) * BOARD_LCD_H_RES + x);
+        const uint32_t *src = (const uint32_t *) (s_fb + ((y + row) * BOARD_LCD_H_RES + x) * 2);
         for (int32_t i = 0; i < w / 2; i++) {
             const uint32_t v = src[i];
             *d++ = ((v & 0x00FF00FFu) << 8) | ((v >> 8) & 0x00FF00FFu);
+        }
+    }
+}
+
+/* LVGL keeps RGB888 as blue, green, red; the panel takes red first. */
+static void swap_rb(uint8_t *buf, uint32_t n)
+{
+    for (uint32_t i = 0; i < n; i++, buf += 3) {
+        const uint8_t b = buf[0];
+        buf[0] = buf[2];
+        buf[2] = b;
+    }
+}
+
+static void copy_rgb888(uint8_t *dst, int32_t x, int32_t y, int32_t w, int32_t h)
+{
+    for (int32_t row = 0; row < h; row++) {
+        const uint8_t *src = s_fb + ((y + row) * BOARD_LCD_H_RES + x) * 3;
+        for (int32_t i = 0; i < w; i++, src += 3, dst += 3) {
+            dst[0] = src[2];
+            dst[1] = src[1];
+            dst[2] = src[0];
         }
     }
 }
@@ -153,19 +178,29 @@ static void send_band(lv_display_t *disp, const lv_area_t *band)
     esp_lcd_panel_handle_t panel = (esp_lcd_panel_handle_t) lv_display_get_user_data(disp);
     const lv_display_rotation_t rot = lv_display_get_rotation(disp);
     const int32_t w = lv_area_get_width(band), h = lv_area_get_height(band);
-    uint16_t *buf = s_bounce[s_next_bounce];
+    uint8_t *buf = s_bounce[s_next_bounce];
     s_next_bounce ^= 1;
     xSemaphoreTake(s_bounce_free, portMAX_DELAY);
 
     lv_area_t out = *band;
+    const bool deep = s_px == 3;
     if (rot == LV_DISPLAY_ROTATION_0) {
-        copy_swapped(buf, band->x1, band->y1, w, h);
+        if (deep) {
+            copy_rgb888(buf, band->x1, band->y1, w, h);
+        } else {
+            copy_swapped(buf, band->x1, band->y1, w, h);
+        }
     } else {
-        const uint32_t px = sizeof(uint16_t);
+        const uint32_t px = s_px;
         const bool swap = rot == LV_DISPLAY_ROTATION_90 || rot == LV_DISPLAY_ROTATION_270;
-        const uint16_t *src = s_fb + band->y1 * BOARD_LCD_H_RES + band->x1;
-        lv_draw_sw_rotate(src, buf, w, h, BOARD_LCD_H_RES * px, (swap ? h : w) * px, rot, LV_COLOR_FORMAT_RGB565);
-        lv_draw_sw_rgb565_swap(buf, (uint32_t) (w * h));
+        const uint8_t *src = s_fb + (band->y1 * BOARD_LCD_H_RES + band->x1) * px;
+        lv_draw_sw_rotate(src, buf, w, h, BOARD_LCD_H_RES * px, (swap ? h : w) * px, rot,
+                          deep ? LV_COLOR_FORMAT_RGB888 : LV_COLOR_FORMAT_RGB565);
+        if (deep) {
+            swap_rb(buf, (uint32_t) (w * h));
+        } else {
+            lv_draw_sw_rgb565_swap(buf, (uint32_t) (w * h));
+        }
         lv_display_rotate_area(disp, &out);
     }
     if (esp_lcd_panel_draw_bitmap(panel, out.x1, out.y1, out.x2 + 1, out.y2 + 1, buf) != ESP_OK) {
@@ -364,18 +399,23 @@ void lvgl_port_unlock(void)
     _lock_release(&s_lvgl_lock);
 }
 
-esp_err_t lvgl_port_init(const board_lcd_t *lcd, lv_display_t **out_display)
+esp_err_t lvgl_port_init(const board_lcd_t *lcd, bool deep, lv_display_t **out_display)
 {
     lv_init();
 
     lv_display_t *disp = lv_display_create(BOARD_LCD_H_RES, BOARD_LCD_V_RES);
-    const size_t fb_size = BOARD_LCD_H_RES * BOARD_LCD_V_RES * sizeof(lv_color16_t);
+    // Before the buffers: LVGL works out their stride from it.
+    lv_display_set_color_format(disp, deep ? LV_COLOR_FORMAT_RGB888 : LV_COLOR_FORMAT_RGB565);
+    s_px = deep ? 3 : 2;
+    const size_t fb_size = BOARD_LCD_H_RES * BOARD_LCD_V_RES * s_px;
     s_fb = heap_caps_aligned_alloc(64, fb_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     ESP_RETURN_ON_FALSE(s_fb, ESP_ERR_NO_MEM, TAG, "frame buffer");
     memset(s_fb, 0, fb_size);
-    s_bounce_px = BOARD_LCD_H_RES * LVGL_BOUNCE_LINES;
+    // The same bytes at either depth: fewer lines of 24-bit pixels.
+    const size_t bounce_bytes = BOARD_LCD_H_RES * LVGL_BOUNCE_LINES * 2;
+    s_bounce_px = bounce_bytes / s_px;
     for (int i = 0; i < 2; i++) {
-        s_bounce[i] = spi_bus_dma_memory_alloc(BOARD_LCD_SPI_HOST, s_bounce_px * sizeof(uint16_t), 0);
+        s_bounce[i] = spi_bus_dma_memory_alloc(BOARD_LCD_SPI_HOST, bounce_bytes, 0);
         ESP_RETURN_ON_FALSE(s_bounce[i], ESP_ERR_NO_MEM, TAG, "bounce buffers");
     }
     s_bounce_free = xSemaphoreCreateCounting(2, 2);
@@ -384,7 +424,6 @@ esp_err_t lvgl_port_init(const board_lcd_t *lcd, lv_display_t **out_display)
 
     lv_display_set_buffers(disp, s_fb, NULL, fb_size, LV_DISPLAY_RENDER_MODE_DIRECT);
     lv_display_set_user_data(disp, lcd->panel);
-    lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
     lv_display_set_flush_cb(disp, flush_cb);
     lv_display_add_event_cb(disp, round_area_cb, LV_EVENT_INVALIDATE_AREA, NULL);
 

@@ -15,8 +15,8 @@
 #include "esp_flash.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "esp_system.h"
-#include "eyes.h"
 #include "habits.h"
 #include "habits_ui.h"
 #include "inbox.h"
@@ -24,6 +24,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "link.h"
+#include "look.h"
 #include "lvgl_port.h"
 #include "net.h"
 #include "nvs_flash.h"
@@ -36,16 +37,37 @@ static const char *TAG = "menu";
 
 #define CX (BOARD_LCD_H_RES / 2)
 #define CY (BOARD_LCD_V_RES / 2)
-/* The home: round apps in a honeycomb around Yoru, as on a watch. Six
- * around the middle, where Yoru is, each this big and this far out. */
-#define HEX_R 152
-#define ICON_D 112
-#define BADGE_D 34
-/* The apps fly out of Yoru one after the other. */
-#define POP_MS 420
-#define POP_STAGGER_MS 40
-/* A tapped app grows from its place to the whole screen as it opens. */
-#define ZOOM_MS 300
+/* The home: a honeycomb of small round bubbles, as on a watch, Yoru one of
+ * them. Centre to centre this far, each this big. */
+#define GRID_STEP 100.0f
+#define BUBBLE_R 42.0f
+/* The fisheye: past FISH_IN from the middle of the screen the bubbles
+ * shrink, down to FISH_MIN of their size FISH_SPAN further out. */
+#define FISH_IN 130.0f
+#define FISH_SPAN 110.0f
+#define FISH_MIN 0.3f
+/* The home redraws only the bubbles that changed, at most this often. */
+#define HOME_FRAME_MS 16
+/* Opening, Yoru shrinks into its bubble and the others bloom out of the
+ * middle one after the other. Closing, Yoru goes back to the middle at the
+ * size the face has under the menu (eyes.c, MENU_SIZE), and the face takes
+ * over. */
+#define INTRO_MS 360
+#define INTRO_STAGGER_MS 30
+#define OUTRO_MS 240
+#define YORU_PEEK_R (LOOK_SPHERE_R * 0.62f)
+/* A tapped bubble grows over the screen as it opens its app, and shrinks
+ * back into place when you come back. Past the corners: */
+#define ZOOM_MS 260
+#define ZOOM_R 340.0f
+#define PULSE_MS 260
+#define NOTE_MS 1800
+/* A finger that moves this far pans instead of tapping. */
+#define TAP_SLOP 10
+#define MAX_THROW 1600.0f
+/* A swipe up this long, from this close to the bottom edge, closes it. */
+#define EDGE_PX 56
+#define CLOSE_SWIPE_PX 60
 /* Closes by itself after this long untouched: shorter on the home, where
  * there is little to read. */
 #define IDLE_HOME_MS 8000
@@ -142,6 +164,7 @@ static const item_t DISPLAY_ITEMS[] = {
     SET("Night until", "Notte fino alle", K_ARC, SETTING_NIGHT_TO, F_HOUR),
     SET("Dim when asleep", "Attenua dormendo", K_SWITCH, SETTING_AUTO_DIM, F_NONE),
     SET("Rotation", "Rotazione", K_CHOICE, SETTING_ROTATION, F_ROTATION),
+    SET("24-bit colour", "Colori a 24 bit", K_SWITCH, SETTING_COLOR_24, F_NONE),
 };
 static const item_t SOUND_ITEMS[] = {
     SET("Volume", "Volume", K_ARC, SETTING_VOLUME, F_PCT),
@@ -200,40 +223,44 @@ static const category_t CATEGORIES[] = {
 
 /* ---- State ------------------------------------------------------------------ */
 
-/* The apps on the home, clockwise from the top. */
-typedef enum { APP_INBOX, APP_TIMERS, APP_HABITS, APP_SETTINGS, APP_FOCUS, APP_AGENTS, APP_COUNT } app_t;
+/* The bubbles on the home in honeycomb order: the middle, then clockwise
+ * from the top left (slot_pos). A new app goes at the end, on the next ring. */
+typedef enum {
+    APP_INBOX,
+    APP_YORU,
+    APP_AGENTS,
+    APP_TIMERS,
+    APP_HABITS,
+    APP_SETTINGS,
+    APP_FOCUS,
+    APP_COUNT
+} app_t;
 
 typedef struct {
     const char *en, *it;
-    /* The icon's gradient, top to bottom. */
+    /* The bubble's gradient, top to bottom. */
     uint32_t top, bottom;
     const char *glyph;
 } app_def_t;
 
 static const app_def_t APPS[APP_COUNT] = {
     [APP_INBOX] = {"Notifications", "Notifiche", 0xFF6B6B, 0xE0262F, LV_SYMBOL_ENVELOPE},
+    [APP_YORU] = {"Yoru", "Yoru", 0, 0, NULL},
+    [APP_AGENTS] = {"Agents", "Agenti", 0x5AB0FF, 0x0A6CDF, LV_SYMBOL_KEYBOARD},
     [APP_TIMERS] = {"Timers", "Timer", 0xFFB340, 0xF07800, NULL},
     [APP_HABITS] = {"Habits", "Abitudini", 0x2A2D36, 0x101114, NULL},
     [APP_SETTINGS] = {"Settings", "Impostazioni", 0x9A9AA2, 0x55555D, LV_SYMBOL_SETTINGS},
     [APP_FOCUS] = {"Do not disturb", "Non disturbare", 0x8E8CF8, 0x4B48D6, NULL},
-    [APP_AGENTS] = {"Agents", "Agenti", 0x5AB0FF, 0x0A6CDF, LV_SYMBOL_KEYBOARD},
 };
-
-/* What each app's icon shows live: a badge, a ring, the moon. */
-typedef struct {
-    lv_obj_t *icon, *badge, *badge_text;
-    lv_obj_t *arcs[3];
-    lv_obj_t *glyph;
-} app_icon_t;
 
 static struct {
     lv_obj_t *face;
     menu_cb_t cb;
-    /* One of these is up at a time: the home (see-through, Yoru in the
-     * middle), Settings, a category's page, the arc, or an app's page. */
+    /* One of these is up at a time: the home, Settings, a category's page,
+     * the arc, or an app's page. */
     lv_obj_t *home, *settings, *page, *editor, *app;
-    lv_obj_t *hint;
-    app_icon_t icons[APP_COUNT];
+    /* The app last opened, whose bubble the way back shrinks into. */
+    app_t from;
     int cat;
     const item_t *edit;
     lv_obj_t *edit_value;
@@ -244,6 +271,53 @@ static struct {
     lv_timer_t *timer;
     bool open;
 } s;
+
+/* A bubble this frame: its centre from the middle of the screen, its radius. */
+typedef struct {
+    float x, y, r;
+} bubble_t;
+
+/* What the bubbles show live: badges, the timer's ring, the habits' rings,
+ * the moon. */
+typedef struct {
+    int badge[APP_COUNT];
+    uint32_t badge_rgb[APP_COUNT];
+    float timer;
+    float habit[3];
+    uint32_t habit_rgb[3];
+    bool focus;
+} live_t;
+
+typedef enum { PH_IDLE, PH_INTRO, PH_OUTRO, PH_ZOOM, PH_UNZOOM } phase_t;
+
+/* The home: one object that draws every bubble itself, so a frame redraws
+ * the bubbles that changed and nothing else. */
+static struct {
+    lv_obj_t *obj, *name;
+    lv_timer_t *tick;
+    uint32_t tick_ms;
+    phase_t phase;
+    uint32_t phase_ms;
+    int target; // the bubble zooming
+    /* The pan, kept while the menu is open, and a throw's speed (px/s). */
+    float ox, oy, vx, vy;
+    bool dragging, drag, from_bottom;
+    lv_point_t press_pt, last_pt;
+    uint32_t last_ms;
+    float press_ox, press_oy;
+    int pressed; // -1: none
+    uint32_t pulse_ms[APP_COUNT];
+    bubble_t now[APP_COUNT];
+    lv_area_t drawn[APP_COUNT];
+    uint32_t dirty; // a bit per bubble to redraw where it is
+    live_t live;
+    const char *note;
+    uint32_t note_ms;
+    /* Yoru's eyes: where they look, the lid, the blinks. */
+    float gx, gy, lid;
+    uint32_t blink_ms, next_blink_ms;
+    uint32_t ball_frame;
+} h;
 
 static bool italian(void)
 {
@@ -553,7 +627,8 @@ static void show_face(bool show)
 }
 
 static void build_page(int cat);
-static void build_home(bool pop);
+static void build_home(app_t from);
+static void home_drop(void);
 static void build_settings(void);
 
 /* The direction of a swipe, once: the release after it is not a tap too. */
@@ -817,7 +892,7 @@ static void build_page(int cat)
     s.nvalues = 0;
     drop(&s.page);
     drop(&s.settings);
-    drop(&s.home);
+    home_drop();
     show_face(false);
     s.page = full_screen(true);
     lv_obj_add_event_cb(s.page, page_back_cb, LV_EVENT_GESTURE, NULL);
@@ -865,13 +940,13 @@ static void settings_back_cb(lv_event_t *e)
         return;
     }
     drop(&s.settings);
-    build_home(true);
+    build_home(APP_SETTINGS);
 }
 
 /* The categories, each a row with its round icon, as a watch's Settings. */
 static void build_settings(void)
 {
-    drop(&s.home);
+    home_drop();
     drop(&s.page);
     drop(&s.settings);
     s.nvalues = 0;
@@ -916,182 +991,621 @@ static void build_settings(void)
 
 /* ---- The home ------------------------------------------------------------------- */
 
-/* Where the i-th app sits: the top-left corner of its icon. */
-static void icon_pos(int i, int32_t *x, int32_t *y)
+/* Each bubble from its slot and the pan to where it shows this frame. */
+static float ease_out(float k)
 {
-    const float a = (-90.0f + 60.0f * (float) i) * 3.14159265f / 180.0f;
-    *x = CX + (int32_t) lroundf(HEX_R * cosf(a)) - ICON_D / 2;
-    *y = CY + (int32_t) lroundf(HEX_R * sinf(a)) - ICON_D / 2;
+    const float u = 1 - k;
+    return 1 - u * u * u;
 }
 
-/* A ring that fills up, inside an icon (the timer's, the habits'). */
-static lv_obj_t *ring_arc(lv_obj_t *parent, int32_t d, int32_t w, lv_color_t color, lv_color_t track)
+static float ease_in_out(float k)
 {
-    lv_obj_t *arc = lv_arc_create(parent);
-    lv_obj_remove_style_all(arc);
-    lv_obj_set_size(arc, d, d);
-    lv_obj_center(arc);
-    lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE);
-    lv_arc_set_rotation(arc, 270);
-    lv_arc_set_bg_angles(arc, 0, 360);
-    lv_arc_set_range(arc, 0, 1000);
-    lv_arc_set_value(arc, 0);
-    lv_obj_set_style_arc_width(arc, w, LV_PART_MAIN);
-    lv_obj_set_style_arc_color(arc, track, LV_PART_MAIN);
-    lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(arc, w, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(arc, color, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_opa(arc, LV_OPA_COVER, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_rounded(arc, true, LV_PART_INDICATOR);
-    return arc;
+    return k < 0.5f ? 4 * k * k * k : 1 - powf(-2 * k + 2, 3) / 2;
 }
 
-static void set_arc(lv_obj_t *arc, float k)
+/* Past 1 and back, for a pop. */
+static float back_out(float k)
 {
-    const int32_t v = (int32_t) lroundf(LV_CLAMP(0.0f, k, 1.0f) * 1000);
-    if (lv_arc_get_value(arc) != v) {
-        lv_arc_set_value(arc, v);
+    const float c1 = 1.4f, c3 = c1 + 1, u = k - 1;
+    return 1 + c3 * u * u * u + c1 * u * u;
+}
+
+static float clamp01(float k)
+{
+    return k < 0 ? 0 : k > 1 ? 1 : k;
+}
+
+/* Slot i of the honeycomb, from the middle: the middle, then ring after
+ * ring of 6, 12, 18..., each from the top left clockwise. */
+static void slot_pos(int i, float *x, float *y)
+{
+    static const int8_t DIR[6][2] = {{1, 0}, {0, 1}, {-1, 1}, {-1, 0}, {0, -1}, {1, -1}};
+    int q = 0, r = 0;
+    if (i > 0) {
+        int k = 1, n = i - 1;
+        while (n >= 6 * k) {
+            n -= 6 * k;
+            k++;
+        }
+        r = -k;
+        for (int side = 0; side < 6 && n > 0; side++) {
+            const int steps = LV_MIN(n, k);
+            q += DIR[side][0] * steps;
+            r += DIR[side][1] * steps;
+            n -= steps;
+        }
+    }
+    *x = GRID_STEP * ((float) q + (float) r * 0.5f);
+    *y = GRID_STEP * 0.8660254f * (float) r;
+}
+
+/* Like a watch's: towards the rim the bubbles shrink and close up, so more
+ * of them fit and the ones in the middle are the big ones. Returns the
+ * scale; (x, y) from the middle of the screen. */
+static float fisheye(float *x, float *y)
+{
+    const float d = hypotf(*x, *y);
+    if (d <= FISH_IN) {
+        return 1;
+    }
+    const float u = d - FISH_IN;
+    const float t = fminf(1, u / FISH_SPAN);
+    const float to = u <= FISH_SPAN ? FISH_IN + u * (1 - 0.4f * t)
+                                    : FISH_IN + 0.6f * FISH_SPAN + 0.2f * (u - FISH_SPAN);
+    *x *= to / d;
+    *y *= to / d;
+    return 1 - (1 - FISH_MIN) * t * t * (3 - 2 * t);
+}
+
+static void pan_bounds(float *x0, float *x1, float *y0, float *y1)
+{
+    *x0 = *x1 = *y0 = *y1 = 0;
+    for (int i = 0; i < APP_COUNT; i++) {
+        float x, y;
+        slot_pos(i, &x, &y);
+        // Far enough that any of them can come to the middle.
+        *x0 = fminf(*x0, -x);
+        *x1 = fmaxf(*x1, -x);
+        *y0 = fminf(*y0, -y);
+        *y1 = fmaxf(*y1, -y);
     }
 }
 
-static void set_badge(app_icon_t *ic, int n, lv_color_t color)
+static uint32_t since(uint32_t ms)
 {
-    if (n <= 0) {
-        lv_obj_add_flag(ic->badge, LV_OBJ_FLAG_HIDDEN);
+    return lv_tick_elaps(ms);
+}
+
+/* Where bubble i is this frame and how big, from the middle of the screen. */
+static bubble_t place(int i)
+{
+    float x, y;
+    slot_pos(i, &x, &y);
+    x += h.ox;
+    y += h.oy;
+    const float f = fisheye(&x, &y);
+    float r = BUBBLE_R * f;
+    const float t = (float) since(h.phase_ms);
+    switch (h.phase) {
+    case PH_INTRO: {
+        if (i == APP_YORU) {
+            // Yoru shrinks into its bubble from where it was, in the middle.
+            const float k = ease_out(clamp01(t / INTRO_MS));
+            x *= k;
+            y *= k;
+            r = LOOK_SPHERE_R + (r - LOOK_SPHERE_R) * k;
+            break;
+        }
+        // The others bloom out of the middle one after the other.
+        const float k = clamp01((t - (float) i * INTRO_STAGGER_MS) / INTRO_MS);
+        const float spread = 0.45f + 0.55f * ease_out(k);
+        x *= spread;
+        y *= spread;
+        r *= k <= 0 ? 0 : back_out(k);
+        break;
+    }
+    case PH_OUTRO: {
+        const float k = ease_in_out(clamp01(t / OUTRO_MS));
+        if (i == APP_YORU) {
+            // Back to the middle at the size the face has under the menu,
+            // which takes over from there.
+            x *= 1 - k;
+            y *= 1 - k;
+            r += (YORU_PEEK_R - r) * k;
+        } else {
+            x *= 1 - 0.4f * k;
+            y *= 1 - 0.4f * k;
+            r *= 1 - k;
+        }
+        break;
+    }
+    case PH_ZOOM:
+    case PH_UNZOOM:
+        if (i == h.target) {
+            float k = ease_in_out(clamp01(t / ZOOM_MS));
+            k = h.phase == PH_ZOOM ? k : 1 - k;
+            x *= 1 - k;
+            y *= 1 - k;
+            r += (ZOOM_R - r) * k;
+        }
+        break;
+    default:
+        break;
+    }
+    if (i == h.pressed) {
+        r *= 0.9f; // it sinks a little under the finger
+    }
+    if (h.pulse_ms[i] != 0) {
+        const float k = clamp01((float) since(h.pulse_ms[i]) / PULSE_MS);
+        r *= 1 - 0.16f * sinf((float) M_PI * k);
+    }
+    return (bubble_t) {x, y, fmaxf(0, r)};
+}
+
+static lv_area_t bubble_area(const bubble_t *b)
+{
+    // The badge sticks out a little past the top right.
+    const float pad = 0.12f * b->r + 4;
+    lv_area_t a = {
+        (int32_t) floorf(CX + b->x - b->r - pad),
+        (int32_t) floorf(CY + b->y - b->r - pad),
+        (int32_t) ceilf(CX + b->x + b->r + pad),
+        (int32_t) ceilf(CY + b->y + b->r + pad),
+    };
+    return a;
+}
+
+static void invalidate_bubble(int i, const bubble_t *b)
+{
+    const lv_area_t was = h.drawn[i], now = bubble_area(b);
+    const bool touch = was.x1 <= now.x2 && now.x1 <= was.x2 && was.y1 <= now.y2 && now.y1 <= was.y2;
+    if (touch) {
+        lv_area_t both = {LV_MIN(was.x1, now.x1), LV_MIN(was.y1, now.y1), LV_MAX(was.x2, now.x2),
+                          LV_MAX(was.y2, now.y2)};
+        lv_obj_invalidate_area(h.obj, &both);
+    } else {
+        lv_obj_invalidate_area(h.obj, &was);
+        lv_obj_invalidate_area(h.obj, &now);
+    }
+    h.drawn[i] = now;
+}
+
+/* ---- Drawing the home: everything by hand, in one object ---------------------- */
+
+static void disc(lv_layer_t *layer, float x, float y, float r, lv_color_t color)
+{
+    lv_draw_rect_dsc_t dsc;
+    lv_draw_rect_dsc_init(&dsc);
+    dsc.bg_color = color;
+    dsc.radius = LV_RADIUS_CIRCLE;
+    const lv_area_t a = {(int32_t) lroundf(x - r), (int32_t) lroundf(y - r), (int32_t) lroundf(x + r) - 1,
+                         (int32_t) lroundf(y + r) - 1};
+    lv_draw_rect(layer, &dsc, &a);
+}
+
+/* A ring that fills up from the top, clockwise. `r` is its outer edge. */
+static void ring(lv_layer_t *layer, float x, float y, float r, float w, float k, lv_color_t color, lv_color_t track)
+{
+    lv_draw_arc_dsc_t dsc;
+    lv_draw_arc_dsc_init(&dsc);
+    dsc.center.x = (int32_t) lroundf(x);
+    dsc.center.y = (int32_t) lroundf(y);
+    dsc.radius = (uint16_t) lroundf(r);
+    dsc.width = (int32_t) fmaxf(1, lroundf(w));
+    dsc.start_angle = 0;
+    dsc.end_angle = 360;
+    dsc.color = track;
+    lv_draw_arc(layer, &dsc);
+    k = clamp01(k);
+    if (k > 0.005f) {
+        dsc.start_angle = 270;
+        dsc.end_angle = 270 + (int32_t) lroundf(360 * k);
+        dsc.rounded = k < 0.995f;
+        dsc.color = color;
+        lv_draw_arc(layer, &dsc);
+    }
+}
+
+static void text(lv_layer_t *layer, const lv_font_t *font, float x, float y, lv_color_t color, const char *str)
+{
+    lv_draw_label_dsc_t dsc;
+    lv_draw_label_dsc_init(&dsc);
+    dsc.font = font;
+    dsc.color = color;
+    dsc.text = str;
+    dsc.align = LV_TEXT_ALIGN_CENTER;
+    const int32_t lh = lv_font_get_line_height(font);
+    const lv_area_t a = {(int32_t) x - 60, (int32_t) y - lh / 2, (int32_t) x + 60, (int32_t) y - lh / 2 + lh};
+    lv_draw_label(layer, &dsc, &a);
+}
+
+/* The glyph's font for a bubble this big; NULL when too small for one. */
+static const lv_font_t *glyph_font(float r, int smaller)
+{
+    static const lv_font_t *const FONTS[] = {&lv_font_montserrat_28, &lv_font_montserrat_20, &lv_font_montserrat_14};
+    const int step = (r >= 34 ? 0 : r >= 24 ? 1 : r >= 16 ? 2 : 3) + smaller;
+    return step < 3 ? FONTS[step] : NULL;
+}
+
+/* Yoru in its bubble: its own sphere, and its eyes as under the menu
+ * (eyes.c, EYES_MOOD_PEEK), so the face can take over where it ends. */
+static void draw_yoru(lv_layer_t *layer, float x, float y, float r)
+{
+    // Rendered once per size (look_ball): fewer sizes when it is big.
+    // Big, in steps of 4 from its own size, which is rendered already.
+    const int rq = r > 64 ? LOOK_SPHERE_R - 4 * (int) lroundf((LOOK_SPHERE_R - r) / 4)
+                          : LV_MAX(2, 2 * (int) lroundf(r / 2));
+    const look_sprite_t *sp = look_ball(rq, rq, ++h.ball_frame);
+    if (sp == NULL) {
         return;
     }
-    char text[8];
-    snprintf(text, sizeof(text), n > 9 ? "9+" : "%d", n);
-    if (strcmp(lv_label_get_text(ic->badge_text), text) != 0) {
-        lv_label_set_text(ic->badge_text, text);
+    look_draw(layer, sp, (int32_t) lroundf(x), (int32_t) lroundf(y), 1, 1, 0, LV_OPA_COVER, lv_color_black());
+    const float rr = (float) rq;
+    const float nx = 1 - 0.3f * h.gx * h.gx, ny = 1 - 0.25f * h.gy * h.gy;
+    const float hw = fmaxf(1, 0.071f * rr * nx), hh = fmaxf(1, 0.157f * rr * ny * h.lid);
+    const float ey = y + (0.114f + 0.343f * h.gy) * rr;
+    for (int side = -1; side <= 1; side += 2) {
+        const float ex = x + ((float) side * 0.229f * nx + 0.443f * h.gx) * rr;
+        lv_draw_rect_dsc_t dsc;
+        lv_draw_rect_dsc_init(&dsc);
+        dsc.bg_color = lv_color_hex(0x1D1B24);
+        dsc.radius = LV_RADIUS_CIRCLE;
+        const lv_area_t a = {(int32_t) lroundf(ex - hw), (int32_t) lroundf(ey - hh), (int32_t) lroundf(ex + hw),
+                             (int32_t) lroundf(ey + hh)};
+        lv_draw_rect(layer, &dsc, &a);
     }
-    lv_obj_set_style_bg_color(ic->badge, color, 0);
-    lv_obj_remove_flag(ic->badge, LV_OBJ_FLAG_HIDDEN);
 }
 
-/* The moon: a pale disc with a bite out of it in the icon's own colour. */
-static void paint_focus(app_icon_t *ic)
+static void draw_badge(lv_layer_t *layer, int i, float x, float y, float r)
 {
-    const bool on = board_settings_on(SETTING_FOCUS);
-    const lv_color_t bg = lv_color_hex(on ? 0x5E5CE6 : 0x2C2C34);
-    lv_obj_set_style_bg_color(ic->icon, bg, 0);
-    lv_obj_set_style_bg_grad_dir(ic->icon, LV_GRAD_DIR_NONE, 0);
-    lv_obj_set_style_bg_color(ic->arcs[0], on ? COL_TEXT : lv_color_hex(0x8E8E93), 0);
-    lv_obj_set_style_bg_color(ic->arcs[1], bg, 0);
+    const int n = h.live.badge[i];
+    if (n <= 0 || r < 18) {
+        return;
+    }
+    const float bx = x + 0.72f * r, by = y - 0.72f * r, br = 0.31f * r;
+    disc(layer, bx, by, br + fmaxf(2, 0.07f * r), COL_BG); // cut out of the bubble
+    disc(layer, bx, by, br, lv_color_hex(h.live.badge_rgb[i]));
+    char str[8];
+    snprintf(str, sizeof(str), n > 9 ? "9+" : "%d", n);
+    text(layer, r >= 34 ? &lv_font_montserrat_20 : &lv_font_montserrat_14, bx, by, COL_TEXT, str);
 }
 
-/* What the icons say now: what is unread, waiting, running, done today. */
+static void draw_app(lv_layer_t *layer, int i, const bubble_t *b)
+{
+    const float x = CX + b->x, y = CY + b->y, r = b->r;
+    if (r < 1) {
+        return;
+    }
+    if (i == APP_YORU) {
+        draw_yoru(layer, x, y, r);
+        return;
+    }
+    const app_def_t *d = &APPS[i];
+    const bool zooming = (h.phase == PH_ZOOM || h.phase == PH_UNZOOM) && i == h.target;
+    // Opening, it darkens to the black of the page it opens: the page then
+    // takes over without a fade (a blend over the whole screen is slow).
+    float dark = 0;
+    if (zooming) {
+        const float k = clamp01((float) since(h.phase_ms) / ZOOM_MS);
+        dark = h.phase == PH_ZOOM ? k : 1 - k;
+        dark = dark * dark;
+    }
+    const bool focus_on = h.live.focus;
+    uint32_t top = d->top, bottom = d->bottom;
+    if (i == APP_FOCUS) {
+        top = bottom = focus_on ? 0x5E5CE6 : 0x2C2C34;
+    }
+    lv_draw_rect_dsc_t dsc;
+    lv_draw_rect_dsc_init(&dsc);
+    dsc.radius = LV_RADIUS_CIRCLE;
+    const lv_color_t c0 = lv_color_mix(lv_color_black(), lv_color_hex(top), (uint8_t) (255 * dark));
+    const lv_color_t c1 = lv_color_mix(lv_color_black(), lv_color_hex(bottom), (uint8_t) (255 * dark));
+    dsc.bg_color = c1;
+    if (top != bottom) {
+        const lv_color_t colors[2] = {c0, c1};
+        lv_grad_init_stops(&dsc.bg_grad, colors, NULL, NULL, 2);
+        dsc.bg_grad.dir = LV_GRAD_DIR_VER;
+    }
+    const lv_area_t a = {(int32_t) lroundf(x - r), (int32_t) lroundf(y - r), (int32_t) lroundf(x + r) - 1,
+                         (int32_t) lroundf(y + r) - 1};
+    lv_draw_rect(layer, &dsc, &a);
+    if (zooming && dark > 0.15f) {
+        return; // only the colour grows to the page
+    }
+    // What's on it keeps its size while the bubble grows from under it.
+    const float rc = zooming ? BUBBLE_R : r;
+    switch (i) {
+    case APP_TIMERS: {
+        ring(layer, x, y, 0.84f * rc, 0.15f * rc, h.live.timer, COL_TEXT, lv_color_hex(0xB85A00));
+        const lv_font_t *f = glyph_font(rc, 1);
+        if (f != NULL) {
+            text(layer, f, x, y, COL_TEXT, LV_SYMBOL_BELL);
+        }
+        break;
+    }
+    case APP_HABITS:
+        // The day's first three habits as rings, as a watch's Activity.
+        for (int k = 0; k < 3; k++) {
+            const lv_color_t c = lv_color_hex(h.live.habit_rgb[k]);
+            ring(layer, x, y, (0.86f - 0.235f * (float) k) * rc, 0.19f * rc, h.live.habit[k], c,
+                 lv_color_mix(c, lv_color_black(), 60));
+        }
+        break;
+    case APP_FOCUS: {
+        // The moon: a pale disc with a bite out of it in the bubble's colour.
+        disc(layer, x - 0.07f * rc, y + 0.04f * rc, 0.41f * rc, focus_on ? COL_TEXT : lv_color_hex(0x8E8E93));
+        disc(layer, x + 0.21f * rc, y - 0.18f * rc, 0.36f * rc, lv_color_hex(top));
+        break;
+    }
+    default: {
+        const lv_font_t *f = glyph_font(rc, 0);
+        if (f != NULL && d->glyph != NULL) {
+            text(layer, f, x, y, COL_TEXT, d->glyph);
+        }
+        break;
+    }
+    }
+    draw_badge(layer, i, x, y, rc);
+}
+
+/* Over the object's black, which hides what's under it. */
+static void home_draw_cb(lv_event_t *e)
+{
+    lv_layer_t *layer = lv_event_get_layer(e);
+    const bool zooming = h.phase == PH_ZOOM || h.phase == PH_UNZOOM;
+    for (int i = 0; i < APP_COUNT; i++) {
+        if (!(zooming && i == h.target)) {
+            draw_app(layer, i, &h.now[i]);
+        }
+    }
+    if (zooming) {
+        draw_app(layer, h.target, &h.now[h.target]); // over the others
+    }
+}
+
+/* ---- What the bubbles say ------------------------------------------------------------ */
+
+/* What is unread, waiting, running, done today; the bubbles that changed
+ * are redrawn. */
 static void refresh_home(void)
 {
-    app_icon_t *ic = s.icons;
-    set_badge(&ic[APP_INBOX], inbox_unread(NULL), lv_color_hex(0xFF3B30));
-
+    live_t v;
+    memset(&v, 0, sizeof(v));
+    v.badge[APP_INBOX] = inbox_unread(NULL);
+    v.badge_rgb[APP_INBOX] = 0xFF3B30;
     agents_summary_t sum;
     agents_summary(&sum);
-    set_badge(&ic[APP_AGENTS], sum.waiting, lv_color_hex(0xFF9F0A));
-
+    v.badge[APP_AGENTS] = sum.waiting;
+    v.badge_rgb[APP_AGENTS] = 0xFF9F0A;
     timer_view_t tv;
     const int nt = timers_count();
-    const bool timer = timers_at(0, &tv);
-    set_arc(ic[APP_TIMERS].arcs[0], timer ? tv.left_s / tv.total_s : 0);
-    set_badge(&ic[APP_TIMERS], nt > 1 ? nt : 0, lv_color_hex(0xFF3B30));
-
-    for (int i = 0; i < 3; i++) {
-        const habit_t *h = habits_at(i);
-        set_arc(ic[APP_HABITS].arcs[i], h != NULL ? (float) h->done / (float) h->goal : 0);
+    v.timer = timers_at(0, &tv) && tv.total_s > 0 ? tv.left_s / tv.total_s : 0;
+    v.badge[APP_TIMERS] = nt > 1 ? nt : 0;
+    v.badge_rgb[APP_TIMERS] = 0xFF3B30;
+    static const uint32_t RGB[] = {0xFF375F, 0x30D158, 0x40C8E0};
+    for (int k = 0; k < 3; k++) {
+        const habit_t *hb = habits_at(k);
+        v.habit[k] = hb != NULL && hb->goal > 0 ? (float) hb->done / (float) hb->goal : 0;
+        v.habit_rgb[k] = hb != NULL ? hb->rgb : RGB[k];
     }
-    paint_focus(&ic[APP_FOCUS]);
+    v.focus = board_settings_on(SETTING_FOCUS);
+
+    for (int i = 0; i < APP_COUNT; i++) {
+        if (v.badge[i] != h.live.badge[i]) {
+            h.dirty |= 1u << i;
+        }
+    }
+    if (fabsf(v.timer - h.live.timer) > 0.002f) {
+        h.dirty |= 1u << APP_TIMERS;
+    }
+    if (memcmp(v.habit, h.live.habit, sizeof(v.habit)) != 0 || memcmp(v.habit_rgb, h.live.habit_rgb, sizeof(v.habit_rgb)) != 0) {
+        h.dirty |= 1u << APP_HABITS;
+    }
+    if (v.focus != h.live.focus) {
+        h.dirty |= 1u << APP_FOCUS;
+    }
+    h.live = v;
 }
 
-static void pop_cb(void *var, int32_t v)
+/* The name under the bubbles: the one under the finger, else the one in
+ * the middle; or what just happened, for a moment. */
+static void refresh_name(void)
 {
-    lv_obj_t *o = var;
-    int32_t x, y;
-    icon_pos((int) (intptr_t) lv_obj_get_user_data(o), &x, &y);
-    const int32_t x0 = CX - ICON_D / 2, y0 = CY - ICON_D / 2;
-    lv_obj_set_pos(o, x0 + (x - x0) * v / 1024, y0 + (y - y0) * v / 1024);
-}
-
-static void pop_start_cb(lv_anim_t *a)
-{
-    lv_obj_remove_flag(a->var, LV_OBJ_FLAG_HIDDEN);
-}
-
-/* Out of Yoru, one after the other, with a little bounce. */
-static void pop_out(lv_obj_t *o, int i)
-{
-    lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
-    pop_cb(o, 0);
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, o);
-    lv_anim_set_exec_cb(&a, pop_cb);
-    lv_anim_set_values(&a, 0, 1024);
-    lv_anim_set_duration(&a, POP_MS);
-    lv_anim_set_delay(&a, (uint32_t) i * POP_STAGGER_MS);
-    lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
-    lv_anim_set_start_cb(&a, pop_start_cb);
-    lv_anim_start(&a);
-}
-
-/* ---- Opening an app: it grows from its icon to the whole screen ---------- */
-
-static struct {
-    lv_obj_t *obj;
-    int32_t x, y; // where it starts, its centre
-} z;
-
-static void zoom_cb(void *var, int32_t v)
-{
-    const int32_t full = BOARD_LCD_H_RES * 3 / 2; // past the corners
-    const int32_t d = ICON_D + (full - ICON_D) * v / 1024;
-    const int32_t x = z.x + (CX - z.x) * v / 1024, y = z.y + (CY - z.y) * v / 1024;
-    lv_obj_set_size(var, d, d);
-    lv_obj_set_pos(var, x - d / 2, y - d / 2);
-    // Solid as it grows, then it melts into the page under it.
-    lv_obj_set_style_bg_opa(var, (lv_opa_t) (v < 400 ? 255 : 255 - (v - 400) * 255 / 624), 0);
-}
-
-static void zoom_done_cb(lv_anim_t *a)
-{
-    lv_obj_delete(a->var);
-    if (z.obj == a->var) {
-        z.obj = NULL;
+    const char *str;
+    if (h.note != NULL && since(h.note_ms) < NOTE_MS) {
+        str = h.note;
+    } else {
+        int best = h.pressed;
+        if (best < 0) {
+            float d = 1e9f;
+            for (int i = 0; i < APP_COUNT; i++) {
+                const float di = hypotf(h.now[i].x, h.now[i].y);
+                if (di < d) {
+                    d = di;
+                    best = i;
+                }
+            }
+        }
+        str = tr(APPS[best].en, APPS[best].it);
+    }
+    if (strcmp(lv_label_get_text(h.name), str) != 0) {
+        lv_label_set_text(h.name, str);
     }
 }
 
-static void zoom(int32_t x, int32_t y, uint32_t rgb)
+/* ---- Moving ----------------------------------------------------------------------------- */
+
+static void open_target(app_t app);
+static void home_drop(void);
+
+/* Where Yoru looks: at the bubble under your finger, else at the others;
+ * up as it goes back, as the face does under the menu. */
+static void yoru_gaze(float *gx, float *gy)
 {
-    if (z.obj != NULL) {
-        lv_anim_delete(z.obj, zoom_cb);
-        lv_obj_delete(z.obj);
+    const bubble_t *y = &h.now[APP_YORU];
+    float dx = -y->x, dy = -y->y;
+    if (h.phase == PH_OUTRO) {
+        dx = 0;
+        dy = -1;
+    } else if (h.pressed >= 0 && h.pressed != APP_YORU) {
+        dx = h.now[h.pressed].x - y->x;
+        dy = h.now[h.pressed].y - y->y;
     }
-    z.x = x;
-    z.y = y;
-    z.obj = circle(lv_layer_top(), ICON_D, rgb);
-    zoom_cb(z.obj, 0);
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, z.obj);
-    lv_anim_set_exec_cb(&a, zoom_cb);
-    lv_anim_set_values(&a, 0, 1024);
-    lv_anim_set_duration(&a, ZOOM_MS);
-    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-    lv_anim_set_completed_cb(&a, zoom_done_cb);
-    lv_anim_start(&a);
+    const float d = hypotf(dx, dy);
+    *gx = d > 1 ? 0.8f * dx / d : 0;
+    *gy = d > 1 ? 0.8f * dy / d : 0.2f;
+    if (h.phase == PH_OUTRO) {
+        *gy = -1;
+    }
 }
 
-static void app_back(void)
+static void yoru_step(float dt)
 {
-    drop(&s.app);
-    build_home(true);
+    // A blink every few seconds: closing quickly, opening a little slower.
+    float lid = 1;
+    if (h.blink_ms != 0) {
+        const float t = (float) since(h.blink_ms);
+        lid = t < 70 ? 1 - 0.94f * t / 70 : t < 200 ? 0.06f + 0.94f * (t - 70) / 130 : 1;
+        if (t >= 200) {
+            h.blink_ms = 0;
+            h.next_blink_ms = lv_tick_get() + 2500 + esp_random() % 3000;
+        }
+    } else if (h.phase == PH_IDLE && (int32_t) (lv_tick_get() - h.next_blink_ms) >= 0) {
+        h.blink_ms = lv_tick_get();
+    }
+    float tgx, tgy;
+    yoru_gaze(&tgx, &tgy);
+    const float k = 1 - expf(-dt * 14);
+    const float gx = h.gx + (tgx - h.gx) * k, gy = h.gy + (tgy - h.gy) * k;
+    if (fabsf(gx - h.gx) > 0.003f || fabsf(gy - h.gy) > 0.003f || lid != h.lid) {
+        h.dirty |= 1u << APP_YORU;
+    }
+    h.gx = gx;
+    h.gy = gy;
+    h.lid = lid;
 }
 
-static void open_app(lv_obj_t *(*build)(void (*back)(void)))
+/* A throw glides on and slows down; past the edge it springs back. */
+static void pan_step(float dt)
 {
-    drop(&s.home);
-    show_face(false);
-    s.app = build(app_back);
+    if (h.dragging) {
+        return;
+    }
+    float x0, x1, y0, y1;
+    pan_bounds(&x0, &x1, &y0, &y1);
+    h.ox += h.vx * dt;
+    h.oy += h.vy * dt;
+    const float slow = expf(-dt * 5);
+    h.vx *= slow;
+    h.vy *= slow;
+    const float back = 1 - expf(-dt * 14);
+    const float cx = LV_CLAMP(x0, h.ox, x1), cy = LV_CLAMP(y0, h.oy, y1);
+    if (cx != h.ox) {
+        h.ox += (cx - h.ox) * back;
+        h.vx *= expf(-dt * 20);
+        if (fabsf(cx - h.ox) < 0.3f) {
+            h.ox = cx;
+        }
+    }
+    if (cy != h.oy) {
+        h.oy += (cy - h.oy) * back;
+        h.vy *= expf(-dt * 20);
+        if (fabsf(cy - h.oy) < 0.3f) {
+            h.oy = cy;
+        }
+    }
+    if (fabsf(h.vx) < 4) {
+        h.vx = 0;
+    }
+    if (fabsf(h.vy) < 4) {
+        h.vy = 0;
+    }
+}
+
+static void tick_cb(lv_timer_t *t)
+{
+    const float dt = (float) LV_MIN(since(h.tick_ms), 100) / 1000.0f;
+    h.tick_ms = lv_tick_get();
+    pan_step(dt);
+    yoru_step(dt);
+
+    const uint32_t in_phase = since(h.phase_ms);
+    bool done = false;
+    if (h.phase == PH_INTRO && in_phase >= INTRO_MS + (APP_COUNT - 1) * INTRO_STAGGER_MS) {
+        h.phase = PH_IDLE;
+    } else if (h.phase == PH_UNZOOM && in_phase >= ZOOM_MS) {
+        h.phase = PH_IDLE;
+        h.dirty |= 1u << h.target; // with its glyph back
+    } else if ((h.phase == PH_ZOOM && in_phase >= ZOOM_MS) || (h.phase == PH_OUTRO && in_phase >= OUTRO_MS)) {
+        done = true;
+    }
+    for (int i = 0; i < APP_COUNT; i++) {
+        if (h.pulse_ms[i] != 0 && since(h.pulse_ms[i]) >= PULSE_MS) {
+            h.pulse_ms[i] = 0;
+            h.dirty |= 1u << i;
+        }
+        const bubble_t b = place(i);
+        const bubble_t *was = &h.now[i];
+        const bool moved = fabsf(b.x - was->x) > 0.2f || fabsf(b.y - was->y) > 0.2f || fabsf(b.r - was->r) > 0.2f;
+        // The one opening or closing changes colour too.
+        const bool zooming = (h.phase == PH_ZOOM || h.phase == PH_UNZOOM) && i == h.target;
+        if (moved || zooming || (h.dirty & (1u << i)) || h.pulse_ms[i] != 0) {
+            h.now[i] = b;
+            invalidate_bubble(i, &b);
+        }
+    }
+    h.dirty = 0;
+    refresh_name();
+
+    if (done) {
+        const phase_t ph = h.phase;
+        const app_t app = (app_t) h.target;
+        h.phase = PH_IDLE;
+        if (ph == PH_ZOOM) {
+            open_target(app);
+        } else {
+            menu_close();
+        }
+    }
+}
+
+static void set_phase(phase_t ph, int target)
+{
+    h.phase = ph;
+    h.phase_ms = lv_tick_get();
+    h.target = target;
+}
+
+static int hit(lv_point_t p)
+{
+    int best = -1;
+    float bd = 1e9f;
+    for (int i = 0; i < APP_COUNT; i++) {
+        const bubble_t *b = &h.now[i];
+        const float d = hypotf((float) p.x - (CX + b->x), (float) p.y - (CY + b->y));
+        if (d <= b->r + 6 && d < bd && b->r > 8) {
+            best = i;
+            bd = d;
+        }
+    }
+    return best;
+}
+
+static void press(int i)
+{
+    if (h.pressed >= 0) {
+        h.dirty |= 1u << h.pressed;
+    }
+    h.pressed = i;
+    if (i >= 0) {
+        h.dirty |= 1u << i;
+    }
+}
+
+/* Past the edge the pan gives less and less, as a rubber band. */
+static float band(float v, float lo, float hi)
+{
+    return v < lo ? lo - (lo - v) * 0.35f : v > hi ? hi + (v - hi) * 0.35f : v;
 }
 
 static void toggle_focus(void)
@@ -1099,22 +1613,183 @@ static void toggle_focus(void)
     const bool on = !board_settings_on(SETTING_FOCUS);
     board_settings_set(SETTING_FOCUS, on);
     playback_sound(on ? SOUND_YAWN : SOUND_CHIRP);
-    paint_focus(&s.icons[APP_FOCUS]);
-    lv_label_set_text(s.hint, on ? tr("Shh... do not disturb", "Shh... non disturbare")
-                                 : tr("Back to normal", "Si torna a parlare"));
-    // A little bounce, so the tap is felt.
-    pop_out(s.icons[APP_FOCUS].icon, 0);
+    refresh_home();
+    h.note = on ? tr("Shh... do not disturb", "Shh... non disturbare") : tr("Back to normal", "Si torna a parlare");
+    h.note_ms = lv_tick_get();
+    h.pulse_ms[APP_FOCUS] = lv_tick_get(); // a little bounce, so the tap is felt
 }
 
-static void launch(app_t app)
+static void home_close(void)
 {
-    if (app == APP_FOCUS) {
-        toggle_focus();
-        return;
+    if (h.phase == PH_IDLE || h.phase == PH_INTRO) {
+        press(-1);
+        set_phase(PH_OUTRO, APP_YORU);
     }
-    int32_t x, y;
-    icon_pos(app, &x, &y);
-    const uint32_t rgb = app == APP_HABITS ? 0x30D158 : APPS[app].bottom;
+}
+
+static void tap(app_t app)
+{
+    switch (app) {
+    case APP_YORU:
+        home_close();
+        break;
+    case APP_FOCUS:
+        toggle_focus();
+        break;
+    default:
+        set_phase(PH_ZOOM, app);
+        break;
+    }
+}
+
+static void home_cb(lv_event_t *e)
+{
+    const lv_event_code_t code = lv_event_get_code(e);
+    if (h.phase != PH_IDLE && h.phase != PH_INTRO) {
+        return; // on its way somewhere
+    }
+    lv_point_t p;
+    lv_indev_get_point(lv_indev_active(), &p);
+    const uint32_t now = lv_tick_get();
+    switch (code) {
+    case LV_EVENT_PRESSED:
+        h.dragging = true;
+        h.drag = false;
+        h.press_pt = p;
+        h.last_pt = p;
+        h.last_ms = now;
+        h.press_ox = h.ox;
+        h.press_oy = h.oy;
+        h.vx = h.vy = 0;
+        h.from_bottom = p.y > BOARD_LCD_V_RES - EDGE_PX;
+        press(hit(p));
+        break;
+    case LV_EVENT_PRESSING: {
+        const int32_t dx = p.x - h.press_pt.x, dy = p.y - h.press_pt.y;
+        if (h.from_bottom && -dy > CLOSE_SWIPE_PX) {
+            // Pushed up from the bottom edge: back to Yoru, as the menu
+            // came down from the top.
+            h.dragging = false;
+            home_close();
+            return;
+        }
+        if (!h.drag && dx * dx + dy * dy > TAP_SLOP * TAP_SLOP) {
+            h.drag = true;
+            press(-1);
+        }
+        if (h.drag && !h.from_bottom) {
+            float x0, x1, y0, y1;
+            pan_bounds(&x0, &x1, &y0, &y1);
+            h.ox = band(h.press_ox + (float) dx, x0, x1);
+            h.oy = band(h.press_oy + (float) dy, y0, y1);
+            const float dt = (float) LV_MAX(since(h.last_ms), 1) / 1000.0f;
+            h.vx = 0.6f * h.vx + 0.4f * (float) (p.x - h.last_pt.x) / dt;
+            h.vy = 0.6f * h.vy + 0.4f * (float) (p.y - h.last_pt.y) / dt;
+            h.last_pt = p;
+            h.last_ms = now;
+        }
+        break;
+    }
+    case LV_EVENT_RELEASED: {
+        const int i = h.pressed;
+        h.dragging = false;
+        press(-1);
+        // A finger held still at the end stops the throw.
+        if (since(h.last_ms) > 80) {
+            h.vx = h.vy = 0;
+        }
+        h.vx = LV_CLAMP(-MAX_THROW, h.vx, MAX_THROW);
+        h.vy = LV_CLAMP(-MAX_THROW, h.vy, MAX_THROW);
+        if (!h.drag && i >= 0) {
+            tap((app_t) i);
+        }
+        break;
+    }
+    case LV_EVENT_PRESS_LOST:
+        h.dragging = false;
+        press(-1);
+        break;
+    default:
+        break;
+    }
+}
+
+/* The honeycomb, with Yoru as one of its bubbles. `from` is the app being
+ * left, which shrinks back into its bubble; APP_COUNT for none (the
+ * bubbles bloom out of Yoru). */
+static void build_home(app_t from)
+{
+    home_drop();
+    show_face(false); // Yoru is in its bubble now
+    h.obj = full_screen(true);
+    s.home = h.obj;
+    lv_obj_add_event_cb(h.obj, home_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
+    lv_obj_add_event_cb(h.obj, home_cb, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(h.obj, home_cb, LV_EVENT_PRESSING, NULL);
+    lv_obj_add_event_cb(h.obj, home_cb, LV_EVENT_RELEASED, NULL);
+    lv_obj_add_event_cb(h.obj, home_cb, LV_EVENT_PRESS_LOST, NULL);
+    h.name = label(h.obj, &lv_font_montserrat_20, COL_DIM, "");
+    lv_obj_set_width(h.name, 260);
+    lv_obj_set_style_text_align(h.name, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(h.name, LV_LABEL_LONG_DOT);
+    lv_obj_align(h.name, LV_ALIGN_BOTTOM_MID, 0, -30);
+
+    h.pressed = -1;
+    h.dragging = false;
+    h.vx = h.vy = 0;
+    h.note = NULL;
+    h.lid = 1;
+    h.blink_ms = 0;
+    h.next_blink_ms = lv_tick_get() + 1500;
+    memset(h.pulse_ms, 0, sizeof(h.pulse_ms));
+    memset(&h.live, 0, sizeof(h.live));
+    refresh_home();
+    if (from < APP_COUNT) {
+        set_phase(PH_UNZOOM, from);
+    } else {
+        set_phase(PH_INTRO, APP_YORU);
+    }
+    for (int i = 0; i < APP_COUNT; i++) {
+        h.now[i] = place(i);
+        h.drawn[i] = bubble_area(&h.now[i]);
+    }
+    yoru_gaze(&h.gx, &h.gy);
+    lv_obj_invalidate(h.obj);
+    refresh_name();
+    h.tick_ms = lv_tick_get();
+    h.tick = lv_timer_create(tick_cb, HOME_FRAME_MS, NULL);
+}
+
+static void home_drop(void)
+{
+    if (h.tick != NULL) {
+        lv_timer_delete(h.tick);
+        h.tick = NULL;
+    }
+    h.obj = NULL;
+    h.name = NULL;
+    drop(&s.home);
+}
+
+/* ---- Opening an app ------------------------------------------------------------------ */
+
+static void app_back(void)
+{
+    drop(&s.app);
+    build_home(s.from);
+}
+
+static void open_app(lv_obj_t *(*build)(void (*back)(void)))
+{
+    home_drop();
+    show_face(false);
+    s.app = build(app_back);
+}
+
+/* Once its bubble has grown over the screen, or at once for the host. */
+static void open_target(app_t app)
+{
+    s.from = app;
     switch (app) {
     case APP_INBOX:
         inbox_ui_open(NULL); // the menu goes as the view comes
@@ -1132,122 +1807,8 @@ static void launch(app_t app)
         open_app(habits_ui_build);
         break;
     default:
-        return;
-    }
-    zoom(x + ICON_D / 2, y + ICON_D / 2, rgb);
-}
-
-static void app_cb(lv_event_t *e)
-{
-    const app_t app = (app_t) (intptr_t) lv_event_get_user_data(e);
-    if (lv_event_get_code(e) == LV_EVENT_PRESSED) {
-        lv_label_set_text(s.hint, tr(APPS[app].en, APPS[app].it));
-        // Yoru looks at the one under your finger.
-        int32_t x, y;
-        icon_pos(app, &x, &y);
-        eyes_look_at((float) (x + ICON_D / 2 - CX) / HEX_R, (float) (y + ICON_D / 2 - CY) / HEX_R);
-        return;
-    }
-    launch(app);
-}
-
-static void home_cb(lv_event_t *e)
-{
-    if (lv_event_get_code(e) == LV_EVENT_GESTURE) {
-        if (swipe_dir() == LV_DIR_TOP) {
-            menu_close();
-        }
-        return;
-    }
-    // A tap on Yoru in the middle: back to it.
-    lv_point_t p;
-    lv_indev_get_point(lv_indev_active(), &p);
-    if (LV_ABS(p.x - CX) < 70 && LV_ABS(p.y - CY) < 70) {
-        menu_close();
-    }
-}
-
-static void add_badge(lv_obj_t *icon, app_icon_t *ic)
-{
-    ic->badge = circle(icon, BADGE_D, 0xFF3B30);
-    lv_obj_set_style_border_color(ic->badge, COL_BG, 0);
-    lv_obj_set_style_border_width(ic->badge, 3, 0);
-    lv_obj_align(ic->badge, LV_ALIGN_TOP_RIGHT, 6, -4);
-    ic->badge_text = label(ic->badge, &lv_font_montserrat_20, COL_TEXT, "");
-    lv_obj_center(ic->badge_text);
-    lv_obj_add_flag(ic->badge, LV_OBJ_FLAG_HIDDEN);
-}
-
-static void build_icon(int i)
-{
-    const app_def_t *d = &APPS[i];
-    app_icon_t *ic = &s.icons[i];
-    memset(ic, 0, sizeof(*ic));
-    lv_obj_t *b = circle(s.home, ICON_D, d->bottom);
-    ic->icon = b;
-    lv_obj_set_user_data(b, (void *) (intptr_t) i);
-    lv_obj_set_style_bg_grad_color(b, lv_color_hex(d->bottom), 0);
-    lv_obj_set_style_bg_color(b, lv_color_hex(d->top), 0);
-    lv_obj_set_style_bg_grad_dir(b, LV_GRAD_DIR_VER, 0);
-    // Pressed, it sinks a little, as a watch's does.
-    lv_obj_set_style_transform_width(b, -5, LV_STATE_PRESSED);
-    lv_obj_set_style_transform_height(b, -5, LV_STATE_PRESSED);
-    lv_obj_add_flag(b, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_flag(b, LV_OBJ_FLAG_OVERFLOW_VISIBLE); // the badge sticks out
-    lv_obj_add_event_cb(b, app_cb, LV_EVENT_CLICKED, (void *) (intptr_t) i);
-    lv_obj_add_event_cb(b, app_cb, LV_EVENT_PRESSED, (void *) (intptr_t) i);
-
-    switch (i) {
-    case APP_TIMERS:
-        ic->arcs[0] = ring_arc(b, ICON_D - 18, 8, COL_TEXT, lv_color_hex(0xB85A00));
-        ic->glyph = label(b, &lv_font_montserrat_28, COL_TEXT, LV_SYMBOL_BELL);
-        lv_obj_center(ic->glyph);
-        break;
-    case APP_HABITS:
-        // The day's first three habits as rings, as a watch's Activity.
-        for (int k = 0; k < 3; k++) {
-            const habit_t *h = habits_at(k);
-            static const uint32_t RGB[] = {0xFF375F, 0x30D158, 0x40C8E0};
-            const lv_color_t c = lv_color_hex(h != NULL ? h->rgb : RGB[k]);
-            ic->arcs[k] = ring_arc(b, ICON_D - 14 - 26 * k, 11, c, lv_color_mix(c, lv_color_black(), 60));
-        }
-        break;
-    case APP_FOCUS: {
-        lv_obj_t *moon = circle(b, 46, 0xF2F2F5);
-        lv_obj_align(moon, LV_ALIGN_CENTER, -4, 2);
-        lv_obj_t *bite = circle(b, 40, 0x5E5CE6);
-        lv_obj_align(bite, LV_ALIGN_CENTER, 12, -10);
-        ic->arcs[0] = moon;
-        ic->arcs[1] = bite;
         break;
     }
-    default:
-        ic->glyph = label(b, &lv_font_montserrat_40, COL_TEXT, d->glyph);
-        lv_obj_center(ic->glyph);
-        break;
-    }
-    // Every icon has one, hidden until it has something to count.
-    add_badge(b, ic);
-}
-
-/* Six round apps around Yoru, who peeks out from the middle. */
-static void build_home(bool pop)
-{
-    show_face(true);
-    s.home = full_screen(false); // see-through: Yoru is the middle one
-    lv_obj_add_event_cb(s.home, home_cb, LV_EVENT_GESTURE, NULL);
-    lv_obj_add_event_cb(s.home, home_cb, LV_EVENT_CLICKED, NULL);
-    for (int i = 0; i < APP_COUNT; i++) {
-        build_icon(i);
-        if (pop) {
-            pop_out(s.icons[i].icon, i);
-        } else {
-            pop_cb(s.icons[i].icon, 1024);
-        }
-    }
-    refresh_home();
-    s.hint = label(s.home, &lv_font_montserrat_20, COL_TEXT, "");
-    lv_obj_align(s.hint, LV_ALIGN_CENTER, 0, 80);
 }
 
 /* ---- Open and close -------------------------------------------------------------------------- */
@@ -1257,7 +1818,11 @@ static void idle_cb(lv_timer_t *t)
     const uint32_t idle = lv_display_get_inactive_time(NULL);
     const uint32_t limit = s.home != NULL ? IDLE_HOME_MS : s.app != NULL ? IDLE_APP_MS : IDLE_PAGE_MS;
     if (idle >= limit) {
-        menu_close();
+        if (s.home != NULL) {
+            home_close(); // Yoru goes back to the middle
+        } else {
+            menu_close();
+        }
         return;
     }
     if (s.page != NULL) {
@@ -1287,7 +1852,8 @@ void menu_open(void)
     inbox_ui_close();
     s.open = true;
     lv_display_trigger_activity(NULL);
-    build_home(true);
+    h.ox = h.oy = 0;
+    build_home(APP_COUNT);
     s.timer = lv_timer_create(idle_cb, 1000, NULL);
     ESP_LOGI(TAG, "open");
     if (s.cb != NULL) {
@@ -1301,7 +1867,7 @@ void menu_close(void)
         return;
     }
     s.open = false;
-    drop(&s.home);
+    home_drop();
     drop(&s.settings);
     drop(&s.page);
     drop(&s.editor);
@@ -1320,7 +1886,8 @@ void menu_close(void)
 
 bool menu_open_page(const char *name)
 {
-    static const char *const APP_NAMES[APP_COUNT] = {"inbox", "timers", "habits", "settings", NULL, NULL};
+    static const char *const APP_NAMES[APP_COUNT] = {
+        [APP_INBOX] = "inbox", [APP_TIMERS] = "timers", [APP_HABITS] = "habits", [APP_SETTINGS] = "settings"};
     if (strcasecmp(name, "home") == 0) {
         menu_open();
         return true;
@@ -1328,7 +1895,7 @@ bool menu_open_page(const char *name)
     for (int i = 0; i < APP_COUNT; i++) {
         if (APP_NAMES[i] != NULL && strcasecmp(name, APP_NAMES[i]) == 0) {
             menu_open();
-            launch((app_t) i);
+            open_target((app_t) i);
             return true;
         }
     }
