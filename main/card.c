@@ -106,7 +106,7 @@ lv_obj_t *card_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color, 
     return l;
 }
 
-lv_obj_t *card_root(bool opaque)
+lv_obj_t *card_root(void)
 {
     lv_obj_t *o = lv_obj_create(lv_layer_top());
     lv_obj_remove_style_all(o);
@@ -117,10 +117,6 @@ lv_obj_t *card_root(bool opaque)
     // The swipes stop here: bubbled on, they'd reach the top layer, which
     // nobody listens to.
     lv_obj_remove_flag(o, LV_OBJ_FLAG_GESTURE_BUBBLE);
-    if (opaque) {
-        lv_obj_set_style_bg_color(o, lv_color_hex(0x000000), 0);
-        lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
-    }
     return o;
 }
 

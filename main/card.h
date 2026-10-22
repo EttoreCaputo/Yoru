@@ -46,8 +46,10 @@ static inline const char *card_tr(const char *en, const char *it)
 lv_obj_t *card_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color, const char *text);
 
 /** A full-screen root on the top layer that takes every touch and swipe,
- * so nothing reaches Yoru underneath; black when `opaque`. */
-lv_obj_t *card_root(bool opaque);
+ * so nothing reaches Yoru underneath. It has no background: a view that
+ * covers Yoru hides him and lets the screen's own black show, instead of
+ * filling every redrawn area with black a second time. */
+lv_obj_t *card_root(void);
 
 /** The time left, as a ring along the rim from the top. */
 lv_obj_t *card_rim(lv_obj_t *parent);

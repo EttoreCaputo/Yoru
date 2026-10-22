@@ -1,5 +1,23 @@
 # Firmware changelog
 
+## 0.11.9
+
+Three games with Yoru in the Games app of the menu.
+
+- **The Games page** shows Yoru in the middle and the games around him as round bubbles; he looks at the one under your finger. Tap one to play, tap the title at the top of a game to come back.
+- **Tilt ball.** Yoru curls into a ball and you roll him home by tilting the board: past walls, around holes into the dark (he stares at them, and gasps), through gates that slide, eating the fireflies on the way. Ten levels that get harder. Bumping into walls squashes him, a hole sends him back to the start, and the glowing hole is home. Whatever angle you hold the board at when a level starts counts as flat; tap the black to set it again.
+- **Slingshot.** Pull Yoru back from his pad and let go: he flies across the dark and the little planets bend his path with their pull. Dots show where the shot goes. Planets bump him, black holes swallow him, and past the edge he drifts away. Eight levels, with moons going round and black holes to thread; fewer shots is better.
+- **Constellations.** Yoru shows you the sky he comes from: drag him from star to star along every line, in one stroke, without going over a line twice. Lift your finger and the sky forgets; after two tries the stars to start from glow. Once drawn, he tells you its name. Seven skies, the last one is him.
+- Each game remembers the level you reached. Everything runs smoothly: Tilt ball at 60 frames a second, and the other two only redraw what moves.
+
+## 0.11.8
+
+Smoother opening and closing in the menu.
+
+- **Apps open as a wave.** Tapping a bubble no longer swells it over the whole screen: it hollows into a ring of its colour that ripples out past the edge, and closes back into the bubble when you return. Only the band the ring crosses is redrawn, so it runs at about 26 frames a second instead of 14 to 20, without the hitches of up to a tenth of a second.
+- **Notifications open at once,** without the fade over the whole screen, which was the slowest thing the screen could draw.
+- The menu's pages no longer paint their black twice, a little less work on every frame.
+
 ## 0.11.7
 
 - **Yoru can let the Mac judge when you finished talking.** With "Understand when you've finished" set to Smart Turn in Yoru Hub, a short pause to think no longer ends what you are saying: the board waits up to a second and a half, and Yoru Hub stops listening as soon as your voice sounds finished. Without it, nothing changes.

@@ -129,7 +129,7 @@ static void build(const char *tool, const char *text, const char *project, bool 
 {
     // See-through, so Yoru shows in the middle, but it takes every touch:
     // no pokes or menu while a request waits.
-    s.card = card_root(false);
+    s.card = card_root();
     s.rim = card_rim(s.card);
 
     // Which tool, on one line.

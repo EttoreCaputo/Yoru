@@ -20,6 +20,7 @@
 #include "inbox.h"
 #include "inbox_ui.h"
 #include "freertos/FreeRTOS.h"
+#include "games_ui.h"
 #include "freertos/task.h"
 #include "link.h"
 #include "look.h"
@@ -54,10 +55,22 @@ static const char *TAG = "menu";
 #define INTRO_STAGGER_MS 30
 #define OUTRO_MS 240
 #define YORU_PEEK_R (LOOK_SPHERE_R * 0.62f)
-/* A tapped bubble grows over the screen as it opens its app, and shrinks
- * back into place when you come back. Past the corners: */
-#define ZOOM_MS 260
-#define ZOOM_R 340.0f
+/* A tapped bubble opens its app as a wave: it hollows into a ring of its
+ * colour that sweeps out past the rim, leaving the black of the page; coming
+ * back, the ring closes into the bubble again. Only the band the ring sweeps
+ * is redrawn: a disc growing over the whole screen redrew and sent every
+ * pixel, every frame, and ran at 14-20 fps with frames of up to 150 ms. */
+#define ZOOM_MS 380
+#define WAVE_W 14.0f
+/* The round screen's radius: what's past it is never seen. */
+#define SCREEN_R (BOARD_LCD_H_RES / 2)
+/* The swept band goes out as at most this many bands of rows, two runs
+ * each: LVGL keeps 32 areas a frame before it redraws everything, and
+ * each area costs its own transfer, so thinner bands are no faster. */
+#define WAVE_BANDS 11
+/* The wave's radius against how much of the screen it has covered,
+ * sampled at this many radii. */
+#define WAVE_STEPS 40
 #define PULSE_MS 260
 #define NOTE_MS 1800
 /* A finger that moves this far pans instead of tapping. */
@@ -217,6 +230,7 @@ typedef enum {
     APP_HABITS,
     APP_SETTINGS,
     APP_FOCUS,
+    APP_GAMES,
     APP_COUNT
 } app_t;
 
@@ -234,6 +248,7 @@ static const app_def_t APPS[APP_COUNT] = {
     [APP_HABITS] = {"Habits", "Abitudini", 0x2A2D36, 0x101114, NULL},
     [APP_SETTINGS] = {"Settings", "Impostazioni", 0x9A9AA2, 0x55555D, LV_SYMBOL_SETTINGS},
     [APP_FOCUS] = {"Do not disturb", "Non disturbare", 0x8E8CF8, 0x4B48D6, NULL},
+    [APP_GAMES] = {"Games", "Giochi", 0x5BE07A, 0x1E9E46, LV_SYMBOL_PLAY},
 };
 
 static struct {
@@ -282,6 +297,11 @@ static struct {
     phase_t phase;
     uint32_t phase_ms;
     int target; // the bubble zooming
+    /* The wave's ring as last drawn: inner and outer radius. */
+    float wave_in, wave_out;
+    /* The share of the screen inside the wave at WAVE_STEPS radii from
+     * the bubble's out to past the rim. */
+    float wave_cover[WAVE_STEPS];
     /* The pan, kept while the menu is open, and a throw's speed (px/s). */
     float ox, oy, vx, vy;
     bool dragging, drag, from_bottom;
@@ -536,7 +556,10 @@ static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color
     return l;
 }
 
-static lv_obj_t *full_screen(bool opaque)
+/* A full-screen root on the top layer. It draws no background: Yoru is
+ * hidden while the menu is open and the screen is black already, so a
+ * black of its own would only fill every redrawn area twice. */
+static lv_obj_t *full_screen(void)
 {
     lv_obj_t *o = lv_obj_create(lv_layer_top());
     lv_obj_remove_style_all(o);
@@ -547,10 +570,6 @@ static lv_obj_t *full_screen(bool opaque)
     // The swipes stop here: bubbled on, they'd reach the top layer, which
     // nobody listens to.
     lv_obj_remove_flag(o, LV_OBJ_FLAG_GESTURE_BUBBLE);
-    if (opaque) {
-        lv_obj_set_style_bg_color(o, COL_BG, 0);
-        lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
-    }
     return o;
 }
 
@@ -630,7 +649,7 @@ static void build_editor(const item_t *it)
 {
     s.edit = it;
     drop(&s.page);
-    s.editor = full_screen(true);
+    s.editor = full_screen();
     lv_obj_add_event_cb(s.editor, editor_back_cb, LV_EVENT_CLICKED, NULL);
     lv_obj_add_event_cb(s.editor, editor_back_cb, LV_EVENT_GESTURE, NULL);
 
@@ -842,7 +861,7 @@ static void build_page(int cat)
     drop(&s.settings);
     home_drop();
     show_face(false);
-    s.page = full_screen(true);
+    s.page = full_screen();
     lv_obj_add_event_cb(s.page, page_back_cb, LV_EVENT_GESTURE, NULL);
 
     // The title is the way back.
@@ -899,7 +918,7 @@ static void build_settings(void)
     drop(&s.settings);
     s.nvalues = 0;
     show_face(false);
-    s.settings = full_screen(true);
+    s.settings = full_screen();
     lv_obj_add_event_cb(s.settings, settings_back_cb, LV_EVENT_GESTURE, NULL);
 
     char title[40];
@@ -1067,16 +1086,6 @@ static bubble_t place(int i)
         }
         break;
     }
-    case PH_ZOOM:
-    case PH_UNZOOM:
-        if (i == h.target) {
-            float k = ease_in_out(clamp01(t / ZOOM_MS));
-            k = h.phase == PH_ZOOM ? k : 1 - k;
-            x *= 1 - k;
-            y *= 1 - k;
-            r += (ZOOM_R - r) * k;
-        }
-        break;
     default:
         break;
     }
@@ -1218,6 +1227,35 @@ static void draw_badge(lv_layer_t *layer, int i, float x, float y, float r)
     text(layer, r >= 34 ? &lv_font_montserrat_20 : &lv_font_montserrat_14, bx, by, COL_TEXT, str);
 }
 
+/* An app's bubble colours, top to bottom. */
+static void app_colors(int i, uint32_t *top, uint32_t *bottom)
+{
+    *top = APPS[i].top;
+    *bottom = APPS[i].bottom;
+    if (i == APP_FOCUS) {
+        *top = *bottom = h.live.focus ? 0x5E5CE6 : 0x2C2C34;
+    }
+}
+
+/* A disc in the app's gradient. */
+static void app_disc(lv_layer_t *layer, int i, float x, float y, float r)
+{
+    uint32_t top, bottom;
+    app_colors(i, &top, &bottom);
+    lv_draw_rect_dsc_t dsc;
+    lv_draw_rect_dsc_init(&dsc);
+    dsc.radius = LV_RADIUS_CIRCLE;
+    dsc.bg_color = lv_color_hex(bottom);
+    if (top != bottom) {
+        const lv_color_t colors[2] = {lv_color_hex(top), lv_color_hex(bottom)};
+        lv_grad_init_stops(&dsc.bg_grad, colors, NULL, NULL, 2);
+        dsc.bg_grad.dir = LV_GRAD_DIR_VER;
+    }
+    const lv_area_t a = {(int32_t) lroundf(x - r), (int32_t) lroundf(y - r), (int32_t) lroundf(x + r) - 1,
+                         (int32_t) lroundf(y + r) - 1};
+    lv_draw_rect(layer, &dsc, &a);
+}
+
 static void draw_app(lv_layer_t *layer, int i, const bubble_t *b)
 {
     const float x = CX + b->x, y = CY + b->y, r = b->r;
@@ -1229,43 +1267,12 @@ static void draw_app(lv_layer_t *layer, int i, const bubble_t *b)
         return;
     }
     const app_def_t *d = &APPS[i];
-    const bool zooming = (h.phase == PH_ZOOM || h.phase == PH_UNZOOM) && i == h.target;
-    // Opening, it darkens to the black of the page it opens: the page then
-    // takes over without a fade (a blend over the whole screen is slow).
-    float dark = 0;
-    if (zooming) {
-        const float k = clamp01((float) since(h.phase_ms) / ZOOM_MS);
-        dark = h.phase == PH_ZOOM ? k : 1 - k;
-        dark = dark * dark;
-    }
+    app_disc(layer, i, x, y, r);
     const bool focus_on = h.live.focus;
-    uint32_t top = d->top, bottom = d->bottom;
-    if (i == APP_FOCUS) {
-        top = bottom = focus_on ? 0x5E5CE6 : 0x2C2C34;
-    }
-    lv_draw_rect_dsc_t dsc;
-    lv_draw_rect_dsc_init(&dsc);
-    dsc.radius = LV_RADIUS_CIRCLE;
-    const lv_color_t c0 = lv_color_mix(lv_color_black(), lv_color_hex(top), (uint8_t) (255 * dark));
-    const lv_color_t c1 = lv_color_mix(lv_color_black(), lv_color_hex(bottom), (uint8_t) (255 * dark));
-    dsc.bg_color = c1;
-    if (top != bottom) {
-        const lv_color_t colors[2] = {c0, c1};
-        lv_grad_init_stops(&dsc.bg_grad, colors, NULL, NULL, 2);
-        dsc.bg_grad.dir = LV_GRAD_DIR_VER;
-    }
-    const lv_area_t a = {(int32_t) lroundf(x - r), (int32_t) lroundf(y - r), (int32_t) lroundf(x + r) - 1,
-                         (int32_t) lroundf(y + r) - 1};
-    lv_draw_rect(layer, &dsc, &a);
-    if (zooming && dark > 0.15f) {
-        return; // only the colour grows to the page
-    }
-    // What's on it keeps its size while the bubble grows from under it.
-    const float rc = zooming ? BUBBLE_R : r;
     switch (i) {
     case APP_TIMERS: {
-        ring(layer, x, y, 0.84f * rc, 0.15f * rc, h.live.timer, COL_TEXT, lv_color_hex(0xB85A00));
-        const lv_font_t *f = glyph_font(rc, 1);
+        ring(layer, x, y, 0.84f * r, 0.15f * r, h.live.timer, COL_TEXT, lv_color_hex(0xB85A00));
+        const lv_font_t *f = glyph_font(r, 1);
         if (f != NULL) {
             text(layer, f, x, y, COL_TEXT, LV_SYMBOL_BELL);
         }
@@ -1275,40 +1282,286 @@ static void draw_app(lv_layer_t *layer, int i, const bubble_t *b)
         // The day's first three habits as rings, as a watch's Activity.
         for (int k = 0; k < 3; k++) {
             const lv_color_t c = lv_color_hex(h.live.habit_rgb[k]);
-            ring(layer, x, y, (0.86f - 0.235f * (float) k) * rc, 0.19f * rc, h.live.habit[k], c,
+            ring(layer, x, y, (0.86f - 0.235f * (float) k) * r, 0.19f * r, h.live.habit[k], c,
                  lv_color_mix(c, lv_color_black(), 60));
         }
         break;
     case APP_FOCUS: {
         // The moon: a pale disc with a bite out of it in the bubble's colour.
-        disc(layer, x - 0.07f * rc, y + 0.04f * rc, 0.41f * rc, focus_on ? COL_TEXT : lv_color_hex(0x8E8E93));
-        disc(layer, x + 0.21f * rc, y - 0.18f * rc, 0.36f * rc, lv_color_hex(top));
+        disc(layer, x - 0.07f * r, y + 0.04f * r, 0.41f * r, focus_on ? COL_TEXT : lv_color_hex(0x8E8E93));
+        uint32_t top, bottom;
+        app_colors(i, &top, &bottom);
+        disc(layer, x + 0.21f * r, y - 0.18f * r, 0.36f * r, lv_color_hex(top));
         break;
     }
     default: {
-        const lv_font_t *f = glyph_font(rc, 0);
+        const lv_font_t *f = glyph_font(r, 0);
         if (f != NULL && d->glyph != NULL) {
             text(layer, f, x, y, COL_TEXT, d->glyph);
         }
         break;
     }
     }
-    draw_badge(layer, i, x, y, rc);
+    draw_badge(layer, i, x, y, r);
 }
 
-/* Over the object's black, which hides what's under it. */
+/* Half the chord of a circle of radius r, |dy| from its centre; -1 when
+ * the row misses it. */
+static float chord(float r, float dy)
+{
+    return r > dy ? sqrtf(r * r - dy * dy) : -1;
+}
+
+/* How far out the wave goes: past the farthest point of the round screen,
+ * ring and all. */
+static float wave_far(void)
+{
+    const bubble_t *b = &h.now[h.target];
+    return hypotf(b->x, b->y) + SCREEN_R + WAVE_W + 2;
+}
+
+/* The area of the screen within `r` of the bubble, row by row. */
+static float wave_area(float r)
+{
+    const bubble_t *b = &h.now[h.target];
+    float sum = 0;
+    for (float y = -SCREEN_R + 2; y < SCREEN_R; y += 4) {
+        const float s = chord(SCREEN_R, fabsf(y)), c = chord(r, fabsf(y - b->y));
+        if (c > 0) {
+            sum += fmaxf(0, fminf(s, b->x + c) - fmaxf(-s, b->x - c));
+        }
+    }
+    return sum;
+}
+
+/* Once a wave: how much of the screen it covers at each radius, so the
+ * frames can share the drawing out evenly. */
+static void wave_plan(void)
+{
+    const float r0 = h.now[h.target].r, far = wave_far();
+    for (int i = 0; i < WAVE_STEPS; i++) {
+        h.wave_cover[i] = wave_area(r0 + (far - r0) * (float) i / (WAVE_STEPS - 1));
+    }
+}
+
+/* The wave's ring this frame, from the tapped bubble out past the rim: at
+ * 0 it is the bubble, whole; at 1 a thin ring beyond the screen's edge. The
+ * screen it covers grows evenly with time, so every frame redraws about as
+ * much: out of the bubble fast, slowing where the screen is widest, quick
+ * again past it, as a ripple across a round pool. */
+static void wave_at(float k, float *in, float *out)
+{
+    const float r0 = h.now[h.target].r, far = wave_far();
+    const float *cover = h.wave_cover;
+    const float want = cover[0] + (cover[WAVE_STEPS - 1] - cover[0]) * k;
+    int i = 0;
+    while (i < WAVE_STEPS - 2 && cover[i + 1] < want) {
+        i++;
+    }
+    const float span = cover[i + 1] - cover[i];
+    const float f = (float) i + (span > 0 ? clamp01((want - cover[i]) / span) : 1);
+    *out = r0 + (far - r0) * f / (WAVE_STEPS - 1);
+    *in = fmaxf(0, *out - (r0 + (WAVE_W - r0) * ease_out(k)));
+}
+
+static float wave_k(void)
+{
+    const float k = clamp01((float) since(h.phase_ms) / ZOOM_MS);
+    return h.phase == PH_ZOOM ? k : 1 - k;
+}
+
+/* One pixel of the frame, as LVGL keeps it: RGB565, or blue, green, red. */
+static inline void put_px(uint8_t *p, bool deep, lv_color_t c, uint16_t c565)
+{
+    if (deep) {
+        p[0] = c.blue;
+        p[1] = c.green;
+        p[2] = c.red;
+    } else {
+        *(uint16_t *) p = c565;
+    }
+}
+
+static lv_color_t get_px(const uint8_t *p, bool deep)
+{
+    if (deep) {
+        return lv_color_make(p[2], p[1], p[0]);
+    }
+    const uint16_t v = *(const uint16_t *) p;
+    return lv_color_make((uint8_t) ((v >> 8) & 0xF8), (uint8_t) ((v >> 3) & 0xFC), (uint8_t) (v << 3));
+}
+
+/* The pixels of a row whose centres lie within `r` of x = c: [*lo, *hi],
+ * empty (lo > hi) for a negative r. */
+static void span(float c, float r, int32_t *lo, int32_t *hi)
+{
+    if (r < 0) {
+        *lo = 1;
+        *hi = 0;
+        return;
+    }
+    *lo = (int32_t) ceilf(c - r - 0.5f);
+    *hi = (int32_t) floorf(c + r - 0.5f);
+}
+
+/* The wave, written straight into the frame. LVGL works out a circle's mask
+ * again for each new radius in each area it redraws, and a disc this big
+ * mostly covers what is black already. Row by row it is runs: nothing in
+ * the hole (the screen's black is there; `hole` paints it over bubbles),
+ * the colour in the ring, and only its edges antialiased. */
+static void draw_wave(lv_layer_t *layer, bool hole)
+{
+    const bubble_t *b = &h.now[h.target];
+    const float cx = CX + b->x, cy = CY + b->y, ro = h.wave_out, ri = h.wave_in;
+    const bool deep = layer->color_format == LV_COLOR_FORMAT_RGB888;
+    if (layer->draw_buf == NULL || (!deep && layer->color_format != LV_COLOR_FORMAT_RGB565)) {
+        // Not the frame itself (a layer of its own): the slow way.
+        app_disc(layer, h.target, cx, cy, ro);
+        if (ri >= 1) {
+            disc(layer, cx, cy, ri, COL_BG);
+        }
+        return;
+    }
+    const uint32_t bpp = deep ? 3 : 2;
+    uint32_t top, bottom;
+    app_colors(h.target, &top, &bottom);
+    const lv_area_t *lc = &layer->_clip_area;
+    const lv_area_t clip = {LV_MAX(lc->x1, (int32_t) floorf(cx - ro - 1)), LV_MAX(lc->y1, (int32_t) floorf(cy - ro - 1)),
+                            LV_MIN(lc->x2, (int32_t) ceilf(cx + ro + 1)), LV_MIN(lc->y2, (int32_t) ceilf(cy + ro + 1))};
+    const lv_color_t black = lv_color_black();
+    for (int32_t y = clip.y1; y <= clip.y2; y++) {
+        const float dy = fabsf((float) y + 0.5f - cy);
+        // Within A something of the ring; within B all of the disc; past C
+        // none of the hole; within D all of the hole.
+        int32_t a0, a1, b0, b1, c0, c1, d0, d1;
+        span(cx, chord(ro + 0.5f, dy), &a0, &a1);
+        span(cx, chord(ro - 0.5f, dy), &b0, &b1);
+        span(cx, chord(ri + 0.5f, dy), &c0, &c1);
+        span(cx, chord(ri - 0.5f, dy), &d0, &d1);
+        a0 = LV_MAX(a0, clip.x1);
+        a1 = LV_MIN(a1, clip.x2);
+        if (a0 > a1) {
+            continue;
+        }
+        const float g = clamp01(((float) y + 0.5f - (cy - ro)) / (2 * ro));
+        const lv_color_t col = lv_color_mix(lv_color_hex(bottom), lv_color_hex(top), (uint8_t) (255 * g));
+        const uint16_t col565 = lv_color_to_u16(col);
+        uint8_t *row = lv_draw_buf_goto_xy(layer->draw_buf, (uint32_t) (a0 - layer->buf_area.x1),
+                                           (uint32_t) (y - layer->buf_area.y1));
+        for (int32_t x = a0; x <= a1; x++, row += bpp) {
+            if (x >= d0 && x <= d1) {
+                // The hole: skip it, or paint it whole.
+                const int32_t end = LV_MIN(d1, a1);
+                if (hole) {
+                    memset(row, 0, (size_t) (end - x + 1) * bpp);
+                }
+                row += (end - x) * bpp;
+                x = end;
+            } else if (x >= b0 && x <= b1 && (x < c0 || x > c1)) {
+                put_px(row, deep, col, col565);
+            } else {
+                const float dx = (float) x + 0.5f - cx;
+                const float d = sqrtf(dx * dx + dy * dy);
+                const float in_disc = clamp01(ro + 0.5f - d), in_hole = clamp01(ri + 0.5f - d);
+                const lv_color_t under = hole || in_hole < 0.004f ? get_px(row, deep) : black;
+                lv_color_t c = lv_color_mix(col, under, (uint8_t) (255 * (in_disc - in_hole)));
+                c = lv_color_mix(black, c, (uint8_t) (255 * in_hole));
+                put_px(row, deep, c, lv_color_to_u16(c));
+            }
+        }
+    }
+}
+
+/* Over the screen's black. */
 static void home_draw_cb(lv_event_t *e)
 {
     lv_layer_t *layer = lv_event_get_layer(e);
     const bool zooming = h.phase == PH_ZOOM || h.phase == PH_UNZOOM;
+    bool hole = false;
+    const lv_area_t *clip = &layer->_clip_area;
     for (int i = 0; i < APP_COUNT; i++) {
-        if (!(zooming && i == h.target)) {
-            draw_app(layer, i, &h.now[i]);
+        // LVGL redraws a frame area by area: only the bubbles in this one.
+        const lv_area_t a = bubble_area(&h.now[i]);
+        if (a.x2 < clip->x1 || a.x1 > clip->x2 || a.y2 < clip->y1 || a.y1 > clip->y2) {
+            continue;
         }
+        if (zooming) {
+            if (i == h.target) {
+                continue;
+            }
+            // The wave's hole hides what is in it: not drawn at all when
+            // wholly inside, painted over when partly.
+            const bubble_t *b = &h.now[i], *t = &h.now[h.target];
+            const float d = hypotf(b->x - t->x, b->y - t->y), r = 1.2f * b->r + 4;
+            if (d + r < h.wave_in) {
+                continue;
+            }
+            hole |= d - r < h.wave_in;
+        }
+        draw_app(layer, i, &h.now[i]);
     }
     if (zooming) {
-        draw_app(layer, h.target, &h.now[h.target]); // over the others
+        draw_wave(layer, hole); // over the others
     }
+}
+
+/* A run of pixels on row band [y0, y1], clipped to the screen. */
+static void invalidate_run(float x0, float x1, int32_t y0, int32_t y1)
+{
+    lv_area_t a = {LV_MAX(0, (int32_t) floorf(x0)), y0, LV_MIN(BOARD_LCD_H_RES - 1, (int32_t) ceilf(x1)), y1};
+    if (a.x1 <= a.x2) {
+        lv_obj_invalidate_area(h.obj, &a);
+    }
+}
+
+/* Only the ring between radii `a` and `b` around (cx, cy) changes: it goes
+ * as bands of rows, each one run or two (left and right of the hole), and
+ * only as far as the round screen shows. */
+static void invalidate_ring(float cx, float cy, float a, float b)
+{
+    const int32_t top = LV_MAX(0, (int32_t) floorf(cy - b)), bottom = LV_MIN(BOARD_LCD_V_RES - 1, (int32_t) ceilf(cy + b));
+    if (top > bottom) {
+        return;
+    }
+    const int32_t step = LV_MAX(16, ((bottom - top + 1) / WAVE_BANDS + 2) & ~1);
+    for (int32_t y0 = top; y0 <= bottom; y0 += step) {
+        const int32_t y1 = LV_MIN(bottom, y0 + step - 1);
+        // The band's nearest and farthest rows from the ring's centre and
+        // from the screen's: the widest the ring gets in it, the narrowest
+        // its hole, and how much of it the screen shows.
+        const float u0 = (float) y0 - cy, u1 = (float) (y1 + 1) - cy;
+        const float near = u0 <= 0 && u1 >= 0 ? 0 : fminf(fabsf(u0), fabsf(u1));
+        const float far = fmaxf(fabsf(u0), fabsf(u1));
+        const float s0 = (float) y0 - CY, s1 = (float) (y1 + 1) - CY;
+        const float s_near = s0 <= 0 && s1 >= 0 ? 0 : fminf(fabsf(s0), fabsf(s1));
+        if (near >= b || s_near >= SCREEN_R) {
+            continue;
+        }
+        const float xo = sqrtf(b * b - near * near) + 1;
+        const float xi = a > far ? sqrtf(a * a - far * far) - 1 : 0;
+        const float xs = sqrtf(SCREEN_R * SCREEN_R - s_near * s_near) + 1;
+        const float lo = fmaxf(cx - xo, CX - xs), hi = fminf(cx + xo, CX + xs);
+        if (xi <= 1) {
+            invalidate_run(lo, hi, y0, y1);
+        } else {
+            invalidate_run(lo, fminf(cx - xi, hi), y0, y1);
+            invalidate_run(fmaxf(cx + xi, lo), hi, y0, y1);
+        }
+    }
+}
+
+/* The wave moved: what it left and what it reached. */
+static void wave_step(void)
+{
+    float in, out;
+    wave_at(wave_k(), &in, &out);
+    if (fabsf(in - h.wave_in) < 0.3f && fabsf(out - h.wave_out) < 0.3f) {
+        return;
+    }
+    const bubble_t *b = &h.now[h.target];
+    invalidate_ring(CX + b->x, CY + b->y, fminf(in, h.wave_in) - 1, fmaxf(out, h.wave_out) + 1);
+    h.wave_in = in;
+    h.wave_out = out;
 }
 
 /* ---- What the bubbles say ------------------------------------------------------------ */
@@ -1480,6 +1733,9 @@ static void tick_cb(lv_timer_t *t)
     } else if (h.phase == PH_UNZOOM && in_phase >= ZOOM_MS) {
         h.phase = PH_IDLE;
         h.dirty |= 1u << h.target; // with its glyph back
+        // The ring as last drawn goes too: it may be wider than the bubble.
+        const bubble_t *b = &h.now[h.target];
+        invalidate_ring(CX + b->x, CY + b->y, 0, h.wave_out + 2);
     } else if ((h.phase == PH_ZOOM && in_phase >= ZOOM_MS) || (h.phase == PH_OUTRO && in_phase >= OUTRO_MS)) {
         done = true;
     }
@@ -1491,14 +1747,15 @@ static void tick_cb(lv_timer_t *t)
         const bubble_t b = place(i);
         const bubble_t *was = &h.now[i];
         const bool moved = fabsf(b.x - was->x) > 0.2f || fabsf(b.y - was->y) > 0.2f || fabsf(b.r - was->r) > 0.2f;
-        // The one opening or closing changes colour too.
-        const bool zooming = (h.phase == PH_ZOOM || h.phase == PH_UNZOOM) && i == h.target;
-        if (moved || zooming || (h.dirty & (1u << i)) || h.pulse_ms[i] != 0) {
+        if (moved || (h.dirty & (1u << i)) || h.pulse_ms[i] != 0) {
             h.now[i] = b;
             invalidate_bubble(i, &b);
         }
     }
     h.dirty = 0;
+    if (h.phase == PH_ZOOM || h.phase == PH_UNZOOM) {
+        wave_step();
+    }
     refresh_name();
 
     if (done) {
@@ -1518,6 +1775,10 @@ static void set_phase(phase_t ph, int target)
     h.phase = ph;
     h.phase_ms = lv_tick_get();
     h.target = target;
+    if (ph == PH_ZOOM) {
+        wave_plan();
+        wave_at(0, &h.wave_in, &h.wave_out);
+    }
 }
 
 static int hit(lv_point_t p)
@@ -1665,7 +1926,7 @@ static void build_home(app_t from)
 {
     home_drop();
     show_face(false); // Yoru is in its bubble now
-    h.obj = full_screen(true);
+    h.obj = full_screen();
     s.home = h.obj;
     lv_obj_add_event_cb(h.obj, home_draw_cb, LV_EVENT_DRAW_MAIN, NULL);
     lv_obj_add_event_cb(h.obj, home_cb, LV_EVENT_PRESSED, NULL);
@@ -1696,6 +1957,10 @@ static void build_home(app_t from)
     for (int i = 0; i < APP_COUNT; i++) {
         h.now[i] = place(i);
         h.drawn[i] = bubble_area(&h.now[i]);
+    }
+    if (from < APP_COUNT) {
+        wave_plan();
+        wave_at(1, &h.wave_in, &h.wave_out); // the screen still black, all of it
     }
     yoru_gaze(&h.gx, &h.gy);
     lv_obj_invalidate(h.obj);
@@ -1747,6 +2012,9 @@ static void open_target(app_t app)
     case APP_HABITS:
         open_app(habits_ui_build);
         break;
+    case APP_GAMES:
+        open_app(games_ui_build);
+        break;
     default:
         break;
     }
@@ -1775,6 +2043,7 @@ static void idle_cb(lv_timer_t *t)
     if (s.app != NULL) {
         timers_ui_refresh();
         habits_ui_refresh();
+        games_ui_refresh();
     }
 }
 
@@ -1827,7 +2096,8 @@ void menu_close(void)
 bool menu_open_page(const char *name)
 {
     static const char *const APP_NAMES[APP_COUNT] = {
-        [APP_INBOX] = "inbox", [APP_TIMERS] = "timers", [APP_HABITS] = "habits", [APP_SETTINGS] = "settings"};
+        [APP_INBOX] = "inbox", [APP_TIMERS] = "timers", [APP_HABITS] = "habits", [APP_SETTINGS] = "settings",
+        [APP_GAMES] = "games"};
     if (strcasecmp(name, "home") == 0) {
         menu_open();
         return true;

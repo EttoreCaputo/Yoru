@@ -461,11 +461,12 @@ void inbox_ui_open(const char *id)
 {
     if (s.view == NULL) {
         menu_close(); // one view at a time
-        s.view = card_root(true);
+        s.view = card_root();
         lv_obj_add_event_cb(s.view, view_gesture_cb, LV_EVENT_GESTURE, NULL);
         s.page = s.list = NULL;
         s.detail = false;
-        lv_obj_fade_in(s.view, 180, 0);
+        // No fade: blending the whole screen takes LVGL a layer of its own
+        // every frame, and runs at a few frames a second.
         if (s.face != NULL) {
             lv_obj_add_flag(s.face, LV_OBJ_FLAG_HIDDEN);
         }

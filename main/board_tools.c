@@ -634,7 +634,7 @@ static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
         .description = "Open or close the menu on Yoru's screen: on its home (the apps around Yoru), on an app "
-                       "(inbox, timers, habits, settings) or straight on a page of Settings (display, sound, "
+                       "(inbox, timers, habits, games, settings) or straight on a page of Settings (display, sound, "
                        "behaviour, voice, connection, battery, about).",
         .schema = "{\"type\":\"object\",\"properties\":{\"open\":{\"type\":\"boolean\"},"
                   "\"page\":{\"type\":\"string\"}}}",

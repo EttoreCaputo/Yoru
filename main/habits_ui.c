@@ -424,7 +424,7 @@ lv_obj_t *habits_ui_build(void (*back)(void))
 {
     memset(&s, 0, sizeof(s));
     s.back = back;
-    s.page = card_root(true);
+    s.page = card_root();
     lv_obj_add_event_cb(s.page, gesture_cb, LV_EVENT_GESTURE, NULL);
     lv_obj_add_event_cb(s.page, deleted_cb, LV_EVENT_DELETE, NULL);
     char title[32];
