@@ -18,6 +18,10 @@ void ui_voice_show(voice_state_t state);
  * LVGL lock held. */
 void ui_voice_set_level(float level);
 
+/** A ring running out over `ms`: how long the board still listens without
+ * the wake word. 0 takes it away. With the LVGL lock held. */
+void ui_voice_countdown(uint32_t ms);
+
 #ifdef __cplusplus
 }
 #endif

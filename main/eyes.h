@@ -111,6 +111,10 @@ void eyes_look_around(void);
  * speaking): the eyes swell a little with it. 0 when nobody talks. */
 void eyes_set_level(float level);
 
+/** A ring round the body running out over `ms`: how long it still listens
+ * without the wake word. 0 takes it away. */
+void eyes_countdown(uint32_t ms);
+
 /** A poke: the body squashes and springs back. */
 void eyes_poke(void);
 /** A knock from the side (a slap, a knock on the case, a landing): the body

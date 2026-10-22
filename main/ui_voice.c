@@ -15,3 +15,8 @@ void ui_voice_set_level(float level)
 {
     eyes_set_level(level);
 }
+
+void ui_voice_countdown(uint32_t ms)
+{
+    eyes_countdown(ms);
+}

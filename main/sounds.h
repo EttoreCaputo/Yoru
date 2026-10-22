@@ -19,6 +19,9 @@ typedef enum {
     SOUND_ERROR,
     SOUND_ALARM,
     SOUND_VOLUME,
+    /* Listening again after an answer, without the wake word, and giving up. */
+    SOUND_LISTEN,
+    SOUND_LISTEN_END,
     /* The pet's: only while pet sounds are on (playback_set_pet_sounds). */
     SOUND_BOOT,
     SOUND_HELLO,

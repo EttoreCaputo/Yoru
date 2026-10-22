@@ -45,10 +45,22 @@ static const char *TAG = "voice";
 #define WAKE_TAIL_MS (VAD_HANGOVER_MS + 200)
 #define NO_SPEECH_MS 5000
 /* After a spoken reply the board listens without the wake word, for less
- * long. The VAD still reports the room's echo of the last words for its
+ * long (the host may say how long, and how long a pause ends what's said).
+ * The VAD still reports the room's echo of the last words for its
  * hangover: speech that doesn't outlast it isn't the next command. */
 #define FOLLOW_UP_NO_SPEECH_MS 4000
+#define FOLLOW_UP_MIN_WAIT_MS 1500
+#define FOLLOW_UP_MAX_WAIT_MS 15000
+#define MIN_END_SILENCE_MS 200
+#define MAX_END_SILENCE_MS 3000
 #define FOLLOW_UP_TAIL_MS (VAD_HANGOVER_MS + SPEAKER_TAIL_MS)
+/* Without the wake word nobody said it's for the board: a TV, people
+ * talking in the room or a word under the breath kept the conversation
+ * going. Only this much speech counts, this loud on each frame (someone
+ * near, talking to it), with gaps no longer than FOLLOW_UP_GAP_MS. */
+#define FOLLOW_UP_MIN_SPEECH_MS 350
+#define FOLLOW_UP_ENERGY_DB -50.0f
+#define FOLLOW_UP_GAP_MS 300
 #define MAX_UTTERANCE_MS 12000
 /* Push-to-talk (PWR held) ends when the key is let go, or after this. */
 #define MAX_TALK_MS 60000
@@ -87,6 +99,8 @@ static const char *TAG = "voice";
 /* PWR held and let go (voice_talk()). */
 #define TALK_BIT BIT4
 #define RELEASE_BIT BIT5
+/* The host sets how long a pause ends the utterance (voice_set_pause()). */
+#define PAUSE_BIT BIT6
 
 typedef enum {
     END_SPEECH,
@@ -112,6 +126,11 @@ typedef struct {
     int64_t ignore_until_us; /* VAD speech before this is the wake word's */
     int64_t speech_us; /* last frame with speech; 0 before any */
     int no_speech_ms;  /* given up after this without speech */
+    int end_silence_ms; /* this much silence after speech ends it */
+    bool follow_up;    /* no wake word: speech must be near and last */
+    int loud_ms;       /* follow-up: speech near enough so far */
+    int64_t loud_us;   /* its last frame */
+    bool paused;       /* in a pause after speech, told to the host */
     uint32_t samples;
     uint32_t dropped;
     int64_t level_us;
@@ -164,6 +183,13 @@ static SemaphoreHandle_t s_ctl;
 static EventGroupHandle_t s_req;
 static bool s_muted;
 static bool s_paused;
+
+/* The follow-up's window and pause, from voice_listen() (0: the defaults). */
+static volatile int s_follow_up_wait_ms;
+static volatile int s_follow_up_pause_ms;
+/* The pause the host wants for an utterance, from voice_set_pause(). */
+static volatile uint8_t s_pause_id;
+static volatile int s_pause_ms;
 
 /* Wake words before this are ignored: the speaker is (or just was) on. */
 static volatile int64_t s_speaker_until_us;
@@ -360,7 +386,7 @@ void voice_set_state(voice_state_t state)
 
 /** `ignore_ms`: VAD speech this early isn't the command (the wake word's
  * tail, the speaker's echo). */
-static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms)
+static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms, int end_silence_ms)
 {
     stream_t *st = &s_stream;
     st->active = true;
@@ -370,6 +396,11 @@ static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms)
     st->start_us = esp_timer_get_time();
     st->ignore_until_us = st->start_us + (int64_t) ignore_ms * 1000;
     st->no_speech_ms = no_speech_ms;
+    st->end_silence_ms = end_silence_ms;
+    st->follow_up = strcmp(trigger, "follow_up") == 0;
+    st->loud_ms = 0;
+    st->loud_us = 0;
+    st->paused = false;
     st->speech_us = 0;
     st->samples = 0;
     st->dropped = 0;
@@ -385,6 +416,14 @@ static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms)
     cJSON_AddStringToObject(params, "format", "s16le");
     rpc_notify("utterance_start", params);
     voice_set_state(VOICE_LISTENING);
+    if (st->follow_up) {
+        // Nobody said its name: a tick and a ring running out say it's
+        // still listening, and for how long.
+        playback_sound(SOUND_LISTEN);
+        lvgl_port_lock();
+        ui_voice_countdown((uint32_t) no_speech_ms);
+        lvgl_port_unlock();
+    }
 }
 
 static void stream_end(end_reason_t reason)
@@ -409,13 +448,39 @@ static void stream_end(end_reason_t reason)
     cJSON_AddNumberToObject(params, "frames", st->seq);
     cJSON_AddNumberToObject(params, "dropped", st->dropped);
     rpc_notify("utterance_end", params);
+    if (st->follow_up && reason == END_NO_SPEECH) {
+        // Nothing more was said: it stops listening, and says so.
+        playback_sound(SOUND_LISTEN_END);
+    }
     // With speech the host transcribes it, and says what comes next. Held
     // PWR means someone spoke, whatever the VAD made of it.
     const bool heard = st->speech_us != 0 || (st->button && ms >= MIN_TALK_MS);
     voice_set_state(heard && reason != END_MUTED ? VOICE_THINKING : VOICE_IDLE);
     lvgl_port_lock();
     ui_voice_set_level(0);
+    ui_voice_countdown(0);
     lvgl_port_unlock();
+}
+
+/* Whether this frame is speech the utterance counts: after the ignored
+ * start and, in a follow-up, once enough of it was near the board. */
+static bool heard_speech(stream_t *st, const afe_fetch_result_t *res, int64_t now, int frame_ms)
+{
+    if (res->vad_state != VAD_SPEECH || now < st->ignore_until_us) {
+        return false;
+    }
+    if (!st->follow_up || st->speech_us != 0) {
+        return true;
+    }
+    if (res->data_volume < FOLLOW_UP_ENERGY_DB) {
+        return false;
+    }
+    if (now - st->loud_us > FOLLOW_UP_GAP_MS * 1000) {
+        st->loud_ms = 0;
+    }
+    st->loud_ms += frame_ms;
+    st->loud_us = now;
+    return st->loud_ms >= FOLLOW_UP_MIN_SPEECH_MS;
 }
 
 static void stream_frame(const afe_fetch_result_t *res)
@@ -436,8 +501,23 @@ static void stream_frame(const afe_fetch_result_t *res)
     }
     st->seq++;
     st->samples += bytes / sizeof(int16_t);
-    if (res->vad_state == VAD_SPEECH && now >= st->ignore_until_us) {
+    if (heard_speech(st, res, now, (int) (bytes / sizeof(int16_t) / 16))) {
+        if (st->speech_us == 0 && st->follow_up) {
+            // Someone is talking: no more running out.
+            lvgl_port_lock();
+            ui_voice_countdown(0);
+            lvgl_port_unlock();
+        }
         st->speech_us = now;
+        st->paused = false;
+    } else if (st->speech_us != 0 && !st->button && !st->paused) {
+        // The VAD's hangover is over: a host that judges whether the
+        // sentence is finished (Smart Turn) looks now, and may stop it.
+        st->paused = true;
+        cJSON *params = cJSON_CreateObject();
+        cJSON_AddNumberToObject(params, "id", st->id);
+        cJSON_AddNumberToObject(params, "ms", (int) (st->samples / 16));
+        rpc_notify("utterance_pause", params);
     }
 
     if (now - st->level_us >= LEVEL_EVERY_MS * 1000) {
@@ -453,7 +533,7 @@ static void stream_frame(const afe_fetch_result_t *res)
         if (elapsed_ms >= MAX_TALK_MS) {
             stream_end(END_MAX_LENGTH);
         }
-    } else if (st->speech_us != 0 && (now - st->speech_us) / 1000 >= END_SILENCE_MS) {
+    } else if (st->speech_us != 0 && (now - st->speech_us) / 1000 >= st->end_silence_ms) {
         stream_end(END_SPEECH);
     } else if (st->speech_us == 0 && elapsed_ms >= st->no_speech_ms) {
         stream_end(END_NO_SPEECH);
@@ -475,7 +555,7 @@ static void on_wake(const afe_fetch_result_t *res)
         // WAKE_TAIL_MS anyway.
         playback_sound(SOUND_WAKE);
     }
-    stream_start("wake", WAKE_TAIL_MS, NO_SPEECH_MS);
+    stream_start("wake", WAKE_TAIL_MS, NO_SPEECH_MS, END_SILENCE_MS);
 }
 
 static void feed_task(void *arg)
@@ -510,7 +590,7 @@ static void fetch_task(void *arg)
         // Muted or paused nothing is fed, and fetching would only get the AFE
         // to warn about its empty buffer every time.
         EventBits_t run = xEventGroupWaitBits(s_run, RUN_BIT, pdFALSE, pdTRUE, pdMS_TO_TICKS(FETCH_WAIT_MS));
-        EventBits_t req = xEventGroupClearBits(s_req, LISTEN_BIT | STOP_BIT | FOLLOW_UP_BIT | TALK_BIT | RELEASE_BIT);
+        EventBits_t req = xEventGroupClearBits(s_req, LISTEN_BIT | STOP_BIT | FOLLOW_UP_BIT | TALK_BIT | RELEASE_BIT | PAUSE_BIT);
         // s_stream is only touched with s_fetch held.
         xSemaphoreTake(s_fetch, portMAX_DELAY);
         if (!(run & RUN_BIT)) {
@@ -522,17 +602,22 @@ static void fetch_task(void *arg)
             if (req & TALK_BIT) {
                 // PWR wins over whatever was being heard.
                 stream_end(END_HOST);
-                stream_start("button", 0, MAX_TALK_MS);
+                stream_start("button", 0, MAX_TALK_MS, END_SILENCE_MS);
             }
             if ((req & RELEASE_BIT) && s_stream.button) {
                 stream_end(END_RELEASED);
             }
             if ((req & LISTEN_BIT) && !s_stream.active) {
                 if (req & FOLLOW_UP_BIT) {
-                    stream_start("follow_up", FOLLOW_UP_TAIL_MS, FOLLOW_UP_NO_SPEECH_MS);
+                    const int wait = s_follow_up_wait_ms, pause = s_follow_up_pause_ms;
+                    stream_start("follow_up", FOLLOW_UP_TAIL_MS, wait > 0 ? wait : FOLLOW_UP_NO_SPEECH_MS,
+                                 pause > 0 ? pause : END_SILENCE_MS);
                 } else {
-                    stream_start("host", 0, NO_SPEECH_MS);
+                    stream_start("host", 0, NO_SPEECH_MS, END_SILENCE_MS);
                 }
+            }
+            if ((req & PAUSE_BIT) && s_stream.active && s_stream.id == s_pause_id) {
+                s_stream.end_silence_ms = s_pause_ms;
             }
             if (!s_stream.active && s_wakenet_on != s_wake_on) {
                 // The menu's switch: WakeNet's CPU is free while it's off.
@@ -570,12 +655,30 @@ static void fetch_task(void *arg)
     }
 }
 
-bool voice_listen(bool follow_up)
+static int clamp_ms(int ms, int lo, int hi)
+{
+    return ms <= 0 ? 0 : ms < lo ? lo : ms > hi ? hi : ms;
+}
+
+bool voice_listen(bool follow_up, int wait_ms, int pause_ms)
 {
     if (!s_available || s_muted) {
         return false;
     }
+    s_follow_up_wait_ms = clamp_ms(wait_ms, FOLLOW_UP_MIN_WAIT_MS, FOLLOW_UP_MAX_WAIT_MS);
+    s_follow_up_pause_ms = clamp_ms(pause_ms, MIN_END_SILENCE_MS, MAX_END_SILENCE_MS);
     xEventGroupSetBits(s_req, LISTEN_BIT | (follow_up ? FOLLOW_UP_BIT : 0));
+    return true;
+}
+
+bool voice_set_pause(uint8_t id, int pause_ms)
+{
+    if (!s_available || pause_ms <= 0) {
+        return false;
+    }
+    s_pause_id = id;
+    s_pause_ms = clamp_ms(pause_ms, MIN_END_SILENCE_MS, MAX_END_SILENCE_MS);
+    xEventGroupSetBits(s_req, PAUSE_BIT);
     return true;
 }
 

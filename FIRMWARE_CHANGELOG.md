@@ -1,5 +1,17 @@
 # Firmware changelog
 
+## 0.11.7
+
+- **Yoru can let the Mac judge when you finished talking.** With "Understand when you've finished" set to Smart Turn in Yoru Hub, a short pause to think no longer ends what you are saying: the board waits up to a second and a half, and Yoru Hub stops listening as soon as your voice sounds finished. Without it, nothing changes.
+
+## 0.11.6
+
+Better at knowing when you are still talking to Yoru after an answer ("Keep listening after an answer" in Yoru Hub).
+
+- **You can see and hear it listening.** When Yoru keeps listening after an answer it plays a soft tick, and a thin ring around it runs out as the time to answer passes. When the ring is gone and you said nothing, a soft falling note says it stopped listening.
+- **It waits as long as the answer needs.** Yoru Hub now says how long to wait: longer when Yoru asked you something, and with more patience for pauses while you answer; short after a plain answer.
+- **Less chatter from the room.** Without the wake word, only someone close and talking for a moment counts: the TV, people talking further away or a word under your breath no longer keep the conversation going.
+
 ## 0.11.5
 
 - **Only Yoru.** Yoru no longer follows coding agents. The Agents app is gone from the menu, along with its little Yorus, the dots on the rim, the steps at the bottom, the chats and the "New session" page. Claude Code's permission requests and questions no longer appear on the screen: answer them on the computer. When Yoru itself asks before acting for you (sending a mail, creating an event), the Allow and Deny card still comes.

@@ -56,6 +56,11 @@ static const tone_t ALARM[] = {
 };
 /* A tick at the new volume. */
 static const tone_t VOLUME[] = {{880, 880, 120, W_SINE, 100, 0, 0, E_PLUCK}};
+/* Softer than the wake chime, and short: over well within the speaker's
+ * echo, which the follow-up ignores. A tick up, still listening; a glide
+ * down, done listening. */
+static const tone_t LISTEN[] = {{1047, 1047, 70, W_SINE, 55, 0, 0, E_PLUCK}};
+static const tone_t LISTEN_END[] = {{784, 523, 160, W_SINE, 50, 0, 0, E_SWELL}};
 
 /* Powering up: a rising hum, then "hi!". */
 static const tone_t BOOT[] = {
@@ -232,6 +237,8 @@ static const sound_def_t SOUNDS[SOUND_COUNT] = {
     DEF(SOUND_ERROR, "error", ERROR),
     DEF(SOUND_ALARM, "alarm", ALARM),
     DEF(SOUND_VOLUME, "volume", VOLUME),
+    DEF(SOUND_LISTEN, "listen", LISTEN),
+    DEF(SOUND_LISTEN_END, "listen_end", LISTEN_END),
     DEF(SOUND_BOOT, "boot", BOOT),
     DEF(SOUND_HELLO, "hello", HELLO),
     DEF(SOUND_MUTE, "mute", MUTE),

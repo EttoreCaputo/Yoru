@@ -204,9 +204,26 @@ void rpc_handle(uint8_t *payload, size_t len)
         // Push-to-talk, or the follow-up after a reply: stream an utterance
         // without the wake word.
         const cJSON *follow_up = cJSON_GetObjectItemCaseSensitive(params, "follow_up");
-        if (!voice_listen(cJSON_IsTrue(follow_up))) {
+        const cJSON *wait = cJSON_GetObjectItemCaseSensitive(params, "wait_ms");
+        const cJSON *pause = cJSON_GetObjectItemCaseSensitive(params, "pause_ms");
+        if (!voice_listen(cJSON_IsTrue(follow_up), cJSON_IsNumber(wait) ? wait->valueint : 0,
+                          cJSON_IsNumber(pause) ? pause->valueint : 0)) {
             code = RPC_INVALID_PARAMS;
             message = voice_available() ? "microphone muted" : "voice not available";
+        } else {
+            result = cJSON_CreateObject();
+        }
+    } else if (strcmp(name, "voice/pause") == 0) {
+        // The host judges when the sentence is finished: the board's own
+        // pause only ends it if the host says nothing.
+        const cJSON *id = cJSON_GetObjectItemCaseSensitive(params, "id");
+        const cJSON *pause = cJSON_GetObjectItemCaseSensitive(params, "pause_ms");
+        if (!cJSON_IsNumber(id) || !cJSON_IsNumber(pause)) {
+            code = RPC_INVALID_PARAMS;
+            message = "expected {\"id\": n, \"pause_ms\": 200..3000}";
+        } else if (!voice_set_pause((uint8_t) id->valueint, pause->valueint)) {
+            code = RPC_INVALID_PARAMS;
+            message = "voice not available";
         } else {
             result = cJSON_CreateObject();
         }

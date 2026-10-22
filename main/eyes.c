@@ -53,6 +53,12 @@
 #define MENU_SIZE_MS 220
 /* Tinted (thinking, done, error) Yoru steps back a little, inside its halo. */
 #define STATUS_SIZE 0.86f
+/* The follow-up's ring: this far out from the sphere, this thick, in steps
+ * of this many degrees (it redraws only when it has shrunk by one). */
+#define COUNTDOWN_GAP 14
+#define COUNTDOWN_W 5
+#define COUNTDOWN_STEP 3
+#define COUNTDOWN_RGB 0x9ECBFF
 /* The most pieces an overlay has (three z's, three dots). */
 #define MAX_OVERLAY_RECTS 3
 /* The eye sprites: the largest eye (surprised, swelling, stretched) fits
@@ -274,6 +280,7 @@ typedef struct {
     float fog;           // how bright that distance leaves it, 1 .. FOG_FLOOR
     float tint;          // the status tint, halo and badge
     float tint_rgb[3];   // floats, so the struct compares without padding
+    int32_t countdown;   // degrees of the follow-up's ring left, 0 without it
 } body_vis_t;
 
 typedef struct {
@@ -314,6 +321,8 @@ static struct {
     float near;
     float size;           // 1, MENU_SIZE with the menu open, STATUS_SIZE tinted
     eyes_status_t status;
+    /* The follow-up's ring: how long it runs, and since when (t_ms). */
+    uint32_t cd_ms, cd_from_ms;
     float tint;
     float tint_rgb[3];
     /* The gesture playing, how far in, and where the hands were when it
@@ -487,6 +496,11 @@ static void body_layout(body_vis_t *v)
     v->fog = FOG_FLOOR + (1 - FOG_FLOOR) / (1 + FOG * fmaxf(0, zf - 1));
     v->tint = s.tint;
     memcpy(v->tint_rgb, s.tint_rgb, sizeof(v->tint_rgb));
+    const uint32_t gone = s.t_ms - s.cd_from_ms;
+    if (s.cd_ms > 0 && gone < s.cd_ms) {
+        const float left = 360.0f * (1 - (float) gone / (float) s.cd_ms);
+        v->countdown = COUNTDOWN_STEP * (int32_t) ceilf(left / COUNTDOWN_STEP);
+    }
 }
 
 static void eye_layout(void)
@@ -683,6 +697,29 @@ static void draw_badge(lv_layer_t *layer, const body_vis_t *v)
     draw_disc(layer, x, y, 15 * K * s.badge_scale, rgb_color(v->tint_rgb), opa);
 }
 
+/* The follow-up's ring, from the top round clockwise, shorter as the time
+ * to answer runs out. */
+static void draw_countdown(lv_layer_t *layer, const body_vis_t *v)
+{
+    if (v->countdown <= 0) {
+        return;
+    }
+    lv_draw_arc_dsc_t dsc;
+    lv_draw_arc_dsc_init(&dsc);
+    dsc.color = lv_color_hex(COUNTDOWN_RGB);
+    dsc.opa = (lv_opa_t) (200 * v->fog);
+    dsc.width = COUNTDOWN_W;
+    dsc.rounded = 1;
+    dsc.center.x = v->bx;
+    dsc.center.y = v->by;
+    dsc.radius = (uint16_t) (LV_MAX(v->rx, v->ry) + COUNTDOWN_GAP);
+    // A whole turn would start and end at the same angle: nothing drawn.
+    const int32_t deg = LV_MIN(v->countdown, 359);
+    dsc.start_angle = 270;
+    dsc.end_angle = (270 + deg) % 360;
+    lv_draw_arc(layer, &dsc);
+}
+
 /* A small heart: two round tops and a point below, centred on (x, y). */
 static void draw_heart(lv_layer_t *layer, float x, float y, lv_color_t color, lv_opa_t opa)
 {
@@ -857,6 +894,7 @@ static void draw_cb(lv_event_t *e)
         const float d = fminf(1, v->dist);
         look_draw(layer, &lk->halo, v->bx, v->by, d, d, 0, (lv_opa_t) (90 * v->tint), rgb_color(v->tint_rgb));
     }
+    draw_countdown(layer, v);
     if (!s.hands_front) {
         draw_hands(layer);
     }
@@ -895,6 +933,11 @@ static lv_area_t body_area(const body_vis_t *v)
         const float d = fminf(1, v->dist);
         const lv_area_t h = look_area(&look_get()->halo, v->bx, v->by, d, d, false);
         a = (lv_area_t) {LV_MIN(a.x1, h.x1), LV_MIN(a.y1, h.y1), LV_MAX(a.x2, h.x2), LV_MAX(a.y2, h.y2)};
+    }
+    if (v->countdown > 0) {
+        const int32_t r = LV_MAX(v->rx, v->ry) + COUNTDOWN_GAP + COUNTDOWN_W + 2;
+        a = (lv_area_t) {LV_MIN(a.x1, v->bx - r), LV_MIN(a.y1, v->by - r), LV_MAX(a.x2, v->bx + r),
+                         LV_MAX(a.y2, v->by + r)};
     }
     return a;
 }
@@ -1451,6 +1494,12 @@ void eyes_look_around(void)
 {
     s.held = false;
     s.next_look_ms = 600;
+}
+
+void eyes_countdown(uint32_t ms)
+{
+    s.cd_ms = ms;
+    s.cd_from_ms = s.t_ms;
 }
 
 void eyes_set_level(float level)

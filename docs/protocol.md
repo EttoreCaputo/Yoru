@@ -89,6 +89,33 @@ Before Yoru Hub's assistant does something with one of your services that change
 - The first answer wins, from the app or the board; the host sends `hide_approval` to every board once it's over.
 - On the board: the tool and `text` above Yoru, Deny and Allow below it, and a ring along the rim running the time down. The fonts are ASCII. An `id` is at most 47 bytes. While a card is up the screen takes no pokes, `show_menu` is refused and PWR doesn't put Yoru to sleep; Yoru wakes up, comes close and glances between the request and the buttons. `get_state` has `approval`, true while one is up.
 
+## Listening after an answer
+
+`voice/listen` with `"follow_up": true` (the host's "Keep listening after an answer") takes two more numbers since 0.11.6, both optional:
+
+```json
+{"jsonrpc":"2.0","id":7,"method":"voice/listen","params":{"follow_up":true,"wait_ms":8000,"pause_ms":700}}
+```
+
+- `wait_ms`: how long the board waits for speech before giving up (`utterance_end` `reason` `no_speech`), 1500 to 15000; 4000 without it.
+- `pause_ms`: how long a pause ends what's being said, 200 to 3000 (2000 in 0.11.6); 400 without it (the wake word's). The VAD's own 500 ms come on top.
+- Without the wake word only speech near the board counts: 350 ms of it, each frame at -50 dBFS or louder, gaps under 300 ms. Quieter or shorter speech leaves `speech` false.
+- The board plays a soft tick (`listen`) and shows a ring around Yoru running out over `wait_ms`; the ring goes once speech starts. Giving up without speech plays a soft falling note (`listen_end`). Both are earcons, played with pet sounds off too.
+- Older boards ignore the two numbers and wait 4 s.
+
+## Finished sentences
+
+Since 0.11.7 a host can judge for itself when a sentence is finished (Yoru Hub does with Smart Turn), instead of the board's short pause:
+
+```json
+{"jsonrpc":"2.0","method":"utterance_pause","params":{"id":12,"ms":2350}}
+{"jsonrpc":"2.0","id":8,"method":"voice/pause","params":{"id":12,"pause_ms":1500}}
+```
+
+- `utterance_pause` comes at each pause once speech has started (wake word, host or follow-up, not push-to-talk): when the VAD's 500 ms hangover after the last speech is over. `ms` is how much audio was sent so far. It comes again after the next stretch of speech.
+- `voice/pause` sets how long a pause ends utterance `id` (200 to 3000 ms after the hangover), if it's the one being heard; an older id is ignored. A host that judges pauses sends it right after `utterance_start` with a long one, then `voice/stop` as soon as it hears the sentence is finished; the board's own pause only ends it if the host says nothing.
+- An older board answers `voice/pause` with `-32601` and never sends `utterance_pause`: its own pause ends every utterance.
+
 ## PWR
 
 ### Push-to-talk

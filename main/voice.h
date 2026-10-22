@@ -55,9 +55,15 @@ void voice_pause(bool pause);
 
 /** Stream an utterance as if the wake word had been heard (push-to-talk).
  * `follow_up`: the host asks right after its spoken reply, so what's said
- * next needs no wake word; it gives up sooner without speech. False without
- * voice or muted. */
-bool voice_listen(bool follow_up);
+ * next needs no wake word; it gives up after `wait_ms` without speech
+ * (1.5..15 s), ends after a pause of `pause_ms` (0.2..2 s), only counts
+ * speech near the board, and shows a ring running out meanwhile. 0 for
+ * either: the default. False without voice or muted. */
+bool voice_listen(bool follow_up, int wait_ms, int pause_ms);
+/** How long a pause ends utterance `id`, if it's the one being heard
+ * (0.2..3 s): a host that judges when a sentence is finished asks for a
+ * long one and stops the utterance itself. False without voice. */
+bool voice_set_pause(uint8_t id, int pause_ms);
 /** Push-to-talk: stream what's said until voice_talk_end() (PWR let go) or
  * 60 s, with `trigger` "button" on `utterance_start`. Ends what was being
  * heard and stops the speaker. False without voice or muted. */
