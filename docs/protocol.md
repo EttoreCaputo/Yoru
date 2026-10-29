@@ -184,7 +184,7 @@ Since 0.11.0, with the `timers` capability. The host keeps the timers, the pomod
 {"timers":[{"id":3,"kind":"timer","state":"run","left_s":272,"total_s":600,"label":"Pasta"},{"id":4,"kind":"reminder","state":"run","left_s":2520,"total_s":3600,"label":"Call Anna","at":"17:30"}]}
 ```
 
-A timer that goes to `ring` (and wasn't ringing in the last list) makes Yoru jump like an alarm clock, with the alarm earcon and a line over the bottom rim with its label; the host still says it aloud. A host that never sends `set_timers` still has its snapshot's `timer` (Metrics): the Timers app shows that one alone, without its actions, and it rings the same way. That is Yoru Hub today: its timers (`core/src/timers.rs`) reach the board only in the snapshot, and it doesn't send `set_timers` or handle `timer_action` yet.
+A timer that goes to `ring` (and wasn't ringing in the last list) makes Yoru jump like an alarm clock, with the alarm earcon and a line over the bottom rim with its label; the host still says it aloud. A host that never sends `set_timers` still has its snapshot's `timer` (Metrics): the Timers app shows that one alone, without its actions, and it rings the same way. Yoru Hub keeps its timers in `core/src/timers.rs` and sends the list from each board's session (`core/src/bridge/session.rs`), the snapshot's `timer` too for older firmware.
 
 What the user does comes back as `timer_action`:
 
@@ -202,7 +202,7 @@ What the user does comes back as `timer_action`:
 
 ## Habits
 
-Since 0.11.0, with the `habits` capability. Yoru Hub has no habits yet, so it sends no `set_habits` and the app stays empty. The host keeps the user's habits, how many times each is done today and the streaks, starts each day afresh at midnight, and sends today's list whenever it changes and on connect.
+Since 0.11.0, with the `habits` capability. Yoru Hub keeps them in `core/src/assistant/habits.rs` (set by voice or on its Routines page). The host keeps the user's habits, how many times each is done today and the streaks, starts each day afresh at midnight, and sends today's list whenever it changes and on connect.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
@@ -220,7 +220,7 @@ The menu's Habits app shows the first three as rings around how many are done to
 
 ## Fetch
 
-Since 0.11.0, with the `fetch` capability. Yoru Hub doesn't send `show_fetch` yet. While the host's assistant calls one of its connectors (an MCP tool: Gmail, Calendar, GitHub...), Yoru runs an errand: a portal in the connector's colour opens on the rim, Yoru dives in, and comes back with a parcel when the call is done.
+Since 0.11.0, with the `fetch` capability (Yoru Hub: `core/src/bridge/errands.rs`). While the host's assistant calls one of its connectors (an MCP tool: Gmail, Calendar, GitHub...), Yoru runs an errand: a portal in the connector's colour opens on the rim, Yoru dives in, and comes back with a parcel when the call is done.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|

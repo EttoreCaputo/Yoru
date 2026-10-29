@@ -12,11 +12,10 @@ Firmware 0.11.9 (2026-10-29).
 - Senses: touch, motion (`motion.c`: lifted, put down, shaken, knocked, rocked, face down, dropped, spun, tilt), the sound's direction (`ears_dir.c`), the PMU (M2).
 - The menu as a watch's: Notifications, Timers, Habits, Games, Do not disturb and Settings around Yoru; every setting on the board, in Italian and English (M2).
 - Voice and link: wake word (Alexa, Hi ESP, Jarvis, Computer), push-to-talk on PWR, listening on after an answer, the host judging the end of a sentence (Smart Turn), speech on the speaker, USB and WiFi (M3).
-- The assistant's body (M4): the inbox (`show_notification`) and the Allow and Deny card, both used by Yoru Hub; BOOT opens the inbox, the screen goes dark after a minute asleep. The Timers and Habits apps and the errands are built too, but Yoru Hub doesn't drive them yet.
+- The assistant's body (M4): the inbox (`show_notification`), the Allow and Deny card, the Timers and Habits apps and the errands, all driven by Yoru Hub; BOOT opens the inbox, the screen goes dark after a minute asleep.
 - Games: Tilt ball, Slingshot, Constellations (since 0.11.9).
 
 **Left**
-- Yoru Hub's side of 0.11.0: send `set_timers`, `set_habits` and `show_fetch`, and handle `timer_action` and `habit_check` (habits don't exist in Yoru Hub at all). Until then Timers shows only the snapshot's timer, Habits is empty and Yoru never goes on an errand.
 - Voice: the custom wake word "Yoru" (M6); the mic gain (M3); the second mic, with a two-mic AFE (M3).
 - The pet's return: needs, moods and acts, with the late-night notice and the sounds' language (M5).
 - Power: deep sleep on battery with wake-on-motion (M2).
@@ -74,7 +73,7 @@ To check on the hardware: rendering time per frame (`!lvgl stats`), and the flas
 
 In 0.5.0: the menu (`menu.c`), motion (`motion.c`), the PMU (`board_pmu.c`), the sound's direction (`ears_dir.c`), and new eye moods and gestures for them (dizzy, scared, peek; hold, shoo, flail; knock and lean). Left: the Look items (name, colour, eye shape: M5, when there is more than one; the host already sets `eye_color` and `eye_style`), pairing a computer from the menu (the host does it over USB), deep sleep with wake-on-motion on battery, sending the gestures to the host, and checking on the board which way the IMU's x and y and the two mics lie (`SCREEN_X`/`SCREEN_Y` in `motion.c`, `MIC_A_SIDE` in `ears_dir.c`).
 
-**The menu as a watch's (since 0.11.0).** The ring of icons became a honeycomb of round apps around Yoru; since 0.11.1 Yoru is one of the bubbles (top left), the bubbles are smaller, the honeycomb pans with a fisheye towards the rim, and only the bubbles that change are redrawn: Notifications, Timers, Habits, Settings, Do not disturb and, since 0.11.9, Games (Agents left in 0.11.5), with badges and rings that say what is new. Since 0.11.8 an app opens as a ring of its colour rippling out past the edge. The items below are all under Settings, each category with its round icon. Timers and Habits come from the host (`set_timers`, `set_habits`); a host's connector call sends Yoru on an errand through a portal (`show_fetch`, `errand.c`). Yoru Hub sends none of the three yet.
+**The menu as a watch's (since 0.11.0).** The ring of icons became a honeycomb of round apps around Yoru; since 0.11.1 Yoru is one of the bubbles (top left), the bubbles are smaller, the honeycomb pans with a fisheye towards the rim, and only the bubbles that change are redrawn: Notifications, Timers, Habits, Settings, Do not disturb and, since 0.11.9, Games (Agents left in 0.11.5), with badges and rings that say what is new. Since 0.11.8 an app opens as a ring of its colour rippling out past the edge. The items below are all under Settings, each category with its round icon. Timers and Habits come from the host (`set_timers`, `set_habits`); a host's connector call sends Yoru on an errand through a portal (`show_fetch`, `errand.c`). Yoru Hub drives all three (since 2026-10-29).
 
 **Settings menu on the board.** It is a round menu, made for the circle, that opens without the app. This is the plan it was built from; what is in today: Display (brightness, night brightness and hours, dim when asleep, rotation with auto, 24-bit colour), Sound (volume, Yoru's sounds, mic off, listening chime), Behaviour (sleepy and asleep after, do not disturb, touch and motion reactions, turns to sounds, the BOOT button), Voice (wake word on or off, which one, language), Connection, Battery and About (with the 80 MHz bus test). Look and pairing are still to do.
 - **Opening and closing.** Swipe down from the top edge to open it, swipe up or wait a few seconds to close it. Yoru peeks at the menu while it is open, eyes small and up at the edge. The gesture must not clash with poking and stroking the eyes.
@@ -142,7 +141,7 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 
 ### M4: host and app (in)
 - The host is Yoru Hub (`../yoru-hub`): the assistant with connectors, voice, watchers and notifications, timers, habits, the flasher and WiFi pairing, and an MCP server for other clients (react, speak, notify, timers). Its plan and status: `docs/assistant.md` there.
-- On the board, for it: the inbox (0.10.0), the Timers and Habits apps and the errands (0.11.0), the Allow and Deny card for its own confirmations (0.11.5). Yoru Hub uses the inbox and the card; timers, habits and errands wait for its side (Where it stands).
+- On the board, for it: the inbox (0.10.0), the Timers and Habits apps and the errands (0.11.0), the Allow and Deny card for its own confirmations (0.11.5). Yoru Hub uses all of them.
 - Earlier hosts: Companion Hub with DualEye (to 2026-10-18), then the Yoru app (2026-10-18 to 2026-10-19, History).
 - Left: Anthropic's Hardware Buddy BLE protocol, so Yoru also works with Claude Desktop without the hub (Bluetooth next to WiFi and ESP-SR needs its internal RAM measured first).
 

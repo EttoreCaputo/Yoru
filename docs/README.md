@@ -21,7 +21,7 @@ Status: early development, firmware 0.11.9. What is in and what is left: [the ro
 - **Senses:** touch (pokes, strokes, flicks), motion (lifted, shaken, knocked, rocked, face down, dropped, spun, tilted) and where a sudden sound comes from.
 - **Voice:** a wake word (Alexa, Hi ESP, Jarvis or Computer, until "Yoru" exists), push-to-talk on PWR, listening on after an answer, and the host's voice on the speaker.
 - **The menu,** a watch's honeycomb of round apps around Yoru (swipe down from the top): Notifications, Timers, Habits, Games, Do not disturb and Settings.
-- **The host's side:** the inbox of notifications and the Allow and Deny card before Yoru acts for you. Timers and reminders, habits and Yoru's errands (while the assistant calls one of your services) are on the board, waiting for Yoru Hub to drive them.
+- **The host's side:** the inbox of notifications, timers and reminders, your daily habits, the Allow and Deny card before Yoru acts for you, and Yoru's errands while the assistant calls one of your services.
 - **Games:** Tilt ball, Slingshot and Constellations.
 
 ## Host program
