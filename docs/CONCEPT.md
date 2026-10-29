@@ -83,7 +83,10 @@ There are no dashboard screens that turn Yoru into gauges. What happens in your 
 ## Behaviour
 
 ### A life of its own
-Yoru doesn't play random animations. Like a Tamagotchi, a Sims character or Cozmo, it has needs, and what it does comes from them (`main/needs.c`, `main/life.c`):
+Yoru doesn't play random animations. Like a Tamagotchi, a Sims character or Cozmo, it has needs, and what it does comes from them.
+
+> On the board this was in from 0.6.0 to 0.7.x (`needs.c`, `life.c`) and is out since 0.8.0: today Yoru floats near the middle, turns to sounds, reacts to touch and motion, naps when nobody is around and comes to the glass when something urgent waits for you. The needs come back later (`docs/ROADMAP.md`, M5); this section is what they will be.
+
 
 | Need | Runs down | Met by |
 |------|-----------|--------|
@@ -118,7 +121,7 @@ It reacts *towards* things, never at random:
 - **Shaking:** it gets dizzy (spiral eyes) and then grumpy.
 - **Touch:** stroking the screen makes it happy and the sphere leans towards the finger. A tap is a poke: the ball squashes and wobbles; once is fine, three in a row annoy it. A long press puts it to sleep, or into focus mode.
 - **Music:** it bobs to the beat and the hands sway with it.
-- **Menu:** a swipe down from the top edge opens a menu like a watch's: Yoru shrinks into a bubble of a honeycomb of small round apps (notifications, timers, habits, settings, do not disturb), one of them rather than their centre, blinking and looking at the one under your finger; the honeycomb can be dragged, and shrinks towards the rim so more apps fit (see the roadmap, M2).
+- **Menu:** a swipe down from the top edge opens a menu like a watch's: Yoru shrinks into a bubble of a honeycomb of small round apps (notifications, timers, habits, games, settings, do not disturb), one of them rather than their centre, blinking and looking at the one under your finger; the honeycomb can be dragged, and shrinks towards the rim so more apps fit (see the roadmap, M2).
 
 ### Moods from your day
 Yoru feels your day, not the machine's: it isn't part of the computer, so its temperature or load mean nothing to it.
@@ -186,15 +189,15 @@ The moods, knocks, slaps, lean, greeting and pointer-follow added with firmware 
 - Scaling a picture costs LVGL about 80 ms a frame on this chip, so the sphere is never scaled: each size it takes on the way near or far is rendered once, in a few milliseconds (a table for the shading, no square roots), and the sizes in use are kept within about 3 MB of PSRAM.
 - Everything around the sphere stays true black, as before.
 - Asleep, the far-away dot keeps almost every pixel off.
-- The sphere's gradients are dithered as they are rendered, so the panel's 16-bit colour shows no rings.
+- The sphere's gradients are dithered as they are rendered, so the panel's 16-bit colour shows no rings; with 24-bit colour on (a setting) they are smooth without it.
 
 ## For hackers
 
-- Open firmware. Local brain by default (llama.cpp, local speech-to-text and text-to-speech), any OpenAI-compatible API if you prefer. No account and no subscription, and it keeps working if any cloud disappears.
+- Open firmware. You pick the brain: a model on this computer through Ollama (free and private), Groq (free, with daily limits), OpenAI or Claude, with your own key. Speech-to-text and text-to-speech can run on the computer too (whisper.cpp, Piper). No account with us and no subscription.
 - Moods, looks (colours, eyes, finishes) and reactions are data that can be edited, shared and modded.
 - An MCP server and a tool registry let agents (Claude Code, Claude Desktop, anything that speaks MCP) make Yoru react, speak or show something.
 - Integrations with things around the house are added as skills on the computer, not on the board.
 
 ## Wake word
 
-"Yoru" works as a wake word: two syllables with clear vowels. ESP-SR only ships fixed words, so it needs a custom model, via microWakeWord (see the DualEye wake-word study). Until then, an ESP-SR word stands in.
+"Yoru" works as a wake word: two syllables with clear vowels. ESP-SR only ships fixed words, so it needs a custom model, via microWakeWord (see the DualEye wake-word study). Until then, an ESP-SR word stands in: Alexa, Hi ESP, Jarvis or Computer.

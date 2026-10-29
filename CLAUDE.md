@@ -7,7 +7,7 @@ Host program: `../yoru-hub` (formerly Companion Hub), Yoru's personal assistant 
 ## Rule: every firmware change bumps the version and gets built
 
 1. Bump `version.txt` (patch by default). Check `git log` first: if the current version is committed, it must go up. Bump once per piece of work.
-2. Add a `## <version>` section at the top of `FIRMWARE_CHANGELOG.md`, written for the person using the board.
+2. Add a `## <version>` section at the top of `docs/FIRMWARE_CHANGELOG.md`, written for the person using the board.
 3. Build: `source ~/.espressif/tools/activate_idf_v6.1.sh && idf.py build merge-bin`. If it fails, fix it or report it clearly.
 4. Flash the board once the build passes: `idf.py -p <port> flash` (the port is `/dev/cu.usbmodem*`). If no board is connected or flashing fails, say so.
 5. Copy the build into Yoru Hub, which ships it: `../yoru-hub/tools/fetch_firmware.sh`.
@@ -32,6 +32,10 @@ Never run `git commit`, `git push` or anything else that writes history. Leave t
 ## Rule: everything in the code is in English
 
 Identifiers, comments, log messages, strings, file names and docs in the repo are written in English, even when the conversation is in another language. The only exception is text the user sees in another language on purpose (the Italian menu labels).
+
+## Rule: documentation lives in `docs/`
+
+Every document goes in `docs/`: the README (`docs/README.md`, which GitHub shows on the repository's page), the changelog, the roadmap, the protocol. Nothing else outside it but this file. When a piece of work changes what a doc says, update the doc in the same piece of work.
 
 ## Conventions
 

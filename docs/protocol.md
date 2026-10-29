@@ -2,14 +2,14 @@
 
 Yoru speaks DualEye's protocol v2, copied from [DualEye's protocol](../../esp32s3-dualeye-pcmonitor/docs/protocol.md): the same frames, channels, JSON-RPC methods, audio streams and WiFi pairing. This page lists only what is different on Yoru; read DualEye's for the rest. When the two diverge, fix both until the shared parts move to a repository of their own.
 
-Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main/net.c`, `main/rpc.c` (board); `tools/yoru_link.py` (test scripts); `NotchBuddy/Sources/Yoru/` in the [Yoru app](https://github.com/EttoreCaputo/yoru-app) (host, since 2026-10-18); `core/src/link.rs` and `wifi.rs` in [Companion Hub](https://github.com/EttoreCaputo/companion-hub) (the earlier host). The host is moving back to Companion Hub, now Yoru Hub (`../yoru-hub`, `core/src/`), which becomes Yoru's personal assistant: see its `docs/assistant.md`. The inbox below is its firmware part (phase A4).
+Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main/net.c`, `main/rpc.c` (board); `tools/yoru_link.py` (test scripts); `core/src/protocol.rs`, `link.rs`, `wifi.rs` and `voice.rs` in Yoru Hub (`../yoru-hub`), the host, Yoru's personal assistant (its `docs/assistant.md`). The Yoru app (`NotchBuddy/Sources/Yoru/` in the coucou fork) was the host from 2026-10-18 to 2026-10-19. A change to the protocol is made here and in Yoru Hub's `core/src/` together.
 
 ## Identity
 
 `hello` and `ready` answer:
 
 ```json
-{"protocol":2,"firmware":"0.3.0","idf":"v6.1","board":"yoru-amoled-1.75c","id":"7c0c5f4233e4","transport":"usb","max_payload":4096,"channels":["ctrl","metrics","log","audio_up","audio_down"],"capabilities":["tools","gaze","wifi","voice","speaker","inbox","timers","habits","fetch"]}
+{"protocol":2,"firmware":"0.11.9","idf":"v6.1","board":"yoru-amoled-1.75c","id":"7c0c5f4233e4","transport":"usb","max_payload":4096,"channels":["ctrl","metrics","log","audio_up","audio_down"],"capabilities":["tools","gaze","wifi","voice","speaker","inbox","timers","habits","fetch"]}
 ```
 
 - `board` is `yoru-amoled-1.75c`; a host tells Yoru from DualEye by it.
@@ -48,17 +48,17 @@ Settings are kept in NVS and survive a reboot.
 |------|-----------|--------|
 | `set_brightness` | `percent`: 5–100 | How bright the eyes glow while awake. Asleep they dim by themselves (setting `auto_dim`) |
 | `set_mic` | `muted`, `wake_sound`: booleans, at least one | As on DualEye. Muted, the mic isn't read: no wake word, nothing heard in the room |
-| `set_wake_word` | `word`: one of `voice.wake_words` (`alexa`, `hiesp`) | As on DualEye. Yoru's own word comes in M6 |
+| `set_wake_word` | `word`: one of `voice.wake_words` (`alexa`, `hiesp`, `jarvis`, `computer`) | As on DualEye. Yoru's own word comes in M6 |
 | `set_volume` | `percent`: 0–100 | Speaker volume, with the `volume` sound at the new level |
 | `react` | `name`: `happy` · `excited` · `wink` · `proud` · `relieved` · `charged` · `dance` · `love` · `curious` · `thinking` · `focus` · `angry` · `hot` · `sleepy` · `yawn` · `tired` · `sigh` · `sad` · `surprised` · `scared` · `bored` · `look_around` · `blink` · `wave` · `point` · `shy` · `clap` · `stretch` · `dizzy` · `annoyed` · `falling` · `drowsy` · `lifted` | The eyes react for a few seconds, with Yoru's sound for it. DualEye's `play_eyes` names, those these eyes can show. Refused during a conversation |
 | `play_sound` | `name` | As on DualEye: the same sounds |
-| `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
+| `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
 | `set_setting` | `name`, `value`: integer | Change one setting within its range (switches are 0 or 1); it applies at once |
 | `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging`) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`) and `errand` (Yoru is on one) |
 | `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `habits` · `games` (0.11.8 and later) · `settings` · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it. Since 0.11.0; before, the menu was a ring and `inbox` one of its pages |
 | `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Yoru asks before it acts for you, over the eyes, with Allow and Deny (see Confirmations). A second call replaces it |
 | `hide_approval` | `id`: string | Take that card away: it was answered in the app, or gave up. An `id` that isn't shown is fine |
-| `show_toast` | `text`: string, `seconds`: integer, `tone`?: `info` · `done` · `wait` · `error` | Since 0.7.0. One line above the bottom rim for a few seconds. A second call replaces it |
+| `show_toast` | `text`: string, `seconds`: integer, `tone`?: `info` · `done` · `wait` · `error` | Since 0.7.0. One line above the bottom rim for a few seconds. A second call replaces it. Yoru Hub no longer sends it (since 2026-10-21) |
 | `show_notification` | `id`, `source`?, `title`, `text`?, `urgency`?, `actions`? | Since 0.10.0. Put a notification in the inbox (see Inbox) |
 | `hide_notification` | `id`: string | Since 0.10.0. Take it out of the inbox. An `id` that isn't there is fine |
 | `clear_notifications` | none | Since 0.10.0. Empty the inbox |
@@ -174,7 +174,7 @@ The host does what it means and may then `hide_notification` it.
 
 ## Timers
 
-Since 0.11.0, with the `timers` capability. The host keeps the timers, the pomodoro and the reminders (Yoru Hub's `core/src/timers.rs`) and sends the whole list whenever it changes (one is set, paused, resumed, cancelled, rings, is dismissed) and on connect. The board counts each one down from when the list came; the menu's Timers app shows them, the one that ends first first, and the ringing ones before all.
+Since 0.11.0, with the `timers` capability. The host keeps the timers, the pomodoro and the reminders and sends the whole list whenever it changes (one is set, paused, resumed, cancelled, rings, is dismissed) and on connect. The board counts each one down from when the list came; the menu's Timers app shows them, the one that ends first first, and the ringing ones before all.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
@@ -184,7 +184,7 @@ Since 0.11.0, with the `timers` capability. The host keeps the timers, the pomod
 {"timers":[{"id":3,"kind":"timer","state":"run","left_s":272,"total_s":600,"label":"Pasta"},{"id":4,"kind":"reminder","state":"run","left_s":2520,"total_s":3600,"label":"Call Anna","at":"17:30"}]}
 ```
 
-A timer that goes to `ring` (and wasn't ringing in the last list) makes Yoru jump like an alarm clock, with the alarm earcon and a line over the bottom rim with its label; the host still says it aloud. A host that never sends `set_timers` still has its snapshot's `timer` (Metrics): the Timers app shows that one alone, without its actions, and it rings the same way.
+A timer that goes to `ring` (and wasn't ringing in the last list) makes Yoru jump like an alarm clock, with the alarm earcon and a line over the bottom rim with its label; the host still says it aloud. A host that never sends `set_timers` still has its snapshot's `timer` (Metrics): the Timers app shows that one alone, without its actions, and it rings the same way. That is Yoru Hub today: its timers (`core/src/timers.rs`) reach the board only in the snapshot, and it doesn't send `set_timers` or handle `timer_action` yet.
 
 What the user does comes back as `timer_action`:
 
@@ -202,7 +202,7 @@ What the user does comes back as `timer_action`:
 
 ## Habits
 
-Since 0.11.0, with the `habits` capability. The host keeps the user's habits, how many times each is done today and the streaks, starts each day afresh at midnight, and sends today's list whenever it changes and on connect.
+Since 0.11.0, with the `habits` capability. Yoru Hub has no habits yet, so it sends no `set_habits` and the app stays empty. The host keeps the user's habits, how many times each is done today and the streaks, starts each day afresh at midnight, and sends today's list whenever it changes and on connect.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
@@ -220,7 +220,7 @@ The menu's Habits app shows the first three as rings around how many are done to
 
 ## Fetch
 
-Since 0.11.0, with the `fetch` capability. While the host's assistant calls one of its connectors (an MCP tool: Gmail, Calendar, GitHub...), Yoru runs an errand: a portal in the connector's colour opens on the rim, Yoru dives in, and comes back with a parcel when the call is done.
+Since 0.11.0, with the `fetch` capability. Yoru Hub doesn't send `show_fetch` yet. While the host's assistant calls one of its connectors (an MCP tool: Gmail, Calendar, GitHub...), Yoru runs an errand: a portal in the connector's colour opens on the rim, Yoru dives in, and comes back with a parcel when the call is done.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
