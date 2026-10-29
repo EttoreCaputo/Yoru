@@ -26,7 +26,7 @@ Status: early development, firmware 0.11.9. What is in and what is left: [the ro
 
 ## Host program
 
-On the computer, Yoru is driven by Yoru Hub (`../yoru-hub`), its desktop app and CLI: a personal assistant that reaches your services through MCP connectors, tells you what is worth knowing, answers by voice, flashes and updates the firmware, pairs Yoru over WiFi and lets other MCP clients use it.
+On the computer, Yoru is driven by Yoru Hub (`../yoru-hub`), its desktop app and CLI: a personal assistant that reaches your services through MCP connectors, tells you what is worth knowing, answers by voice, flashes and updates the firmware, pairs Yoru over WiFi and lets other MCP clients use it. It runs on macOS only for now (Apple Silicon and Intel).
 
 The app carries this firmware: after a change, build it here and run `tools/fetch_firmware.sh` in Yoru Hub.
 
