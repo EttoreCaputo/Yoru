@@ -20,6 +20,7 @@ idf_component_register(SRCS "approval.c" "toast.c" "inbox_ui.c" "inbox.c" "main.
                             "card.c"
                             "board_button.c"
                             "motion.c"
+                            "power.c"
                             "ui_voice.c"
                             "life.c"
                             "ears_dir.c"

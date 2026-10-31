@@ -72,3 +72,10 @@ CONFIG_MDNS_MEMORY_ALLOC_SPIRAM=y
 CONFIG_ESP_PHY_IRAM_OPT=n
 CONFIG_ESP_WIFI_SOFTAP_SUPPORT=n
 CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+
+# Power (0.12.0, main/power.c): frequency scaling and light sleep on battery.
+# Light sleep keeps the CPU powered: its retention buffer would take internal
+# RAM that WiFi and ESP-SR need.
+CONFIG_PM_ENABLE=y
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
+CONFIG_PM_POWER_DOWN_CPU_IN_LIGHT_SLEEP=n

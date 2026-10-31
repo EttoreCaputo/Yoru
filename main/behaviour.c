@@ -23,6 +23,7 @@
 #include "motion.h"
 #include "metrics_model.h"
 #include "playback.h"
+#include "power.h"
 #include "timers.h"
 #include "toast.h"
 
@@ -213,7 +214,9 @@ static int awake_brightness(void)
 {
     const int day = (int) board_settings_get(SETTING_BRIGHTNESS);
     const int dark = (int) board_settings_get(SETTING_NIGHT_BRIGHTNESS);
-    return night() && dark < day ? dark : day;
+    const int want = night() && dark < day ? dark : day;
+    const int cap = power_brightness_cap(); // on battery
+    return want < cap ? want : cap;
 }
 
 static int asleep_brightness(void)
@@ -473,12 +476,16 @@ static void go_dark(void)
     s.dark = true;
     set_brightness(0);
     lvgl_port_set_touch(false);
+    eyes_set_pace(EYES_PACE_STOPPED); // power.c keeps it so
+    board_display_set_sleep(true);
 }
 
 static void light_up(void)
 {
     ESP_LOGI(TAG, "screen lit");
     s.dark = false;
+    board_display_set_sleep(false);
+    eyes_set_pace(EYES_PACE_FULL); // power.c slows it again if it should
     lvgl_port_set_touch(true);
     s.last_touch_ms = lv_tick_get();
 }
@@ -547,9 +554,30 @@ static void timers_tick(void)
     react(EYES_MOOD_SURPRISED, 1800);
 }
 
+/* What power.c needs to know; it may hibernate, and then Yoru wakes up
+ * (unless it's still face down). */
+static void power_step(void)
+{
+    const power_scene_t scene = {
+        .asleep = s.asleep,
+        .dark = s.dark,
+        .busy = s.voice != VOICE_IDLE || s.talking,
+        .can_hibernate = timers_count() == 0 && !errand_busy() && s.voice == VOICE_IDLE && !s.talking
+                         && !card_up() && !s.menu && !s.view,
+    };
+    if (power_tick(&scene) && !s.face_down) {
+        light_up();
+        if (s.asleep) {
+            wake_up();
+        }
+    }
+}
+
 static void tick_cb(lv_timer_t *timer)
 {
     const uint32_t now = lv_tick_get();
+
+    power_step();
 
     if (s.status_until_ms != 0 && (int32_t) (now - s.status_until_ms) >= 0) {
         s.status_until_ms = 0;

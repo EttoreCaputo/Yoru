@@ -10,6 +10,8 @@
 #include "esp_codec_dev.h"
 #include "esp_codec_dev_defaults.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 static const char *TAG = "board_audio";
 
@@ -27,6 +29,15 @@ static i2s_chan_handle_t s_tx;
 static i2s_chan_handle_t s_rx;
 static esp_codec_dev_handle_t s_out;
 static esp_codec_dev_handle_t s_in;
+static esp_codec_dev_sample_info_t s_out_fs, s_in_fs;
+/* Closing a device powers its codec down (and the speaker's amplifier with
+ * the ES8311); opening it again needs these back. s_lock covers them. */
+static SemaphoreHandle_t s_lock;
+static bool s_out_open, s_in_open;
+static bool s_out_muted = true;
+static bool s_lazy;
+static int s_volume = AUDIO_DEFAULT_VOLUME;
+static float s_in_gain_db = AUDIO_REF_GAIN_DB;
 
 /* TX in standard stereo mode for the ES8311, RX in 4-slot TDM for the ES7210,
  * both on I2S0 so they share MCLK/BCLK/WS. */
@@ -145,33 +156,43 @@ static esp_err_t codecs_start(void)
     s_in = esp_codec_dev_new(&in_cfg);
     ESP_RETURN_ON_FALSE(s_in != NULL, ESP_FAIL, TAG, "input dev");
 
-    esp_codec_dev_sample_info_t out_fs = {
+    s_out_fs = (esp_codec_dev_sample_info_t) {
         .bits_per_sample = 16,
         .channel = 1,
         .sample_rate = BOARD_AUDIO_SAMPLE_RATE,
     };
-    ESP_RETURN_ON_FALSE(esp_codec_dev_open(s_out, &out_fs) == ESP_CODEC_DEV_OK, ESP_FAIL, TAG, "open out");
+    ESP_RETURN_ON_FALSE(esp_codec_dev_open(s_out, &s_out_fs) == ESP_CODEC_DEV_OK, ESP_FAIL, TAG, "open out");
+    s_out_open = true;
 
-    esp_codec_dev_sample_info_t in_fs = {
+    s_in_fs = (esp_codec_dev_sample_info_t) {
         .bits_per_sample = 16,
         .channel = BOARD_AUDIO_IN_CHANNELS,
         .sample_rate = BOARD_AUDIO_SAMPLE_RATE,
     };
-    ESP_RETURN_ON_FALSE(esp_codec_dev_open(s_in, &in_fs) == ESP_CODEC_DEV_OK, ESP_FAIL, TAG, "open in");
+    ESP_RETURN_ON_FALSE(esp_codec_dev_open(s_in, &s_in_fs) == ESP_CODEC_DEV_OK, ESP_FAIL, TAG, "open in");
+    s_in_open = true;
+    return ESP_OK;
+}
+
+static esp_err_t apply_in_gains(void)
+{
+    ESP_RETURN_ON_FALSE(esp_codec_dev_set_in_gain(s_in, s_in_gain_db) == ESP_CODEC_DEV_OK, ESP_FAIL, TAG, "gain");
+    ESP_RETURN_ON_FALSE(esp_codec_dev_set_in_channel_gain(s_in, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(BOARD_AUDIO_MIC_SLOT),
+                                                          AUDIO_MIC_GAIN_DB)
+                            == ESP_CODEC_DEV_OK,
+                        ESP_FAIL, TAG, "mic gain");
     return ESP_OK;
 }
 
 esp_err_t board_audio_init(void)
 {
+    s_lock = xSemaphoreCreateMutex();
+    ESP_RETURN_ON_FALSE(s_lock != NULL, ESP_ERR_NO_MEM, TAG, "lock");
     ESP_RETURN_ON_ERROR(board_i2c_bus(&s_i2c), TAG, "i2c");
     ESP_RETURN_ON_ERROR(i2s_start(), TAG, "i2s");
     ESP_RETURN_ON_ERROR(codecs_start(), TAG, "codecs");
     ESP_RETURN_ON_ERROR(board_audio_set_volume(AUDIO_DEFAULT_VOLUME), TAG, "volume");
-    ESP_RETURN_ON_ERROR(board_audio_set_in_gain(AUDIO_REF_GAIN_DB), TAG, "gain");
-    ESP_RETURN_ON_FALSE(esp_codec_dev_set_in_channel_gain(s_in, ESP_CODEC_DEV_MAKE_CHANNEL_MASK(BOARD_AUDIO_MIC_SLOT),
-                                                          AUDIO_MIC_GAIN_DB)
-                            == ESP_CODEC_DEV_OK,
-                        ESP_FAIL, TAG, "mic gain");
+    ESP_RETURN_ON_ERROR(apply_in_gains(), TAG, "gains");
     ESP_RETURN_ON_ERROR(board_audio_set_mute(true), TAG, "mute");
     ESP_LOGI(TAG, "ES8311 + ES7210 ready, %d Hz", BOARD_AUDIO_SAMPLE_RATE);
     return ESP_OK;
@@ -189,17 +210,110 @@ esp_err_t board_audio_read(int16_t *frames_out, size_t frames)
     return esp_codec_dev_read(s_in, frames_out, bytes) == ESP_CODEC_DEV_OK ? ESP_OK : ESP_FAIL;
 }
 
+/* With s_lock held. */
+static esp_err_t open_out(void)
+{
+    if (s_out_open) {
+        return ESP_OK;
+    }
+    ESP_RETURN_ON_FALSE(esp_codec_dev_open(s_out, &s_out_fs) == ESP_CODEC_DEV_OK, ESP_FAIL, TAG, "open out");
+    s_out_open = true;
+    esp_codec_dev_set_out_vol(s_out, s_volume);
+    return ESP_OK;
+}
+
+static void close_out(void)
+{
+    if (s_out_open) {
+        esp_codec_dev_close(s_out);
+        s_out_open = false;
+    }
+}
+
 esp_err_t board_audio_set_volume(int volume)
 {
-    return esp_codec_dev_set_out_vol(s_out, volume) == ESP_CODEC_DEV_OK ? ESP_OK : ESP_FAIL;
+    if (s_lock == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_volume = volume;
+    // Closed, the ES8311 takes it when it opens again.
+    const bool ok = !s_out_open || esp_codec_dev_set_out_vol(s_out, volume) == ESP_CODEC_DEV_OK;
+    xSemaphoreGive(s_lock);
+    return ok ? ESP_OK : ESP_FAIL;
 }
 
 esp_err_t board_audio_set_mute(bool mute)
 {
-    return esp_codec_dev_set_out_mute(s_out, mute) == ESP_CODEC_DEV_OK ? ESP_OK : ESP_FAIL;
+    if (s_lock == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_out_muted = mute;
+    esp_err_t err = ESP_OK;
+    if (!mute) {
+        err = open_out();
+    }
+    if (err == ESP_OK && s_out_open && esp_codec_dev_set_out_mute(s_out, mute) != ESP_CODEC_DEV_OK) {
+        err = ESP_FAIL;
+    }
+    if (mute && s_lazy) {
+        close_out();
+    }
+    xSemaphoreGive(s_lock);
+    return err;
+}
+
+void board_audio_set_lazy(bool lazy)
+{
+    if (s_lock == NULL) {
+        return;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    if (lazy != s_lazy) {
+        s_lazy = lazy;
+        if (lazy && s_out_muted) {
+            close_out();
+        } else if (!lazy && open_out() == ESP_OK) {
+            esp_codec_dev_set_out_mute(s_out, s_out_muted);
+        }
+    }
+    xSemaphoreGive(s_lock);
+}
+
+esp_err_t board_audio_set_mic(bool on)
+{
+    if (s_lock == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    esp_err_t err = ESP_OK;
+    if (on && !s_in_open) {
+        if (esp_codec_dev_open(s_in, &s_in_fs) == ESP_CODEC_DEV_OK) {
+            s_in_open = true;
+            err = apply_in_gains();
+        } else {
+            err = ESP_FAIL;
+        }
+    } else if (!on && s_in_open) {
+        esp_codec_dev_close(s_in);
+        s_in_open = false;
+    }
+    xSemaphoreGive(s_lock);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "mic %s failed", on ? "on" : "off");
+    }
+    return err;
 }
 
 esp_err_t board_audio_set_in_gain(float db)
 {
-    return esp_codec_dev_set_in_gain(s_in, db) == ESP_CODEC_DEV_OK ? ESP_OK : ESP_FAIL;
+    if (s_lock == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    s_in_gain_db = db;
+    const bool ok = !s_in_open || esp_codec_dev_set_in_gain(s_in, db) == ESP_CODEC_DEV_OK;
+    xSemaphoreGive(s_lock);
+    return ok ? ESP_OK : ESP_FAIL;
 }

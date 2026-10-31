@@ -14,11 +14,12 @@ Firmware 0.11.9 (2026-10-29).
 - Voice and link: wake word (Alexa, Hi ESP, Jarvis, Computer), push-to-talk on PWR, listening on after an answer, the host judging the end of a sentence (Smart Turn), speech on the speaker, USB and WiFi (M3).
 - The assistant's body (M4): the inbox (`show_notification`), the Allow and Deny card, the Timers and Habits apps and the errands, all driven by Yoru Hub; BOOT opens the inbox, the screen goes dark after a minute asleep.
 - Games: Tilt ball, Slingshot, Constellations (since 0.11.9).
+- Power (0.12.0, `power.c`): Desk on USB, Balanced or Saver on battery (WiFi modem sleep, frequency scaling, the speaker's amplifier and, in Saver, the mics off while asleep), the panel asleep with the dark screen, and hibernation in light sleep until the IMU's wake on motion, PWR, BOOT or USB.
 
 **Left**
 - Voice: the custom wake word "Yoru" (M6); the mic gain (M3); the second mic, with a two-mic AFE (M3).
 - The pet's return: needs, moods and acts, with the late-night notice and the sounds' language (M5).
-- Power: deep sleep on battery with wake-on-motion (M2).
+- Power: measure what the profiles draw on the board; the touch controller asleep with the dark screen; waking from hibernation for a timer (M2).
 - The menu: the Look items (name, colour, eye shape: the host can set `eye_color` and `eye_style`, the menu can't yet) and pairing a computer from the board (M2).
 - Checks on the board: which way the IMU's x and y and the two mics lie (M2); internal RAM with WiFi and ESP-SR on together (M3), which also decides Bluetooth.
 - Gestures sent to the host (M2), growing up (M5), bobbing to music (M5), moods and looks as data, a desktop simulator (M6), Bluetooth (M4).
@@ -123,13 +124,13 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 - **Dropped.** Free fall: scared eyes and a squeak, then relief.
 - **Spun.** Turning it fast on the desk (gyroscope): dizzy.
 - **Orientation.** In: the screen's rotation can follow how the badge stands, as an "auto" choice (rotation 4) next to the four fixed ones.
-- **Power (to do).** The IMU's wake-on-motion interrupt lets the board sleep deeply on battery and wake when it is picked up.
+- **Power (0.12.0).** On battery the board saves what it can (`power.c`, docs/protocol.md "Power"); after a while in the dark it hibernates, and the IMU's wake-on-motion interrupt on GPIO 21 wakes it when it is picked up. Light sleep rather than deep sleep: Yoru comes back where it was, in a moment, without a reboot.
 - **To do.** Gestures are sent to the host over the link (M3), so the app and MCP tools can use them; in M6 the gesture thresholds become data like the moods.
 
 **Senses**
 - Sound direction from the two mics, so the gaze turns to the noise (`ears_dir.c`, from the raw mics before the AFE).
 - `ears.c` for bangs, claps and chatter: removed in 0.8.0 with the pet; only the sound's direction is left.
-- AXP2101: battery, charging, PWR key, power-off; sleep with the panel and touch in standby, and since 0.9.0 the dark screen after a minute asleep.
+- AXP2101: battery, charging, PWR key, power-off; sleep with the panel and touch in standby, since 0.9.0 the dark screen after a minute asleep, since 0.12.0 with the panel asleep.
 
 ### M3: voice and link (in since 0.3.0)
 - ESP-SR front end with AEC, the wake word (Alexa, Hi ESP, Jarvis or Computer until M6), VAD, the utterance stream and playback, from DualEye. The TDM slots are checked on the board: slot 0 mic, slot 1 the speaker loopback (AEC reference), slot 2 the second mic, slot 3 empty.

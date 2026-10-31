@@ -96,6 +96,15 @@ typedef struct {
  * look_init() first. */
 lv_obj_t *eyes_create(lv_obj_t *parent);
 
+typedef enum {
+    EYES_PACE_FULL,    // 30 frames a second
+    EYES_PACE_SLOW,    // 15: asleep on battery, the dot and its z's
+    EYES_PACE_STOPPED, // hidden and not stepped: the screen is dark
+} eyes_pace_t;
+
+/** How often the eyes move and draw (power.c). With the LVGL lock held. */
+void eyes_set_pace(eyes_pace_t pace);
+
 /** The same mood again changes nothing, so it can be set every tick. */
 void eyes_set_mood(eyes_mood_t mood);
 eyes_mood_t eyes_get_mood(void);

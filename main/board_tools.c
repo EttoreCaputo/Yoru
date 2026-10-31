@@ -25,6 +25,7 @@
 #include "motion.h"
 #include "net.h"
 #include "playback.h"
+#include "power.h"
 #include "timers.h"
 #include "toast.h"
 #include "voice.h"
@@ -363,6 +364,7 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
     cJSON_AddNumberToObject(b, "mv", bat.mv);
     cJSON_AddBoolToObject(b, "usb", bat.usb);
     cJSON_AddBoolToObject(b, "charging", bat.charging);
+    cJSON_AddStringToObject(b, "profile", power_profile_name(power_profile()));
     if (motion_present()) {
         // Gravity and turn rate on the screen's axes, for checking them.
         float g[3], w[3], lx, ly;

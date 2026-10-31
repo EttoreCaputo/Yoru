@@ -10,6 +10,7 @@
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_pm.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -31,7 +32,6 @@
 #define LVGL_MAX_AREAS 32
 /* The panel refreshes at about 60 Hz: past this, TE is missing. */
 #define LVGL_TE_TIMEOUT_MS 25
-#define LVGL_TICK_PERIOD_MS 2
 #define LVGL_TASK_STACK_SIZE (8 * 1024)
 #define LVGL_TASK_PRIORITY 5
 
@@ -349,22 +349,34 @@ int32_t lvgl_port_te_period_us(void)
     return esp_timer_get_time() - s_te_last_us < 100000 ? s_te_period_us : 0;
 }
 
-static void tick_cb(void *arg)
+/* LVGL reads the time when it needs it: a periodic tick would wake the
+ * chip every few ms and keep it from light sleep (power.c). esp_timer's
+ * clock goes on through light sleep. */
+static uint32_t tick_cb(void)
 {
-    lv_tick_inc(LVGL_TICK_PERIOD_MS);
+    return (uint32_t) (esp_timer_get_time() / 1000);
 }
 
 static void lvgl_task(void *arg)
 {
     const uint32_t min_delay_ms = 1000 / configTICK_RATE_HZ;
+    // Drawing wants the full clock; between frames the CPU may slow down.
+    esp_pm_lock_handle_t cpu = NULL;
+    esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "lvgl", &cpu);
     s_window_start_us = esp_timer_get_time();
     while (true) {
+        if (cpu != NULL) {
+            esp_pm_lock_acquire(cpu);
+        }
         _lock_acquire(&s_lvgl_lock);
         int64_t start = esp_timer_get_time();
         s_te_wait_us = 0;
         uint32_t delay_ms = lv_timer_handler();
         account(start, esp_timer_get_time() - s_te_wait_us);
         _lock_release(&s_lvgl_lock);
+        if (cpu != NULL) {
+            esp_pm_lock_release(cpu);
+        }
         if (delay_ms < min_delay_ms) {
             delay_ms = min_delay_ms;
         } else if (delay_ms > 500) {
@@ -439,13 +451,7 @@ esp_err_t lvgl_port_init(const board_lcd_t *lcd, bool deep, lv_display_t **out_d
     lv_indev_set_read_cb(touch, touch_read_cb);
     lv_indev_set_display(touch, disp);
 
-    const esp_timer_create_args_t tick_args = {
-        .callback = &tick_cb,
-        .name = "lvgl_tick",
-    };
-    esp_timer_handle_t tick_timer = NULL;
-    ESP_RETURN_ON_ERROR(esp_timer_create(&tick_args, &tick_timer), TAG, "tick timer");
-    ESP_RETURN_ON_ERROR(esp_timer_start_periodic(tick_timer, LVGL_TICK_PERIOD_MS * 1000), TAG, "tick start");
+    lv_tick_set_cb(tick_cb);
 
     // Core 0: core 1 is kept for the audio front end and the wake word (M3).
     BaseType_t ok = xTaskCreatePinnedToCore(lvgl_task, "lvgl", LVGL_TASK_STACK_SIZE, NULL,

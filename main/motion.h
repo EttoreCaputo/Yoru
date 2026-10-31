@@ -47,6 +47,16 @@ typedef void (*motion_cb_t)(motion_event_t event);
 
 /** Find the IMU and start reading it. ESP_ERR_NOT_FOUND without one. */
 esp_err_t motion_init(motion_cb_t cb);
+
+typedef enum {
+    MOTION_FULL,           // every gesture, 100 samples a second
+    MOTION_SLOW,           // face down and up only, 10 a second (dark screen)
+    MOTION_WAKE_ON_MOTION, // nothing read: INT1 goes high when it's moved
+} motion_mode_t;
+
+/** How much the IMU does (power.c). Wake on motion is set up before this
+ * returns; leaving it resets the chip. Not from the motion task. */
+esp_err_t motion_set_mode(motion_mode_t mode);
 bool motion_present(void);
 
 /** How the case leans away from how it has been resting lately, -1..1 on

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "board.h"
+#include "driver/gpio.h"
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -21,6 +22,11 @@ static const char *TAG = "motion";
 #define IMU_CTRL2 0x03 // accelerometer: range, rate
 #define IMU_CTRL3 0x04 // gyroscope: range, rate
 #define IMU_CTRL7 0x08 // bit 0 accelerometer, bit 1 gyroscope on
+#define IMU_CTRL9 0x0A // host commands
+#define IMU_CAL1_L 0x0B
+#define IMU_CAL1_H 0x0C
+#define IMU_STATUSINT 0x2D // bit 7: a command is done
+#define IMU_STATUS1 0x2F   // bit 2: wake on motion; reading clears it
 #define IMU_AX_L 0x35  // ax ay az gx gy gz, 16 bits each, little-endian
 #define IMU_RESET 0x60
 #define QMI8658_ID 0x05
@@ -32,6 +38,18 @@ static const char *TAG = "motion";
 #define GYR_LSB_DPS 32.0f
 
 #define PERIOD_MS 10
+/* With the screen dark (power.c) only face down and up matter: a sample a
+ * tenth as often, the gyroscope off. */
+#define SLOW_PERIOD_MS 100
+/* Wake on motion while hibernating: the accelerometer alone at 21 Hz in its
+ * low-power mode (+-8 g), past this many mg, the first samples ignored
+ * while it settles. INT1, starting low. */
+#define WOM_ACC_CFG 0x2D
+#define WOM_THRESHOLD_MG 100
+#define WOM_BLANKING 0x10
+#define WOM_INT1_LOW 0x00
+#define CMD_WOM_SETTING 0x08
+#define CMD_ACK 0x00
 
 /* How the chip lies under the glass: the screen's x and y from its axes.
  * Check on a new board with get_state's motion.g: lying flat it reads
@@ -110,6 +128,9 @@ static volatile int s_zsign = 1;
 static volatile bool s_zsign_known;
 static volatile bool s_zsign_dirty;
 static float s_raw_z;
+static TaskHandle_t s_task;
+/* What the task does (motion_set_mode()); it only reads it. */
+static volatile motion_mode_t s_mode = MOTION_FULL;
 
 static struct {
     int64_t now;
@@ -306,6 +327,26 @@ static float lean_axis(float d)
     return d < 0 ? -v : v;
 }
 
+/* Face down and up, from the smoothed gravity, `dt_ms` after the last. */
+static void detect_face(int dt_ms)
+{
+    if (!s_zsign_known) {
+        return;
+    }
+    const bool want_down = !m.face_down && m.g[2] < FACE_DOWN_G;
+    const bool want_up = m.face_down && m.g[2] > FACE_UP_G;
+    m.face_ms = (want_down || want_up) ? m.face_ms + dt_ms : 0;
+    if (want_down && m.face_ms >= FACE_DOWN_MS) {
+        m.face_down = true;
+        m.face_ms = 0;
+        emit(MOTION_FACE_DOWN);
+    } else if (want_up && m.face_ms >= FACE_UP_MS) {
+        m.face_down = false;
+        m.face_ms = 0;
+        emit(MOTION_FACE_UP);
+    }
+}
+
 static void step(const float a[3], const float w[3])
 {
     m.now += PERIOD_MS;
@@ -379,20 +420,7 @@ static void step(const float a[3], const float w[3])
         m.spin_ms = 0;
     }
 
-    if (s_zsign_known) {
-        const bool want_down = !m.face_down && m.g[2] < FACE_DOWN_G;
-        const bool want_up = m.face_down && m.g[2] > FACE_UP_G;
-        m.face_ms = (want_down || want_up) ? m.face_ms + PERIOD_MS : 0;
-        if (want_down && m.face_ms >= FACE_DOWN_MS) {
-            m.face_down = true;
-            m.face_ms = 0;
-            emit(MOTION_FACE_DOWN);
-        } else if (want_up && m.face_ms >= FACE_UP_MS) {
-            m.face_down = false;
-            m.face_ms = 0;
-            emit(MOTION_FACE_UP);
-        }
-    }
+    detect_face(PERIOD_MS);
 
     detect_rock();
     detect_upright();
@@ -428,11 +456,24 @@ static void load_zsign(void)
     }
 }
 
-static void motion_task(void *arg)
+/* Reset and set up for the gestures: both sensors at 250 Hz. */
+static esp_err_t configure(void)
+{
+    wr(IMU_RESET, 0xB0);
+    vTaskDelay(pdMS_TO_TICKS(20));
+    ESP_RETURN_ON_ERROR(wr(IMU_CTRL1, 0x40), TAG, "ctrl1");
+    ESP_RETURN_ON_ERROR(wr(IMU_CTRL2, ACC_CFG), TAG, "ctrl2");
+    ESP_RETURN_ON_ERROR(wr(IMU_CTRL3, GYR_CFG), TAG, "ctrl3");
+    ESP_RETURN_ON_ERROR(wr(IMU_CTRL7, 0x03), TAG, "ctrl7");
+    vTaskDelay(pdMS_TO_TICKS(30));
+    return ESP_OK;
+}
+
+/* Start from a real reading, so it doesn't look like a fall: for a moment
+ * after a reset the chip reads all zeros. */
+static void seed(void)
 {
     float a[3], w[3];
-    // Start from a real reading, so it doesn't look like a fall: for a moment
-    // after the reset the chip reads all zeros.
     vTaskDelay(pdMS_TO_TICKS(200));
     while (!read_sample(a, w) || norm3(a) < 0.5f) {
         vTaskDelay(pdMS_TO_TICKS(50));
@@ -440,9 +481,98 @@ static void motion_task(void *arg)
     memcpy(m.g, a, sizeof(m.g));
     memcpy(m.rest, a, sizeof(m.rest));
     m.up_candidate = -2;
+}
+
+/* A host command through CTRL9: wait for done, then acknowledge it. */
+static esp_err_t command(uint8_t cmd)
+{
+    ESP_RETURN_ON_ERROR(wr(IMU_CTRL9, cmd), TAG, "ctrl9");
+    const uint8_t reg = IMU_STATUSINT;
+    for (int i = 0; i < 50; i++) {
+        uint8_t st = 0;
+        if (i2c_master_transmit_receive(s_dev, &reg, 1, &st, 1, 20) == ESP_OK && (st & 0x80)) {
+            return wr(IMU_CTRL9, CMD_ACK);
+        }
+        vTaskDelay(pdMS_TO_TICKS(2));
+    }
+    return ESP_ERR_TIMEOUT;
+}
+
+static esp_err_t configure_wom(void)
+{
+    ESP_RETURN_ON_ERROR(wr(IMU_CTRL7, 0x00), TAG, "off");
+    ESP_RETURN_ON_ERROR(wr(IMU_CTRL2, WOM_ACC_CFG), TAG, "rate");
+    ESP_RETURN_ON_ERROR(wr(IMU_CAL1_L, WOM_THRESHOLD_MG), TAG, "threshold");
+    ESP_RETURN_ON_ERROR(wr(IMU_CAL1_H, WOM_INT1_LOW | WOM_BLANKING), TAG, "pin");
+    ESP_RETURN_ON_ERROR(command(CMD_WOM_SETTING), TAG, "wom");
+    ESP_RETURN_ON_ERROR(wr(IMU_CTRL1, 0x48), TAG, "int1"); // INT1 out
+    ESP_RETURN_ON_ERROR(wr(IMU_CTRL7, 0x01), TAG, "on");
+    uint8_t reg = IMU_STATUS1, st;
+    i2c_master_transmit_receive(s_dev, &reg, 1, &st, 1, 20); // a stale event
+    return ESP_OK;
+}
+
+esp_err_t motion_set_mode(motion_mode_t mode)
+{
+    if (s_dev == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    const motion_mode_t was = s_mode;
+    if (mode == was) {
+        return ESP_OK;
+    }
+    esp_err_t err = ESP_OK;
+    s_mode = mode;
+    if (mode == MOTION_WAKE_ON_MOTION) {
+        // The task stops reading at its next sample; the bus takes turns.
+        gpio_set_direction(BOARD_IMU_INT1_GPIO, GPIO_MODE_INPUT);
+        gpio_pulldown_en(BOARD_IMU_INT1_GPIO);
+        err = configure_wom();
+    } else if (was == MOTION_WAKE_ON_MOTION) {
+        err = configure();
+        xTaskNotifyGive(s_task);
+    } else {
+        // The gyroscope only for the gestures.
+        err = wr(IMU_CTRL7, mode == MOTION_SLOW ? 0x01 : 0x03);
+    }
+    ESP_LOGI(TAG, "mode %d%s", mode, err == ESP_OK ? "" : ", failed");
+    return err;
+}
+
+static void motion_task(void *arg)
+{
+    float a[3], w[3];
+    seed();
     TickType_t wake = xTaskGetTickCount();
+    motion_mode_t was = MOTION_FULL;
     while (true) {
-        vTaskDelayUntil(&wake, pdMS_TO_TICKS(PERIOD_MS));
+        const motion_mode_t mode = s_mode;
+        if (mode == MOTION_WAKE_ON_MOTION) {
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+            seed();
+            wake = xTaskGetTickCount();
+            was = MOTION_WAKE_ON_MOTION;
+            continue;
+        }
+        if (mode != was) {
+            // From slow samples the smoothing would see a jolt: start again.
+            if (was != MOTION_FULL && read_sample(a, w)) {
+                memcpy(m.g, a, sizeof(m.g));
+                memcpy(m.rest, a, sizeof(m.rest));
+            }
+            was = mode;
+        }
+        vTaskDelayUntil(&wake, pdMS_TO_TICKS(mode == MOTION_SLOW ? SLOW_PERIOD_MS : PERIOD_MS));
+        if (s_mode == MOTION_WAKE_ON_MOTION) {
+            continue;
+        }
+        if (mode == MOTION_SLOW) {
+            if (read_sample(a, w)) {
+                memcpy(m.g, a, sizeof(m.g));
+                detect_face(SLOW_PERIOD_MS);
+            }
+            continue;
+        }
         if (s_zsign_dirty) {
             // The flash is written here, not from the touch's task. Its
             // stack is internal for that (0.3.1).
@@ -477,17 +607,11 @@ esp_err_t motion_init(motion_cb_t cb)
     if (id != QMI8658_ID) {
         ESP_LOGW(TAG, "who-am-i 0x%02x, expected 0x%02x; trying anyway", id, QMI8658_ID);
     }
-    wr(IMU_RESET, 0xB0);
-    vTaskDelay(pdMS_TO_TICKS(20));
-    ESP_RETURN_ON_ERROR(wr(IMU_CTRL1, 0x40), TAG, "ctrl1");
-    ESP_RETURN_ON_ERROR(wr(IMU_CTRL2, ACC_CFG), TAG, "ctrl2");
-    ESP_RETURN_ON_ERROR(wr(IMU_CTRL3, GYR_CFG), TAG, "ctrl3");
-    ESP_RETURN_ON_ERROR(wr(IMU_CTRL7, 0x03), TAG, "ctrl7");
-    vTaskDelay(pdMS_TO_TICKS(30));
+    ESP_RETURN_ON_ERROR(configure(), TAG, "configure");
     load_zsign();
     s_cb = cb;
     // It writes the flash once in a while (save_zsign): internal stack.
-    if (xTaskCreatePinnedToCore(motion_task, "motion", 3072, NULL, 4, NULL, 0) != pdPASS) {
+    if (xTaskCreatePinnedToCore(motion_task, "motion", 3072, NULL, 4, &s_task, 0) != pdPASS) {
         return ESP_ERR_NO_MEM;
     }
     ESP_LOGI(TAG, "QMI8658 ready, glass side %s", s_zsign_known ? (s_zsign > 0 ? "+z" : "-z") : "not known yet");

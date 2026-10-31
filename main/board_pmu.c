@@ -44,11 +44,15 @@ static const char *TAG = "board_pmu";
 #define POLL_MS 150
 #define POLL_DOWN_MS 40
 #define BATTERY_EVERY_MS 3000
+/* With the screen dark (power.c) a tap may take a moment longer to show:
+ * the chip keeps the flags meanwhile. */
+#define POLL_SLOW_MS 400
 
 static i2c_master_dev_handle_t s_dev;
 static board_pmu_key_cb_t s_on_key;
 static board_pmu_state_t s_state;
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
+static volatile bool s_slow;
 /* The key, as its edges said. Only the poll task touches it. */
 static struct {
     bool down;
@@ -148,7 +152,7 @@ static void poll_task(void *arg)
             battery_us = now;
             read_battery();
         }
-        vTaskDelay(pdMS_TO_TICKS(s_key.down ? POLL_DOWN_MS : POLL_MS));
+        vTaskDelay(pdMS_TO_TICKS(s_key.down ? POLL_DOWN_MS : s_slow ? POLL_SLOW_MS : POLL_MS));
     }
 }
 
@@ -217,4 +221,28 @@ void board_pmu_power_off(void)
     uint8_t v = 0;
     rd(AXP_COMMON, &v, 1);
     wr(AXP_COMMON, v | 0x01);
+}
+
+void board_pmu_set_slow(bool slow)
+{
+    s_slow = slow;
+}
+
+bool board_pmu_wake_check(void)
+{
+    if (s_dev == NULL) {
+        return false;
+    }
+    uint8_t irq = 0, st = 0;
+    bool wake = false;
+    if (rd(AXP_INTSTS2, &irq, 1) == ESP_OK && (irq & (KEY_DOWN_BIT | KEY_SHORT_BIT))) {
+        // Taken here: the poll task mustn't see it as a tap that puts Yoru
+        // back to sleep.
+        wr(AXP_INTSTS2, irq & KEY_BITS);
+        wake = true;
+    }
+    if (rd(AXP_STATUS1, &st, 1) == ESP_OK && (st & 0x20)) {
+        wake = true; // plugged in
+    }
+    return wake;
 }

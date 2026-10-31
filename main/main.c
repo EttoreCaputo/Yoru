@@ -26,6 +26,7 @@
 #include "net.h"
 #include "nvs.h"
 #include "playback.h"
+#include "power.h"
 #include "rpc.h"
 #include "voice.h"
 
@@ -167,6 +168,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Yoru %s", esp_app_get_description()->version);
     board_settings_init();
     board_settings_on_change(on_setting);
+    // Before anything takes the power locks it sets up.
+    power_init();
     metrics_model_init();
 
     const bool deep = board_settings_on(SETTING_COLOR_24);

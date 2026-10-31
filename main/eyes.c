@@ -301,6 +301,8 @@ typedef struct {
 
 static struct {
     lv_obj_t *obj;
+    lv_timer_t *timer;
+    bool stopped; // eyes_set_pace() hid it
     eyes_mood_t mood;
     eye_shape_t cur;
     /* Gaze, -1..1, and where it is going. */
@@ -1460,8 +1462,28 @@ lv_obj_t *eyes_create(lv_obj_t *parent)
     lv_obj_remove_flag(s.obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(s.obj, draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
-    lv_timer_create(frame_cb, EYES_FRAME_MS, NULL);
+    s.timer = lv_timer_create(frame_cb, EYES_FRAME_MS, NULL);
     return s.obj;
+}
+
+void eyes_set_pace(eyes_pace_t pace)
+{
+    if (s.timer == NULL) {
+        return;
+    }
+    if (pace == EYES_PACE_STOPPED) {
+        lv_timer_pause(s.timer);
+        lv_obj_add_flag(s.obj, LV_OBJ_FLAG_HIDDEN);
+        s.stopped = true;
+        return;
+    }
+    if (s.stopped) {
+        s.stopped = false;
+        lv_obj_remove_flag(s.obj, LV_OBJ_FLAG_HIDDEN);
+        s.last_tick = lv_tick_get(); // no jump for the time it was stopped
+    }
+    lv_timer_set_period(s.timer, pace == EYES_PACE_SLOW ? EYES_FRAME_MS * 2 : EYES_FRAME_MS);
+    lv_timer_resume(s.timer);
 }
 
 void eyes_set_mood(eyes_mood_t mood)

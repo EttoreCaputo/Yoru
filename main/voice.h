@@ -49,6 +49,11 @@ bool voice_wake_on(void);
 void voice_set_muted(bool muted);
 bool voice_muted(void);
 
+/** Rest (power.c): the mics' codec off and no wake word, as when muted,
+ * without touching the mute. Push-to-talk and the host's listen end it. */
+void voice_set_resting(bool rest);
+bool voice_resting(void);
+
 /** Hand the mic to someone else (the audio self-test's `rec`) and back.
  * Blocks until the feed task has let go of it. Nests. */
 void voice_pause(bool pause);

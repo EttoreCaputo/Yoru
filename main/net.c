@@ -76,6 +76,10 @@ static char s_host[24];
 static bool s_up;          /* driver, netif, mDNS and the TCP task, once */
 static bool s_started;     /* esp_wifi_start() */
 static esp_timer_handle_t s_retry;
+/* Power (power.c): the radio's sleep between beacons, and the WiFi stopped
+ * while the board hibernates. */
+static wifi_ps_type_t s_ps = WIFI_PS_NONE;
+static volatile bool s_hibernating;
 
 /* The connection: s_sock_lock. */
 static SemaphoreHandle_t s_sock_lock;
@@ -327,7 +331,7 @@ static void schedule_retry(void)
 static void retry_cb(void *arg)
 {
     lock();
-    bool go = s_enabled && s_ssid[0] != '\0' && !s_scanning && s_state != ST_CONNECTED;
+    bool go = s_enabled && s_ssid[0] != '\0' && !s_scanning && !s_hibernating && s_state != ST_CONNECTED;
     unlock();
     if (go) {
         esp_wifi_connect();
@@ -347,7 +351,7 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         const wifi_event_sta_disconnected_t *ev = data;
         lock();
         s_ip.addr = 0;
-        bool retry = s_enabled && !s_scanning;
+        bool retry = s_enabled && !s_scanning && !s_hibernating;
         if (retry) {
             switch (ev->reason) {
             case WIFI_REASON_NO_AP_FOUND:
@@ -480,6 +484,8 @@ static void apply(void)
         return;
     }
     cfg.sta.pmf_cfg.capable = true;
+    // Asleep in Saver the radio wakes for every third beacon (WIFI_PS_MAX_MODEM).
+    cfg.sta.listen_interval = 3;
     cfg.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
     cfg.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
     lock();
@@ -496,9 +502,49 @@ static void apply(void)
         esp_wifi_set_config(WIFI_IF_STA, &cfg);
         if (esp_wifi_start() == ESP_OK) {
             s_started = true;
-            // Latency over power: the board is on USB power anyway.
-            esp_wifi_set_ps(WIFI_PS_NONE);
+            esp_wifi_set_ps(s_ps);
         }
+    }
+}
+
+void net_set_power_save(wifi_ps_type_t ps)
+{
+    if (ps == s_ps) {
+        return;
+    }
+    s_ps = ps;
+    if (s_started && !s_hibernating) {
+        esp_wifi_set_ps(ps);
+    }
+}
+
+void net_hibernate(bool on)
+{
+    if (!s_started || on == s_hibernating) {
+        return;
+    }
+    if (on) {
+        s_hibernating = true;
+        esp_timer_stop(s_retry);
+        xSemaphoreTake(s_sock_lock, portMAX_DELAY);
+        if (s_client >= 0) {
+            shutdown(s_client, SHUT_RDWR);
+            s_drop = true;
+        }
+        xSemaphoreGive(s_sock_lock);
+        esp_wifi_stop();
+        lock();
+        s_state = ST_DISCONNECTED;
+        s_ip.addr = 0;
+        unlock();
+        ESP_LOGI(TAG, "WiFi: off while hibernating");
+    } else {
+        s_hibernating = false;
+        // STA_START joins the network again.
+        if (esp_wifi_start() == ESP_OK) {
+            esp_wifi_set_ps(s_ps);
+        }
+        ESP_LOGI(TAG, "WiFi: back on");
     }
 }
 

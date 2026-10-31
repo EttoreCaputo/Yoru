@@ -45,6 +45,8 @@ static const setting_info_t INFO[SETTING_COUNT] = {
     [SETTING_LCD_FAST] = {"lcd_80mhz", 0, 1, 0},
     [SETTING_BOOT_KEY] = {"boot_key", 0, 1, 1},
     [SETTING_COLOR_24] = {"color_24bit", 0, 1, 0},
+    [SETTING_POWER_SAVER] = {"power_saver", 0, 1, 0},
+    [SETTING_HIBERNATE_MIN] = {"hibernate", 0, 240, 30},
 };
 
 static SemaphoreHandle_t s_lock;

@@ -47,6 +47,13 @@ bool board_pmu_present(void);
 /** Switch the board off. USB power keeps it on. */
 void board_pmu_power_off(void);
 
+/** Poll the PWR key less often (the screen is dark). */
+void board_pmu_set_slow(bool slow);
+
+/** While hibernating (power.c): PWR was pressed, or USB plugged in. Takes the
+ * key's flags. */
+bool board_pmu_wake_check(void);
+
 #ifdef __cplusplus
 }
 #endif

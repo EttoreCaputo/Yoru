@@ -23,6 +23,10 @@ esp_err_t board_display_init(board_lcd_t *out, bool fast, bool deep);
 /** 0 (off) to 100 %. An AMOLED has no backlight: this is DCS 0x51. */
 esp_err_t board_display_set_brightness(int percent);
 
+/** The panel off and asleep (a fraction of a mA), or back on: 120 ms. Its
+ * memory keeps the picture. */
+esp_err_t board_display_set_sleep(bool sleep);
+
 #ifdef __cplusplus
 }
 #endif

@@ -30,6 +30,7 @@
 #include "playback.h"
 #include "timers.h"
 #include "timers_ui.h"
+#include "power.h"
 #include "voice.h"
 
 static const char *TAG = "menu";
@@ -108,7 +109,7 @@ typedef enum {
     K_HOLD,   // an action on a long press, for the ones that can't be undone
 } kind_t;
 
-typedef enum { F_NONE, F_PCT, F_HOUR, F_TIME, F_ROTATION, F_LANG } fmt_t;
+typedef enum { F_NONE, F_PCT, F_HOUR, F_TIME, F_ROTATION, F_LANG, F_HIBERNATE } fmt_t;
 
 typedef void (*info_fn_t)(char *out, size_t len);
 typedef void (*action_fn_t)(void);
@@ -133,10 +134,14 @@ typedef struct {
 /* The waits, as the arc offers them: a few round values beat 3590 steps. */
 static const int32_t TIMES[] = {10, 20, 30, 45, 60, 90, 120, 180, 300, 600, 900, 1200, 1800, 3600, 7200};
 #define TIMES_N ((int) (sizeof(TIMES) / sizeof(TIMES[0])))
+/* Minutes of dark screen before hibernating, as a tap goes through them. */
+static const int32_t HIBERNATE[] = {0, 10, 30, 60, 120};
+#define HIBERNATE_N ((int) (sizeof(HIBERNATE) / sizeof(HIBERNATE[0])))
 
 static void info_battery(char *out, size_t len);
 static void info_power(char *out, size_t len);
 static void info_voltage(char *out, size_t len);
+static void info_profile(char *out, size_t len);
 static void info_link(char *out, size_t len);
 static void info_wifi(char *out, size_t len);
 static void info_ip(char *out, size_t len);
@@ -194,6 +199,9 @@ static const item_t BATTERY_ITEMS[] = {
     INFO("Charge", "Carica", info_battery),
     INFO("Power", "Alimentazione", info_power),
     INFO("Voltage", "Tensione", info_voltage),
+    INFO("Profile", "Profilo", info_profile),
+    SET("Power saver", "Risparmio", K_SWITCH, SETTING_POWER_SAVER, F_NONE),
+    SET("Hibernate after", "Letargo dopo", K_CHOICE, SETTING_HIBERNATE_MIN, F_HIBERNATE),
     ACT("Power off", "Spegni", K_HOLD, act_power_off, info_hold),
 };
 static const item_t ABOUT_ITEMS[] = {
@@ -362,6 +370,15 @@ static void format(const item_t *it, int32_t v, char *out, size_t len)
     case F_LANG:
         snprintf(out, len, "%s", v == 1 ? "Italiano" : "English");
         break;
+    case F_HIBERNATE:
+        if (v == 0) {
+            snprintf(out, len, "%s", tr("Never", "Mai"));
+        } else if (v % 60 == 0) {
+            snprintf(out, len, "%ld h", (long) (v / 60));
+        } else {
+            snprintf(out, len, "%ld min", (long) v);
+        }
+        break;
     default:
         snprintf(out, len, "%ld", (long) v);
         break;
@@ -415,6 +432,22 @@ static void info_voltage(char *out, size_t len)
     board_pmu_state_t st;
     board_pmu_get(&st);
     snprintf(out, len, "%d.%02d V", st.mv / 1000, (st.mv % 1000) / 10);
+}
+
+/* On USB it's always Desk; on battery what the switch below says. */
+static void info_profile(char *out, size_t len)
+{
+    switch (power_profile()) {
+    case POWER_BALANCED:
+        snprintf(out, len, "%s", tr("Balanced", "Bilanciato"));
+        break;
+    case POWER_SAVER:
+        snprintf(out, len, "%s", tr("Saver", "Risparmio"));
+        break;
+    default:
+        snprintf(out, len, "%s", tr("Desk (USB)", "Scrivania (USB)"));
+        break;
+    }
 }
 
 static void info_link(char *out, size_t len)
@@ -766,6 +799,20 @@ static void row_cb(lv_event_t *e)
         build_editor(it);
         break;
     case K_CHOICE: {
+        if (it->fmt == F_HIBERNATE) {
+            // The next of the round values past the current one.
+            const int32_t now = board_settings_get(it->setting);
+            int32_t next = HIBERNATE[0];
+            for (int i = 0; i < HIBERNATE_N; i++) {
+                if (HIBERNATE[i] > now) {
+                    next = HIBERNATE[i];
+                    break;
+                }
+            }
+            board_settings_set(it->setting, next);
+            refresh_values();
+            break;
+        }
         int32_t lo, hi;
         board_settings_range(it->setting, &lo, &hi);
         int32_t v = board_settings_get(it->setting) + 1;

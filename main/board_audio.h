@@ -48,6 +48,15 @@ esp_err_t board_audio_set_mute(bool mute);
  * the mic gets the maximum and the loopback less, so it can't clip. */
 esp_err_t board_audio_set_in_gain(float db);
 
+/** Lazy: the speaker's codec and amplifier power down while it's muted, and
+ * come back when it's unmuted (a few I2C writes). On battery (power.c). */
+void board_audio_set_lazy(bool lazy);
+
+/** The mics' codec on or off. Off, board_audio_read() fails: only once no one
+ * reads (voice.c). On the ESP32-S3 the I2S port stays on while the speaker's
+ * half is. */
+esp_err_t board_audio_set_mic(bool on);
+
 #ifdef __cplusplus
 }
 #endif

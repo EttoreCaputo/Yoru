@@ -12,6 +12,7 @@
 
 #include "cJSON.h"
 #include "esp_err.h"
+#include "esp_wifi_types.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "link_crypto.h"
@@ -37,6 +38,14 @@ typedef struct {
 
 /** Load the WiFi settings (NVS must be up) and join the network if set. */
 void net_init(void);
+
+/** The radio's sleep between beacons (power.c): WIFI_PS_NONE on USB and in
+ * a conversation, more on battery. Kept for when the WiFi starts. */
+void net_set_power_save(wifi_ps_type_t ps);
+
+/** Stop the WiFi while the board hibernates, and join again after. Nothing
+ * without a network set up. The host's connection drops. */
+void net_hibernate(bool on);
 
 /** Where the TCP task puts what it receives; NULL while the WiFi has never
  * been on since boot. */

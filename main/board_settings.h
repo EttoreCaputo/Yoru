@@ -61,6 +61,12 @@ typedef enum {
     /* 24-bit colour (RGB888) instead of 16 (RGB565), from the next boot:
      * smoother gradients, half as many bytes again on the screen's bus. */
     SETTING_COLOR_24,
+    /* On battery: Saver instead of Balanced (power.c). On USB the board is
+     * always at its best. */
+    SETTING_POWER_SAVER,
+    /* On battery, minutes of dark screen before it hibernates (power.c);
+     * 0 never. */
+    SETTING_HIBERNATE_MIN,
     SETTING_COUNT,
 } setting_t;
 

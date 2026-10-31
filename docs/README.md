@@ -7,7 +7,7 @@
 
 A desk companion that lives in the black of a round AMOLED: a small matte sphere with two tiny eyes and two floating hands, in the dark, that you can make your own. It lives a life of its own on the desk, and it is the body of a personal assistant on your computer: it tells you what is worth knowing and answers when you talk to it.
 
-Status: early development, firmware 0.11.9. What is in and what is left: [the roadmap](ROADMAP.md).
+Status: early development, firmware 0.12.0. What is in and what is left: [the roadmap](ROADMAP.md).
 
 - [The character](CONCEPT.md)
 - [Roadmap and hardware](ROADMAP.md)
@@ -23,6 +23,7 @@ Status: early development, firmware 0.11.9. What is in and what is left: [the ro
 - **The menu,** a watch's honeycomb of round apps around Yoru (swipe down from the top): Notifications, Timers, Habits, Games, Do not disturb and Settings.
 - **The host's side:** the inbox of notifications, timers and reminders, your daily habits, the Allow and Deny card before Yoru acts for you, and Yoru's errands while the assistant calls one of your services.
 - **Games:** Tilt ball, Slingshot and Constellations.
+- **Battery:** power profiles that save what they can while Yoru is idle (Balanced, or Saver with the mics off while it sleeps), a dark screen that really switches off, and hibernation after a while in the dark, until it's picked up.
 
 ## Host program
 

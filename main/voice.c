@@ -11,6 +11,7 @@
 #include "esp_afe_sr_models.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_pm.h"
 #include "esp_timer.h"
 #include "esp_vadn_models.h"
 #include "esp_wn_models.h"
@@ -183,6 +184,12 @@ static SemaphoreHandle_t s_ctl;
 static EventGroupHandle_t s_req;
 static bool s_muted;
 static bool s_paused;
+/* Resting (power.c, Saver while asleep): the mics' codec is off and the CPU
+ * may slow down, as when muted. s_mic_on: the codec is on now. */
+static bool s_resting;
+static bool s_mic_on = true;
+/* WakeNet needs the full clock: held while the mic is on. */
+static esp_pm_lock_handle_t s_cpu_lock;
 
 /* The follow-up's window and pause, from voice_listen() (0: the defaults). */
 static volatile int s_follow_up_wait_ms;
@@ -271,11 +278,49 @@ int voice_wake_words(const char **ids, int max)
 
 static void update_run(void)
 {
-    if (!s_muted && !s_paused) {
+    if (!s_muted && !s_paused && !s_resting) {
         xEventGroupSetBits(s_run, RUN_BIT);
     } else {
         xEventGroupClearBits(s_run, RUN_BIT);
     }
+}
+
+/* The mics' codec and the full clock follow whether anyone listens. With
+ * s_ctl held. A self-test holding the mic keeps it as it is. */
+static void apply_mic(void)
+{
+    const bool want = !s_muted && !s_resting;
+    if (want == s_mic_on || xSemaphoreTake(s_mic, pdMS_TO_TICKS(500)) != pdTRUE) {
+        return;
+    }
+    board_audio_set_mic(want);
+    xSemaphoreGive(s_mic);
+    s_mic_on = want;
+    if (s_cpu_lock != NULL) {
+        if (want) {
+            esp_pm_lock_acquire(s_cpu_lock);
+        } else {
+            esp_pm_lock_release(s_cpu_lock);
+        }
+    }
+    ESP_LOGI(TAG, "mic %s", want ? "on" : "off");
+}
+
+void voice_set_resting(bool rest)
+{
+    if (!s_available || rest == s_resting) {
+        return;
+    }
+    xSemaphoreTake(s_ctl, portMAX_DELAY);
+    s_resting = rest;
+    update_run();
+    apply_mic();
+    xSemaphoreGive(s_ctl);
+}
+
+bool voice_resting(void)
+{
+    return s_resting;
 }
 
 void voice_set_wake_on(bool on)
@@ -308,6 +353,7 @@ void voice_set_muted(bool muted)
     xSemaphoreTake(s_ctl, portMAX_DELAY);
     s_muted = muted;
     update_run();
+    apply_mic();
     xSemaphoreGive(s_ctl);
     ESP_LOGI(TAG, "wake word %s", muted ? "muted" : "listening");
     if (muted) {
@@ -333,7 +379,11 @@ void voice_pause(bool pause)
     // the one it may be reading.
     if (pause) {
         xSemaphoreTake(s_mic, portMAX_DELAY);
+        board_audio_set_mic(true); // whoever takes it reads it, resting or not
     } else {
+        if (!s_mic_on) {
+            board_audio_set_mic(false);
+        }
         xSemaphoreGive(s_mic);
     }
 }
@@ -665,6 +715,7 @@ bool voice_listen(bool follow_up, int wait_ms, int pause_ms)
     if (!s_available || s_muted) {
         return false;
     }
+    voice_set_resting(false); // the host wants an answer
     s_follow_up_wait_ms = clamp_ms(wait_ms, FOLLOW_UP_MIN_WAIT_MS, FOLLOW_UP_MAX_WAIT_MS);
     s_follow_up_pause_ms = clamp_ms(pause_ms, MIN_END_SILENCE_MS, MAX_END_SILENCE_MS);
     xEventGroupSetBits(s_req, LISTEN_BIT | (follow_up ? FOLLOW_UP_BIT : 0));
@@ -687,6 +738,7 @@ bool voice_talk(void)
     if (!s_available || s_muted) {
         return false;
     }
+    voice_set_resting(false); // PWR held: someone talks
     if (esp_timer_get_time() < s_speaker_until_us) {
         // Talking over the board's own voice stops it.
         playback_barge_in();
@@ -853,6 +905,12 @@ void voice_start(bool muted, const char *wake_word)
         return;
     }
     s_available = true;
+    if (esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "voice", &s_cpu_lock) == ESP_OK) {
+        esp_pm_lock_acquire(s_cpu_lock); // the mic starts on
+    }
+    xSemaphoreTake(s_ctl, portMAX_DELAY);
+    apply_mic(); // muted from the start: off
+    xSemaphoreGive(s_ctl);
     ESP_LOGI(TAG, "wake word \"%s\" (%s), feed %d samples x %d ch%s", voice_wake_word(), s_model, s_chunk,
              BOARD_AUDIO_IN_CHANNELS, muted ? ", muted" : "");
 }

@@ -1,5 +1,14 @@
 # Firmware changelog
 
+## 0.12.0
+
+Yoru lasts much longer on its battery.
+
+- **Power profiles.** On USB nothing changes (Desk). On battery Yoru saves power by itself: the WiFi sleeps between messages (not while you talk to it), the processor slows down when there is nothing to draw or hear, the speaker's amplifier switches off between sounds, and the screen glows at most 60%. Menu → Settings → Battery shows the profile in use.
+- **Saver.** Battery → Risparmio (Power saver) goes further: the screen glows at most 40%, and while Yoru sleeps the microphones are off. The wake word doesn't work then: hold PWR to talk, which wakes it.
+- **The dark screen really switches off.** A minute after Yoru falls asleep the panel goes to sleep instead of just showing black, and Yoru stops drawing. On battery the board also dozes between its jobs. A tap on PWR lights it again, as before (it takes a tenth of a second longer).
+- **Hibernate.** On battery, after 30 minutes of dark screen with no timer running, Yoru switches the WiFi off and sleeps deeply. Pick it up, or press PWR or BOOT, and it wakes up and joins the WiFi again in a few seconds; plugging in the USB wakes it too. While it hibernates, notifications from the computer don't arrive. Battery → Letargo dopo (Hibernate after) sets the time: 10 or 30 minutes, 1 or 2 hours, or never.
+
 ## 0.11.9
 
 Three games with Yoru in the Games app of the menu.

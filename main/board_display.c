@@ -5,6 +5,8 @@
 #include "esp_check.h"
 #include "esp_lcd_co5300.h"
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "board_display";
 
@@ -39,6 +41,7 @@ static const co5300_lcd_init_cmd_t s_init_cmds[] = {
 };
 
 static esp_lcd_panel_io_handle_t s_io;
+static bool s_asleep;
 
 esp_err_t board_display_init(board_lcd_t *out, bool fast, bool deep)
 {
@@ -91,4 +94,25 @@ esp_err_t board_display_set_brightness(int percent)
     }
     uint8_t level = (uint8_t) (percent * 255 / 100);
     return esp_lcd_panel_io_tx_param(s_io, (int) LCD_QSPI_CMD(0x51), &level, 1);
+}
+
+/* Plain sleep, not the driver's deep standby: waking from that needs the
+ * whole init sequence again, over a second with its waits. */
+esp_err_t board_display_set_sleep(bool sleep)
+{
+    if (s_io == NULL || sleep == s_asleep) {
+        return s_io == NULL ? ESP_ERR_INVALID_STATE : ESP_OK;
+    }
+    if (sleep) {
+        ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(s_io, (int) LCD_QSPI_CMD(0x28), NULL, 0), TAG, "display off");
+        ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(s_io, (int) LCD_QSPI_CMD(0x10), NULL, 0), TAG, "sleep in");
+    } else {
+        ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(s_io, (int) LCD_QSPI_CMD(0x11), NULL, 0), TAG, "sleep out");
+        // The panel takes this long to wake before it takes commands again.
+        vTaskDelay(pdMS_TO_TICKS(120));
+        ESP_RETURN_ON_ERROR(esp_lcd_panel_io_tx_param(s_io, (int) LCD_QSPI_CMD(0x29), NULL, 0), TAG, "display on");
+    }
+    s_asleep = sleep;
+    ESP_LOGI(TAG, "panel %s", sleep ? "asleep" : "awake");
+    return ESP_OK;
 }
