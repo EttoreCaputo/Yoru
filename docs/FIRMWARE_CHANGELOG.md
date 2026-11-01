@@ -1,5 +1,12 @@
 # Firmware changelog
 
+## 0.12.2
+
+Yoru holds your finger.
+
+- **A long press on Yoru no longer puts him to sleep.** Keep your finger on him instead: he takes it in both little hands, leans towards it and looks happy. Hold on a moment longer and he melts, with hearts and a purr. Move your finger slowly and his hands follow it, pulling him along a little. Lift it and he lets go, floats back and waves after you.
+- A long press on the black does nothing now. To put Yoru to sleep, tap PWR, turn the board face down, rock him, or leave him be and he dozes off by himself.
+
 ## 0.12.1
 
 Yoru notices its battery.

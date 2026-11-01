@@ -164,6 +164,13 @@ eyes_status_t eyes_get_status(void);
 void eyes_gesture(eyes_gesture_t gesture);
 const char *eyes_gesture_name(eyes_gesture_t gesture);
 
+/** A finger held on the screen at (x, y): both hands reach out and hold it,
+ * in front of the body, following it as it moves (call again with the new
+ * point), until eyes_let_go() or a gesture. */
+void eyes_clutch(int32_t x, int32_t y);
+/** The finger lifted: the hands let go and tuck away behind the body. */
+void eyes_let_go(void);
+
 /** What the hands hold during EYES_GESTURE_CARRY: a little parcel in `rgb`
  * (0xRRGGBB) with a ribbon, brought back from an errand (errand.c). 0: none,
  * and the parcel goes at once. */

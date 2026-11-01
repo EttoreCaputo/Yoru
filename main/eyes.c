@@ -244,6 +244,11 @@ static const hand_key_t CARRY[] = {
     {CARRY_HOLD_MS, {-46, 112, 1}, {46, 112, 1}},
     {CARRY_HOLD_MS + 300, TUCK_L, TUCK_R},
 };
+/* Letting go of a finger: from wherever they held it, back behind the body. */
+static const hand_key_t LET_GO[] = {
+    {0, TUCK_L, TUCK_R},
+    {350, TUCK_L, TUCK_R},
+};
 static const hand_key_t STRETCH[] = {
     {0, TUCK_L, TUCK_R},
     {500, {-206, -34, 1.1f}, {206, -34, 1.1f}},
@@ -259,8 +264,11 @@ typedef struct {
     bool front; // in front of the body (over the eyes, under the chin)
 } gesture_t;
 
+/* The engine's own, past the public ones. */
+#define GESTURE_LET_GO EYES_GESTURE_COUNT
+
 #define GESTURE(name, keys, front) {name, keys, sizeof(keys) / sizeof(keys[0]), front}
-static const gesture_t s_gestures[EYES_GESTURE_COUNT] = {
+static const gesture_t s_gestures[EYES_GESTURE_COUNT + 1] = {
     [EYES_GESTURE_NONE] = {"none", NULL, 0, false},
     [EYES_GESTURE_WAVE] = GESTURE("wave", WAVE, false),
     [EYES_GESTURE_POINT] = GESTURE("point", POINT, false),
@@ -273,7 +281,13 @@ static const gesture_t s_gestures[EYES_GESTURE_COUNT] = {
     [EYES_GESTURE_FLAIL] = GESTURE("flail", FLAIL, false),
     [EYES_GESTURE_DIVE] = GESTURE("dive", DIVE, false),
     [EYES_GESTURE_CARRY] = GESTURE("carry", CARRY, true),
+    [GESTURE_LET_GO] = GESTURE("let_go", LET_GO, true),
 };
+
+/* Holding a finger: the hands a little apart round it, never further out
+ * than this from the body (hand units, like the gestures). */
+#define CLUTCH_GAP 26
+#define CLUTCH_REACH 200
 
 /* Something that moves through the space: along a path, or after a point. */
 typedef struct {
@@ -355,8 +369,11 @@ static struct {
     float tint_rgb[3];
     /* The gesture playing, how far in, and where the hands were when it
      * started (so a new one picks up from there). */
-    eyes_gesture_t gesture;
+    int gesture; // an eyes_gesture_t, or one of the engine's own
     int32_t gesture_ms;
+    /* A finger held (eyes_clutch()), on screen. */
+    bool clutch;
+    int32_t clutch_x, clutch_y;
     hand_pose_t hand_from[2];
     hand_pose_t hand[2];
     bool hands_front;
@@ -447,9 +464,31 @@ static hand_pose_t pose_lerp(hand_pose_t a, hand_pose_t b, float k)
     return (hand_pose_t) {lerp(a.x, b.x, k), lerp(a.y, b.y, k), lerp(a.s, b.s, k)};
 }
 
+/* Both hands round the finger, wherever the body is, squeezing it now and
+ * then. They ease there, so they reach out rather than jump. */
+static void clutch_step(void)
+{
+    const float d = fmaxf(s.body.dist, 0.05f);
+    float x = (float) (s.clutch_x - s.body.bx) / (K * d), y = (float) (s.clutch_y - s.body.by) / (K * d);
+    const float len = hypotf(x, y);
+    if (len > CLUTCH_REACH) {
+        x *= CLUTCH_REACH / len;
+        y *= CLUTCH_REACH / len;
+    }
+    const float squeeze = 1.1f + 0.06f * sinf((float) s.t_ms * 0.005f);
+    const hand_pose_t l = {x - CLUTCH_GAP, y + 4, squeeze}, r = {x + CLUTCH_GAP, y + 4, squeeze};
+    s.hand[0] = pose_lerp(s.hand[0], l, ease(0.3f));
+    s.hand[1] = pose_lerp(s.hand[1], r, ease(0.3f));
+    s.hands_front = true;
+}
+
 /* Where the hands are `ms` into the gesture playing. */
 static void hands_step(void)
 {
+    if (s.clutch) {
+        clutch_step();
+        return;
+    }
     const gesture_t *g = &s_gestures[s.gesture];
     if (g->n == 0) {
         s.hand[0] = (hand_pose_t) TUCK_L;
@@ -1845,9 +1884,30 @@ void eyes_gesture(eyes_gesture_t gesture)
     if (gesture >= EYES_GESTURE_COUNT) {
         return;
     }
+    s.clutch = false; // a gesture needs the hands
     s.hand_from[0] = s.hand[0];
     s.hand_from[1] = s.hand[1];
     s.gesture = gesture;
+    s.gesture_ms = 0;
+}
+
+void eyes_clutch(int32_t x, int32_t y)
+{
+    s.clutch = true;
+    s.clutch_x = x;
+    s.clutch_y = y;
+    s.gesture = EYES_GESTURE_NONE;
+}
+
+void eyes_let_go(void)
+{
+    if (!s.clutch) {
+        return;
+    }
+    s.clutch = false;
+    s.hand_from[0] = s.hand[0];
+    s.hand_from[1] = s.hand[1];
+    s.gesture = GESTURE_LET_GO;
     s.gesture_ms = 0;
 }
 

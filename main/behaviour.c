@@ -38,6 +38,10 @@
 #define POKE_WINDOW_MS 1500
 /* How much finger travel counts as stroking. */
 #define STROKE_PX 160
+/* Holding your finger: the body leans this much of the way to it, and after
+ * this long it melts (hearts, a purr). */
+#define HOLD_LEAN 0.3f
+#define HOLD_LOVE_MS 1500
 /* Back to the middle when something needs Yoru's attention. */
 #define HOME_MS 350
 /* The host's pointer is followed this long after its last move. */
@@ -171,6 +175,12 @@ static struct {
     bool talking;
     /* It came to the glass for a notification. */
     bool inbox_call;
+    /* It holds your finger (a long press on it): since when, whether it has
+     * melted yet, and where it was before leaning to it. */
+    bool holding;
+    uint32_t hold_ms;
+    bool hold_loved;
+    eyes_pos_t hold_home;
 } s;
 
 static void show_voice(voice_state_t state);
@@ -179,6 +189,7 @@ static bool card_up(void);
 static void wait_for_answer(uint32_t now);
 static void hold_gaze(float x, float y, uint32_t ms);
 static void later(const char *scene, uint32_t after_ms);
+static void let_go(bool goodbye);
 
 static void set_brightness(int percent)
 {
@@ -269,6 +280,7 @@ static bool play(const char *name)
 
 static void fall_asleep(void)
 {
+    let_go(false);
     if (!s.asleep) {
         ESP_LOGI(TAG, "asleep");
         s.asleep_ms = lv_tick_get();
@@ -312,6 +324,58 @@ static void show_status(eyes_status_t status, uint32_t for_ms)
     }
 }
 
+/* The hands on the finger, the body leaning a little of the way to it. */
+static void hold_follow(lv_point_t p)
+{
+    eyes_clutch(p.x, p.y);
+    const eyes_pos_t f = eyes_unproject(p.x, p.y, s.hold_home.z), h = s.hold_home;
+    eyes_follow(h.x + (f.x - h.x) * HOLD_LEAN, h.y + (f.y - h.y) * HOLD_LEAN, h.z, 10);
+}
+
+/* A long press on Yoru: it takes your finger in both hands, happy. */
+static void hold_finger(uint32_t now, lv_point_t p)
+{
+    s.holding = true;
+    s.hold_ms = now;
+    s.hold_loved = false;
+    s.hold_home = eyes_where();
+    life_attend();
+    eyes_poke();
+    playback_sound(SOUND_CHIRP);
+    react(EYES_MOOD_HAPPY, 1000); // the tick keeps it going
+    hold_follow(p);
+}
+
+/* Held a while, it melts: hearts and a purr. */
+static void hold_step(uint32_t now)
+{
+    if (!s.hold_loved && now - s.hold_ms >= HOLD_LOVE_MS) {
+        s.hold_loved = true;
+        playback_sound(SOUND_PURR);
+        eyes_set_mood(EYES_MOOD_LOVING);
+    }
+    s.until_ms = now + 1000;
+}
+
+/* The finger lifted, or something else needs Yoru: the hands let go and it
+ * floats back. With `goodbye` it waves after the finger. */
+static void let_go(bool goodbye)
+{
+    if (!s.holding) {
+        return;
+    }
+    s.holding = false;
+    eyes_let_go();
+    eyes_move_to(s.hold_home.x, s.hold_home.y, s.hold_home.z, 600, EYES_PATH_GLIDE);
+    if (goodbye) {
+        eyes_gesture(EYES_GESTURE_WAVE);
+        playback_sound(SOUND_HMM);
+        react(EYES_MOOD_HAPPY, 1800);
+    } else {
+        s.until_ms = 0;
+    }
+}
+
 /* Where the finger is, as a gaze target. */
 static void watch_finger(lv_indev_t *indev)
 {
@@ -320,6 +384,10 @@ static void watch_finger(lv_indev_t *indev)
     eyes_look_at((float) (p.x - BOARD_LCD_H_RES / 2) / 180.0f, (float) (p.y - BOARD_LCD_V_RES / 2) / 180.0f);
     s.stroke += abs(p.x - s.last_point.x) + abs(p.y - s.last_point.y);
     s.last_point = p;
+    if (s.holding) {
+        hold_follow(p);
+        return; // dragged along, not stroked
+    }
     if (!s.stroked && !s.asleep && s.voice == VOICE_IDLE && s.stroke > STROKE_PX && !s.from_top
         && lv_tick_elaps(s.press_ms) >= STROKE_MIN_MS && board_settings_on(SETTING_TOUCH_REACTIONS)) {
         s.stroked = true;
@@ -394,6 +462,7 @@ static void touch_cb(lv_event_t *e)
             // Pulled down from the top edge: the menu, whatever else goes on.
             s.from_top = false;
             s.pressed = false; // no release comes after wait_release
+            let_go(false);
             if (s.asleep) {
                 wake_up();
             }
@@ -407,6 +476,7 @@ static void touch_cb(lv_event_t *e)
         break;
     case LV_EVENT_RELEASED: {
         s.pressed = false;
+        let_go(true); // if it held the finger
         lv_point_t p;
         lv_indev_get_point(indev, &p);
         const int32_t dx = p.x - s.press_point.x, dy = p.y - s.press_point.y;
@@ -436,11 +506,11 @@ static void touch_cb(lv_event_t *e)
         }
         break;
     case LV_EVENT_LONG_PRESSED:
-        if (s.voice != VOICE_IDLE || s.stroked || s.stroke > STROKE_PX) {
-            break; // not in the middle of a conversation
+        // Held on Yoru (not a stroke, not mid-conversation): it holds the finger.
+        if (!s.asleep && !s.from_top && s.voice == VOICE_IDLE && !s.stroked && s.stroke <= STROKE_PX
+            && board_settings_on(SETTING_TOUCH_REACTIONS) && eyes_hit(s.last_point.x, s.last_point.y)) {
+            hold_finger(now, s.last_point);
         }
-        eyes_look_around();
-        fall_asleep();
         break;
     default:
         break;
@@ -732,6 +802,10 @@ static void tick_cb(lv_timer_t *timer)
         s.last_touch_ms = now;
         return;
     }
+    if (s.holding) {
+        hold_step(now);
+        return;
+    }
     const bool playing = s.until_ms != 0 && (int32_t) (now - s.until_ms) < 0;
     if (!playing) {
         s.until_ms = 0;
@@ -937,6 +1011,9 @@ static void show_voice(voice_state_t state)
 void behaviour_voice(voice_state_t state)
 {
     const voice_state_t was = s.voice;
+    if (state != VOICE_IDLE) {
+        let_go(false); // it listens with its hands free
+    }
     s.voice = state;
     s.last_touch_ms = lv_tick_get();
     if (state == VOICE_IDLE) {

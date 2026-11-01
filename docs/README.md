@@ -18,7 +18,7 @@ Status: early development, firmware 0.12.0. What is in and what is left: [the ro
 ## What is on the board
 
 - **Yoru itself:** the sphere with its eyes and hands, moving through a space in perspective. It floats near you, gets sleepy and naps when nobody is around, and comes to the glass when something urgent waits for you. Its needs and the life they drive (fireflies, play, exploring) come back later.
-- **Senses:** touch (pokes, strokes, flicks), motion (lifted, shaken, knocked, rocked, face down, dropped, spun, tilted) and where a sudden sound comes from.
+- **Senses:** touch (pokes, strokes, flicks, and a long press he answers by holding your finger), motion (lifted, shaken, knocked, rocked, face down, dropped, spun, tilted) and where a sudden sound comes from.
 - **Voice:** a wake word (Alexa, Hi ESP, Jarvis or Computer, until "Yoru" exists), push-to-talk on PWR, listening on after an answer, and the host's voice on the speaker.
 - **The menu,** a watch's honeycomb of round apps around Yoru (swipe down from the top): Notifications, Timers, Habits, Games, Do not disturb and Settings.
 - **The host's side:** the inbox of notifications, timers and reminders, your daily habits, the Allow and Deny card before Yoru acts for you, and Yoru's errands while the assistant calls one of your services.
