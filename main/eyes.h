@@ -124,6 +124,27 @@ void eyes_set_level(float level);
  * without the wake word. 0 takes it away. */
 void eyes_countdown(uint32_t ms);
 
+/* The battery beside Yoru (battery.c). */
+typedef enum {
+    EYES_BATTERY_NONE,
+    /* A thin ring round the body, filled as far as the charge, with a spark
+     * of energy running along it into Yoru. It shows round the far dot
+     * asleep too; the follow-up's ring goes over it. */
+    EYES_BATTERY_CHARGING,
+    /* A little battery by its head, amber; red and blinking when EMPTY. Not
+     * asleep. */
+    EYES_BATTERY_LOW,
+    EYES_BATTERY_EMPTY,
+} eyes_battery_t;
+
+/** What the battery shows, and the charge (0..100). The same again changes
+ * nothing, so it can be set every tick. */
+void eyes_set_battery(eyes_battery_t state, int percent);
+/** Plugged in: a bolt shoots up from the bottom edge into Yoru, who jolts
+ * with the energy, eyes wide for a moment; the charge ring fills up from
+ * empty to the charge. */
+void eyes_zap(void);
+
 /** A poke: the body squashes and springs back. */
 void eyes_poke(void);
 /** A knock from the side (a slap, a knock on the case, a landing): the body

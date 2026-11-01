@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "approval.h"
+#include "battery.h"
 #include "board_button.h"
 #include "board.h"
 #include "board_display.h"
@@ -88,6 +89,8 @@ static const scene_t SCENES[] = {
     {"proud", EYES_MOOD_HAPPY, 2500, FX_NONE, G(CLAP), SOUND_TADA},
     {"relieved", EYES_MOOD_HAPPY, 1800, FX_BLINK, G(NONE), SOUND_PHEW},
     {"charged", EYES_MOOD_HAPPY, 1500, FX_POKE, G(NONE), SOUND_CHARGE},
+    // After the bolt of a cable plugged in (its sound came with the bolt).
+    {"plugged", EYES_MOOD_HAPPY, 2200, FX_NONE, G(CLAP), SOUND_COUNT},
     // Bobbing to the beat comes with the music, in M5.
     {"dance", EYES_MOOD_HAPPY, 3000, FX_POKE, G(CLAP), SOUND_BEAT},
     {"love", EYES_MOOD_LOVING, 3500, FX_NONE, G(NONE), SOUND_AWW},
@@ -174,6 +177,8 @@ static void show_voice(voice_state_t state);
 static void apply_rotation(void);
 static bool card_up(void);
 static void wait_for_answer(uint32_t now);
+static void hold_gaze(float x, float y, uint32_t ms);
+static void later(const char *scene, uint32_t after_ms);
 
 static void set_brightness(int percent)
 {
@@ -459,7 +464,8 @@ static life_ctx_t life_context(uint32_t now, bool playing)
                 && !errand_busy(),
         .asleep = s.asleep,
         .focus = board_settings_on(SETTING_FOCUS),
-        .drowsy = lonely_ms >= (uint32_t) board_settings_get(SETTING_SLEEPY_AFTER_S) * 1000,
+        // Low on battery it's tired whoever is around: sleepy eyes, slower.
+        .drowsy = lonely_ms >= (uint32_t) board_settings_get(SETTING_SLEEPY_AFTER_S) * 1000 || battery_low(),
         .lonely = lonely_ms >= (uint32_t) board_settings_get(SETTING_ASLEEP_AFTER_S) * 1000,
     };
 }
@@ -554,6 +560,106 @@ static void timers_tick(void)
     react(EYES_MOOD_SURPRISED, 1800);
 }
 
+/* "Charging: 45%", in the language of the labels. */
+static void battery_toast(const char *en, const char *it, int seconds, toast_tone_t tone)
+{
+    char text[48];
+    const int pct = battery_percent();
+    if (pct >= 0) {
+        snprintf(text, sizeof(text), "%s: %d%%", card_tr(en, it), pct);
+    } else {
+        snprintf(text, sizeof(text), "%s", card_tr(en, it));
+    }
+    toast_show(text, seconds, tone);
+}
+
+/* The cable and the charge (battery.c). Plugged in, a bolt of energy
+ * shoots into Yoru and it perks up; pulled out, a little "oh?"; full, a
+ * proud clap; running low, tired, and nearly empty it asks to be plugged
+ * in, lighting the dark screen for it. Asleep it doesn't wake: plugged in,
+ * the dot jolts and the screen lights a moment to show the charge ring. */
+static void battery_tick(uint32_t now)
+{
+    const battery_event_t ev = battery_step();
+    if (ev == BATTERY_NOTHING || s.face_down) {
+        return;
+    }
+    const bool free = !s.asleep && !card_up() && !s.menu && !s.view && s.voice == VOICE_IDLE;
+    switch (ev) {
+    case BATTERY_PLUGGED:
+        if (s.dark) {
+            light_up();
+            s.asleep_ms = now; // dark again a minute from now
+        }
+        eyes_zap();
+        battery_toast("Charging", "In carica", 3, TOAST_INFO);
+        if (free) {
+            s.last_touch_ms = now;
+            life_attend();
+            // Wide eyes down at the bolt coming up, the jolt with the
+            // sound's "bip!", then a happy clap.
+            playback_sound(SOUND_CHARGE);
+            react(EYES_MOOD_SURPRISED, 600);
+            hold_gaze(0, 0.9f, 500);
+            later("plugged", 600);
+        }
+        break;
+    case BATTERY_UNPLUGGED:
+        if (s.dark) {
+            break;
+        }
+        battery_toast("On battery", "A batteria", 3, TOAST_INFO);
+        if (free) {
+            s.last_touch_ms = now;
+            life_attend();
+            playback_sound(SOUND_UNPLUG);
+            eyes_blink();
+            eyes_knock(0, 0.25f); // the support gone from under it
+            react(EYES_MOOD_CURIOUS, 1400);
+            hold_gaze(0, 0.9f, 1200); // down where the cable was
+        }
+        break;
+    case BATTERY_FULL:
+        if (s.dark) {
+            break;
+        }
+        toast_show(card_tr("Fully charged", "Carica completa"), 4, TOAST_DONE);
+        if (free) {
+            s.last_touch_ms = now;
+            life_attend();
+            play("proud");
+            show_status(EYES_STATUS_DONE, STATUS_DONE_MS);
+        }
+        break;
+    case BATTERY_LOW:
+        if (s.dark) {
+            break;
+        }
+        battery_toast("Battery low", "Batteria scarica", 5, TOAST_WAIT);
+        if (free) {
+            life_attend();
+            play("tired");
+        }
+        break;
+    case BATTERY_CRITICAL:
+        if (s.dark) {
+            light_up();
+            s.asleep_ms = now;
+        }
+        battery_toast("Plug me in", "Mettimi in carica", 8, TOAST_ERROR);
+        playback_sound(SOUND_BATTERY_LOW);
+        if (free) {
+            life_attend();
+            eyes_blink();
+            react(EYES_MOOD_SAD, 3500);
+            hold_gaze(0, 0.9f, 2500);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
 /* What power.c needs to know; it may hibernate, and then Yoru wakes up
  * (unless it's still face down). */
 static void power_step(void)
@@ -586,6 +692,7 @@ static void tick_cb(lv_timer_t *timer)
     apply_rotation();
     inbox_tick(now);
     timers_tick();
+    battery_tick(now);
     if (card_up()) {
         wait_for_answer(now);
         return;

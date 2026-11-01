@@ -61,6 +61,11 @@ static const tone_t VOLUME[] = {{880, 880, 120, W_SINE, 100, 0, 0, E_PLUCK}};
  * down, done listening. */
 static const tone_t LISTEN[] = {{1047, 1047, 70, W_SINE, 55, 0, 0, E_PLUCK}};
 static const tone_t LISTEN_END[] = {{784, 523, 160, W_SINE, 50, 0, 0, E_SWELL}};
+/* E5 C5, twice, soft: a request, not an alarm. */
+static const tone_t BATTERY_LOW[] = {
+    {659, 659, 120, W_SINE, 70, 0, 0, E_PLUCK}, {523, 523, 200, W_SINE, 70, 0, 0, E_PLUCK}, REST(140),
+    {659, 659, 120, W_SINE, 60, 0, 0, E_PLUCK}, {523, 523, 260, W_SINE, 60, 0, 0, E_PLUCK},
+};
 
 /* Powering up: a rising hum, then "hi!". */
 static const tone_t BOOT[] = {
@@ -223,6 +228,10 @@ static const tone_t DRAIN[] = {{900, 180, 750, W_TRI, 55, 4, 5, E_SWELL}};
 static const tone_t CHARGE[] = {
     {180, 900, 550, W_TRI, 55, 0, 0, E_SWELL}, REST(40), {1400, 1800, 90, W_SINE, 65, 0, 0, E_PLUCK},
 };
+/* Unplugged: "oh?", a little blip falling, then a quick question. */
+static const tone_t UNPLUG[] = {
+    {1300, 700, 140, W_SINE, 60, 0, 0, E_SWELL}, REST(60), {800, 1100, 110, W_TRI, 50, 0, 0, E_SWELL},
+};
 
 typedef struct {
     const char *name;
@@ -239,6 +248,7 @@ static const sound_def_t SOUNDS[SOUND_COUNT] = {
     DEF(SOUND_VOLUME, "volume", VOLUME),
     DEF(SOUND_LISTEN, "listen", LISTEN),
     DEF(SOUND_LISTEN_END, "listen_end", LISTEN_END),
+    DEF(SOUND_BATTERY_LOW, "battery_low", BATTERY_LOW),
     DEF(SOUND_BOOT, "boot", BOOT),
     DEF(SOUND_HELLO, "hello", HELLO),
     DEF(SOUND_MUTE, "mute", MUTE),
@@ -285,6 +295,7 @@ static const sound_def_t SOUNDS[SOUND_COUNT] = {
     DEF(SOUND_PHEW, "phew", PHEW),
     DEF(SOUND_DRAIN, "drain", DRAIN),
     DEF(SOUND_CHARGE, "charge", CHARGE),
+    DEF(SOUND_UNPLUG, "unplug", UNPLUG),
 };
 
 const char *sound_name(sound_t sound)

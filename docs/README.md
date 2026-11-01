@@ -23,7 +23,7 @@ Status: early development, firmware 0.12.0. What is in and what is left: [the ro
 - **The menu,** a watch's honeycomb of round apps around Yoru (swipe down from the top): Notifications, Timers, Habits, Games, Do not disturb and Settings.
 - **The host's side:** the inbox of notifications, timers and reminders, your daily habits, the Allow and Deny card before Yoru acts for you, and Yoru's errands while the assistant calls one of your services.
 - **Games:** Tilt ball, Slingshot and Constellations.
-- **Battery:** power profiles that save what they can while Yoru is idle (Balanced, or Saver with the mics off while it sleeps), a dark screen that really switches off, and hibernation after a while in the dark, until it's picked up.
+- **Battery:** Yoru notices it: a bolt of energy when you plug him in, a charge ring while he charges, a clap when he's full, and a tired face and a small battery by his head when he runs low. Power profiles that save what they can while Yoru is idle (Balanced, or Saver with the mics off while it sleeps), a dark screen that really switches off, and hibernation after a while in the dark, until it's picked up.
 
 ## Host program
 

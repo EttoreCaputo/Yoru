@@ -59,6 +59,29 @@
 #define COUNTDOWN_W 5
 #define COUNTDOWN_STEP 3
 #define COUNTDOWN_RGB 0x9ECBFF
+/* Charging, a thinner ring where the follow-up's goes: it fades in, fills
+ * up to the charge in CHARGE_FILL_MS and a spark runs along it every
+ * CHARGE_SPARK_MS, from the top round to the end of the charge. */
+#define CHARGE_W 3
+#define CHARGE_RGB 0x3DDC84
+#define CHARGE_FADE_MS 400
+#define CHARGE_FILL_MS 1200
+#define CHARGE_SPARK_MS 2600
+#define CHARGE_SPARK_STEP 6
+/* Plugged in: a bolt from the bottom edge up into the body, in this long;
+ * it zigzags this far either side, a turn every ZAP_STEP pixels, and shows
+ * ZAP_TAIL pixels of itself. */
+#define ZAP_MS 480
+#define ZAP_RGB 0xFFE45C
+#define ZAP_ZIG 12
+#define ZAP_STEP 38
+#define ZAP_TAIL 120
+/* The low battery: by its head, opposite the badge, clear of the sphere. */
+#define LOWBAT_DX (128 * K)
+#define LOWBAT_DY (-128 * K)
+#define LOWBAT_RGB 0xFFB340
+#define LOWBAT_EMPTY_RGB 0xFF4D5E
+#define LOWBAT_BLINK_MS 600
 /* The most pieces an overlay has (three z's, three dots). */
 #define MAX_OVERLAY_RECTS 3
 /* The eye sprites: the largest eye (surprised, swelling, stretched) fits
@@ -281,6 +304,9 @@ typedef struct {
     float tint;          // the status tint, halo and badge
     float tint_rgb[3];   // floats, so the struct compares without padding
     int32_t countdown;   // degrees of the follow-up's ring left, 0 without it
+    int32_t charge;      // degrees of the charge ring, 0 without it
+    int32_t charge_opa;
+    int32_t spark;       // where its spark is, degrees from the top; -1 resting
 } body_vis_t;
 
 typedef struct {
@@ -358,6 +384,17 @@ static struct {
     uint32_t carry_rgb;
     lv_area_t carry_drawn;
     bool carry_shown;
+    /* The battery: what shows and the charge; the ring's fade (0..1) and how
+     * far it has filled, in degrees; the bolt, how far in, and where it was
+     * drawn; the low battery's look last drawn (-1 hidden) and where. */
+    eyes_battery_t bat;
+    int bat_pct;
+    float charge_vis, charge_deg;
+    bool zapping, zap_shown;
+    int32_t zap_ms;
+    lv_area_t zap_drawn;
+    int32_t lowbat_key;
+    lv_area_t lowbat_drawn;
 } s;
 
 static float lerp(float a, float b, float k)
@@ -502,6 +539,13 @@ static void body_layout(body_vis_t *v)
     if (s.cd_ms > 0 && gone < s.cd_ms) {
         const float left = 360.0f * (1 - (float) gone / (float) s.cd_ms);
         v->countdown = COUNTDOWN_STEP * (int32_t) ceilf(left / COUNTDOWN_STEP);
+    }
+    // The follow-up's ring goes over the charge's.
+    if (v->countdown == 0 && s.charge_vis > 0.01f) {
+        v->charge = LV_MAX(COUNTDOWN_STEP, COUNTDOWN_STEP * (int32_t) lroundf(s.charge_deg / COUNTDOWN_STEP));
+        v->charge_opa = 16 * (int32_t) lroundf(s.charge_vis * 15 * v->fog);
+        const float p = (float) (s.t_ms % CHARGE_SPARK_MS) / (CHARGE_SPARK_MS * 0.7f);
+        v->spark = p < 1 ? CHARGE_SPARK_STEP * (int32_t) (p * (float) v->charge / CHARGE_SPARK_STEP) : -1;
     }
 }
 
@@ -722,6 +766,162 @@ static void draw_countdown(lv_layer_t *layer, const body_vis_t *v)
     lv_draw_arc(layer, &dsc);
 }
 
+static lv_area_t box(float x, float y, float l, float t, float r, float b);
+
+/* The charge ring: a faint track all round, the charge from the top round
+ * clockwise, and the spark running along it into Yoru. */
+static void draw_charge(lv_layer_t *layer, const body_vis_t *v)
+{
+    if (v->charge <= 0 || v->charge_opa <= 0) {
+        return;
+    }
+    const lv_color_t green = lv_color_hex(CHARGE_RGB);
+    const int32_t radius = LV_MAX(v->rx, v->ry) + COUNTDOWN_GAP;
+    lv_draw_arc_dsc_t dsc;
+    lv_draw_arc_dsc_init(&dsc);
+    dsc.color = green;
+    dsc.width = CHARGE_W;
+    dsc.rounded = 1;
+    dsc.center.x = v->bx;
+    dsc.center.y = v->by;
+    dsc.radius = (uint16_t) radius;
+    dsc.opa = (lv_opa_t) (v->charge_opa / 5);
+    dsc.start_angle = 0;
+    dsc.end_angle = 360;
+    lv_draw_arc(layer, &dsc);
+    dsc.opa = (lv_opa_t) (v->charge_opa * 3 / 4);
+    dsc.start_angle = 270;
+    dsc.end_angle = (270 + LV_MIN(v->charge, 359)) % 360;
+    lv_draw_arc(layer, &dsc);
+    if (v->spark >= 0) {
+        const float a = (float) (v->spark - 90) * (float) M_PI / 180.0f;
+        const float x = (float) v->bx + (float) radius * cosf(a), y = (float) v->by + (float) radius * sinf(a);
+        draw_disc(layer, x, y, 6, green, (lv_opa_t) (v->charge_opa / 3));
+        draw_disc(layer, x, y, 3, lv_color_hex(0xE8FFF0), (lv_opa_t) v->charge_opa);
+    }
+}
+
+/* The bolt's x at height y: a zigzag up from the bottom edge, round the
+ * body's x. */
+static float zap_x(float y)
+{
+    const float u = ((float) BOARD_LCD_V_RES - y) / ZAP_STEP;
+    const int k = (int) floorf(u);
+    const float side = (k & 1) ? ZAP_ZIG : -ZAP_ZIG;
+    return (float) s.body.bx + lerp(side, -side, u - (float) k);
+}
+
+/* Where the bolt's head is: from below the edge into the body, faster as
+ * it goes. */
+static float zap_head(void)
+{
+    const float k = clampf((float) s.zap_ms / ZAP_MS, 0, 1);
+    return lerp((float) BOARD_LCD_V_RES + 10, (float) (s.body.by + s.body.ry / 2), k * k);
+}
+
+static void zap_line(lv_layer_t *layer, float y1, float y2, int32_t w, lv_opa_t opa)
+{
+    lv_draw_line_dsc_t dsc;
+    lv_draw_line_dsc_init(&dsc);
+    dsc.color = lv_color_hex(ZAP_RGB);
+    dsc.width = w;
+    dsc.opa = opa;
+    dsc.round_start = 1;
+    dsc.round_end = 1;
+    dsc.p1.x = (lv_value_precise_t) zap_x(y1);
+    dsc.p1.y = (lv_value_precise_t) y1;
+    dsc.p2.x = (lv_value_precise_t) zap_x(y2);
+    dsc.p2.y = (lv_value_precise_t) y2;
+    lv_draw_line(layer, &dsc);
+}
+
+/* Behind the body, so it disappears into Yoru: a glow and a bright core,
+ * one straight piece per zig. */
+static void draw_zap(lv_layer_t *layer)
+{
+    if (!s.zapping) {
+        return;
+    }
+    const float head = zap_head();
+    const float tail = fminf(head + ZAP_TAIL, (float) BOARD_LCD_V_RES);
+    for (int pass = 0; pass < 2; pass++) {
+        float y = head;
+        while (y < tail) {
+            // The next turn below y, or the tail.
+            const float u = ((float) BOARD_LCD_V_RES - y) / ZAP_STEP;
+            float next = (float) BOARD_LCD_V_RES - (ceilf(u) - 1) * ZAP_STEP;
+            if (next <= y + 0.5f) {
+                next += ZAP_STEP;
+            }
+            next = fminf(next, tail);
+            zap_line(layer, y, next, pass == 0 ? 12 : 4, pass == 0 ? 70 : LV_OPA_COVER);
+            y = next;
+        }
+    }
+}
+
+static lv_area_t zap_area(void)
+{
+    const int32_t m = ZAP_ZIG + 10;
+    return (lv_area_t) {s.body.bx - m, s.body.by, s.body.bx + m, BOARD_LCD_V_RES - 1};
+}
+
+static void lowbat_pos(float *x, float *y)
+{
+    const float d = fmaxf(0.25f, s.body.dist);
+    *x = (float) s.body.bx + LOWBAT_DX * d;
+    *y = (float) s.body.by + LOWBAT_DY * d;
+}
+
+/* How it looks this frame, as a number that changes only when it should be
+ * redrawn: its opacity in 16 steps and the charge. -1: not shown. Empty, it
+ * blinks; asleep, it goes with the body into the dark. */
+static int32_t lowbat_key(void)
+{
+    if (s.bat != EYES_BATTERY_LOW && s.bat != EYES_BATTERY_EMPTY) {
+        return -1;
+    }
+    float o = s.near * s.body.fog;
+    if (s.bat == EYES_BATTERY_EMPTY && (s.t_ms / LOWBAT_BLINK_MS) % 2) {
+        o *= 0.25f;
+    }
+    const int32_t step = (int32_t) lroundf(o * 15);
+    return step <= 0 ? -1 : step * 1000 + LV_CLAMP(0, s.bat_pct, 100) * 2 + (s.bat == EYES_BATTERY_EMPTY);
+}
+
+/* A little battery: an outline, a nub and what's left in it. */
+static void draw_lowbat(lv_layer_t *layer)
+{
+    const int32_t key = lowbat_key();
+    if (key < 0) {
+        return;
+    }
+    const lv_opa_t opa = (lv_opa_t) LV_MIN(255, (key / 1000) * 17);
+    const lv_color_t c = lv_color_hex(s.bat == EYES_BATTERY_EMPTY ? LOWBAT_EMPTY_RGB : LOWBAT_RGB);
+    float x, y;
+    lowbat_pos(&x, &y);
+    lv_draw_rect_dsc_t dsc;
+    lv_draw_rect_dsc_init(&dsc);
+    dsc.bg_opa = LV_OPA_TRANSP;
+    dsc.border_color = c;
+    dsc.border_opa = opa;
+    dsc.border_width = 2;
+    dsc.radius = 4;
+    const lv_area_t a = {(int32_t) x - 14, (int32_t) y - 8, (int32_t) x + 11, (int32_t) y + 8};
+    lv_draw_rect(layer, &dsc, &a);
+    fill_rect(layer, x + 12, y - 3, x + 14, y + 3, c, 1, opa);
+    const float inner = 21;
+    const float full = fmaxf(3, inner * (float) LV_CLAMP(0, s.bat_pct, 100) / 100);
+    fill_rect(layer, x - 11, y - 5, x - 11 + full, y + 5, c, 1, opa);
+}
+
+static lv_area_t lowbat_area(void)
+{
+    float x, y;
+    lowbat_pos(&x, &y);
+    return box(x, y, 17, 11, 17, 11);
+}
+
 /* A small heart: two round tops and a point below, centred on (x, y). */
 static void draw_heart(lv_layer_t *layer, float x, float y, lv_color_t color, lv_opa_t opa)
 {
@@ -729,8 +929,6 @@ static void draw_heart(lv_layer_t *layer, float x, float y, lv_color_t color, lv
     fill_rect(layer, x - 1, y - 7, x + 13, y + 7, color, LV_RADIUS_CIRCLE, opa);
     fill_triangle(layer, x - 13, y + 1, x + 13, y + 1, x, y + 16, color, opa);
 }
-
-static lv_area_t box(float x, float y, float l, float t, float r, float b);
 
 /* The parcel: in the hands while they carry it, once they are out. */
 #define PARCEL_Y 112
@@ -897,6 +1095,8 @@ static void draw_cb(lv_event_t *e)
         look_draw(layer, &lk->halo, v->bx, v->by, d, d, 0, (lv_opa_t) (90 * v->tint), rgb_color(v->tint_rgb));
     }
     draw_countdown(layer, v);
+    draw_charge(layer, v);
+    draw_zap(layer);
     if (!s.hands_front) {
         draw_hands(layer);
     }
@@ -922,6 +1122,7 @@ static void draw_cb(lv_event_t *e)
         draw_hands(layer);
     }
     draw_overlays(layer);
+    draw_lowbat(layer);
 }
 
 /* ---- What to redraw ------------------------------------------------------- */
@@ -936,8 +1137,9 @@ static lv_area_t body_area(const body_vis_t *v)
         const lv_area_t h = look_area(&look_get()->halo, v->bx, v->by, d, d, false);
         a = (lv_area_t) {LV_MIN(a.x1, h.x1), LV_MIN(a.y1, h.y1), LV_MAX(a.x2, h.x2), LV_MAX(a.y2, h.y2)};
     }
-    if (v->countdown > 0) {
-        const int32_t r = LV_MAX(v->rx, v->ry) + COUNTDOWN_GAP + COUNTDOWN_W + 2;
+    if (v->countdown > 0 || v->charge > 0) {
+        // The charge's spark is a little wider than the follow-up's ring.
+        const int32_t r = LV_MAX(v->rx, v->ry) + COUNTDOWN_GAP + LV_MAX(COUNTDOWN_W, 12) + 2;
         a = (lv_area_t) {LV_MIN(a.x1, v->bx - r), LV_MIN(a.y1, v->by - r), LV_MAX(a.x2, v->bx + r),
                          LV_MAX(a.y2, v->by + r)};
     }
@@ -1186,6 +1388,30 @@ static bool lead_gaze(float *gx, float *gy)
 
 /* Ease every number towards the mood and the state; true if any of the
  * eye's numbers visibly moved. */
+/* The charge ring fades in and fills; the bolt runs up, and when it reaches
+ * Yoru the jolt: stretched tall, pushed up, eyes wide. */
+static void battery_step(void)
+{
+    const float fade = (float) s.dt_ms / CHARGE_FADE_MS;
+    s.charge_vis = s.bat == EYES_BATTERY_CHARGING ? fminf(1, s.charge_vis + fade) : fmaxf(0, s.charge_vis - fade);
+    if (s.charge_vis <= 0) {
+        s.charge_deg = 0; // it fills up again next time
+    }
+    const float want = 360.0f * (float) LV_CLAMP(0, s.bat_pct, 100) / 100;
+    const float fill = 360.0f * (float) s.dt_ms / CHARGE_FILL_MS;
+    s.charge_deg = want > s.charge_deg ? fminf(want, s.charge_deg + fill) : want;
+    if (!s.zapping) {
+        return;
+    }
+    s.zap_ms += s.dt_ms;
+    if (s.zap_ms >= ZAP_MS) {
+        s.zapping = false;
+        s.squash = -0.8f;
+        s.kvy -= R * 5;
+        s.level = 1; // eased back down like the voice's
+    }
+}
+
 static bool step(void)
 {
     const eye_shape_t *want = &s_moods[s.mood];
@@ -1320,6 +1546,7 @@ static bool step(void)
     const float want_vsq = clampf((fabsf(s.mv.vel.x) - fabsf(s.mv.vel.y)) / z / SPEED_STRETCH, -0.5f, 0.5f);
     s.vsq = fabsf(want_vsq - s.vsq) < 0.01f ? want_vsq : lerp(s.vsq, want_vsq, ease(0.3f));
 
+    battery_step();
     hands_step();
     return moved;
 }
@@ -1398,6 +1625,33 @@ static void frame_cb(lv_timer_t *timer)
         s.carry_shown = parcel;
     }
 
+    // The bolt: its column while it runs, and once more as it goes.
+    if (s.zapping || s.zap_shown) {
+        lv_area_t now = zap_area();
+        if (s.zap_shown) {
+            invalidate_move(&s.zap_drawn, &now);
+        } else {
+            lv_obj_invalidate_area(s.obj, &now);
+        }
+        s.zap_drawn = now;
+        s.zap_shown = s.zapping;
+    }
+
+    // The low battery, when it moves, blinks or goes.
+    const int32_t lowbat = lowbat_key();
+    if (lowbat >= 0 || s.lowbat_key >= 0) {
+        lv_area_t now = lowbat_area();
+        if (lowbat != s.lowbat_key || !areas_equal(&now, &s.lowbat_drawn)) {
+            if (s.lowbat_key >= 0) {
+                invalidate_move(&s.lowbat_drawn, &now);
+            } else {
+                lv_obj_invalidate_area(s.obj, &now);
+            }
+            s.lowbat_drawn = now;
+            s.lowbat_key = lowbat;
+        }
+    }
+
     // The badge breathes without redrawing the whole sphere.
     if (s.status == EYES_STATUS_THINKING && s.tint > 0.01f) {
         lv_area_t now = badge_area();
@@ -1438,6 +1692,7 @@ lv_obj_t *eyes_create(lv_obj_t *parent)
     s.size = 1;
     s.mv.pos = (eyes_pos_t) {0, 0, 1};
     s.badge_scale = 1;
+    s.lowbat_key = -1;
     s.last_tick = lv_tick_get();
     s.hand[0] = (hand_pose_t) TUCK_L;
     s.hand[1] = (hand_pose_t) TUCK_R;
@@ -1522,6 +1777,19 @@ void eyes_countdown(uint32_t ms)
 {
     s.cd_ms = ms;
     s.cd_from_ms = s.t_ms;
+}
+
+void eyes_set_battery(eyes_battery_t state, int percent)
+{
+    s.bat = state;
+    s.bat_pct = percent;
+}
+
+void eyes_zap(void)
+{
+    s.zapping = true;
+    s.zap_ms = 0;
+    s.charge_deg = 0; // the ring fills up with the energy
 }
 
 void eyes_set_level(float level)

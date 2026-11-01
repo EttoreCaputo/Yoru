@@ -44,6 +44,10 @@ static const char *TAG = "board_pmu";
 #define POLL_MS 150
 #define POLL_DOWN_MS 40
 #define BATTERY_EVERY_MS 3000
+/* USB plugged in or out is checked on every poll, so Yoru reacts to the
+ * cable at once; the battery is read again this soon after, once charging
+ * has had a moment to start (or stop). */
+#define USB_SETTLE_MS 600
 /* With the screen dark (power.c) a tap may take a moment longer to show:
  * the chip keeps the flags meanwhile. */
 #define POLL_SLOW_MS 400
@@ -142,12 +146,29 @@ static void poll_key(void)
     }
 }
 
+/* VBUS came or went since the last reading: one byte, on every poll. */
+static bool usb_changed(void)
+{
+    uint8_t st = 0;
+    if (rd(AXP_STATUS1, &st, 1) != ESP_OK) {
+        return false;
+    }
+    portENTER_CRITICAL(&s_mux);
+    const bool was = s_state.usb;
+    portEXIT_CRITICAL(&s_mux);
+    return ((st & 0x20) != 0) != was;
+}
+
 static void poll_task(void *arg)
 {
     int64_t battery_us = 0;
     while (true) {
         poll_key();
         const int64_t now = esp_timer_get_time();
+        if (usb_changed()) {
+            read_battery();
+            battery_us = now - (int64_t) (BATTERY_EVERY_MS - USB_SETTLE_MS) * 1000;
+        }
         if (now - battery_us >= (int64_t) BATTERY_EVERY_MS * 1000) {
             battery_us = now;
             read_battery();

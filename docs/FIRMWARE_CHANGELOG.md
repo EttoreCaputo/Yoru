@@ -1,5 +1,16 @@
 # Firmware changelog
 
+## 0.12.1
+
+Yoru notices its battery.
+
+- **Plugging in.** When you plug in the USB cable a little bolt of energy shoots up from the bottom of the screen into Yoru: he watches it come with wide eyes, jolts as it hits him (with the rising "charge" sound) and claps happily. A line at the bottom says the charge. If he's asleep he doesn't wake: the screen lights for a minute and the small dot jolts.
+- **While charging,** a thin green ring around Yoru fills up as far as the charge, with a spark running along it into him. It also shows around the dot while he sleeps, and goes once charging ends.
+- **Fully charged:** a proud clap, a green moment and "Fully charged".
+- **Unplugging:** a little "oh?", a small drop and a look down where the cable was, and the charge left.
+- **Low battery (20%):** a small amber battery appears by his head, Yoru yawns tiredly and from then on he's sleepy until you charge him. At 8% the battery turns red and blinks, he looks sad, plays a soft two-note call (even with Yoru's sounds off) and asks you to plug him in; this one lights the dark screen too. Each warning comes once on the way down.
+- The board now sees the cable go in or out within a fraction of a second, instead of up to three seconds later.
+
 ## 0.12.0
 
 Yoru lasts much longer on its battery.

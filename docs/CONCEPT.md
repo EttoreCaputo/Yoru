@@ -76,7 +76,8 @@ The hands are what makes Yoru's gestures readable:
 Overlays are small extras drawn next to the sphere, never over the eyes:
 - the badge while it is working on something for you;
 - `z`s when asleep;
-- small hearts when it is petted.
+- small hearts when it is petted;
+- the battery: a thin ring around it filling up while it charges, with a spark running into it, and a small battery by its head when it runs low (it is tired then, not a gauge).
 
 There are no dashboard screens that turn Yoru into gauges. What happens in your day changes how Yoru *feels*, not what it shows.
 

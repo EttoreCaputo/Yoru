@@ -130,7 +130,7 @@ The accelerometer and gyroscope turn the whole case into an input: Yoru lives in
 **Senses**
 - Sound direction from the two mics, so the gaze turns to the noise (`ears_dir.c`, from the raw mics before the AFE).
 - `ears.c` for bangs, claps and chatter: removed in 0.8.0 with the pet; only the sound's direction is left.
-- AXP2101: battery, charging, PWR key, power-off; sleep with the panel and touch in standby, since 0.9.0 the dark screen after a minute asleep, since 0.12.0 with the panel asleep.
+- AXP2101: battery, charging, PWR key, power-off; sleep with the panel and touch in standby, since 0.9.0 the dark screen after a minute asleep, since 0.12.0 with the panel asleep; since 0.12.1 Yoru reacts to the cable and the charge (`battery.c`: a bolt on plugging in, the charge ring, full, low and nearly empty).
 
 ### M3: voice and link (in since 0.3.0)
 - ESP-SR front end with AEC, the wake word (Alexa, Hi ESP, Jarvis or Computer until M6), VAD, the utterance stream and playback, from DualEye. The TDM slots are checked on the board: slot 0 mic, slot 1 the speaker loopback (AEC reference), slot 2 the second mic, slot 3 empty.

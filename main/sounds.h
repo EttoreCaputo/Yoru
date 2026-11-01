@@ -22,6 +22,8 @@ typedef enum {
     /* Listening again after an answer, without the wake word, and giving up. */
     SOUND_LISTEN,
     SOUND_LISTEN_END,
+    /* The battery is nearly empty: plug Yoru in. */
+    SOUND_BATTERY_LOW,
     /* The pet's: only while pet sounds are on (playback_set_pet_sounds). */
     SOUND_BOOT,
     SOUND_HELLO,
@@ -69,6 +71,7 @@ typedef enum {
     SOUND_PHEW,
     SOUND_DRAIN,
     SOUND_CHARGE,
+    SOUND_UNPLUG,
     SOUND_COUNT,
 } sound_t;
 
