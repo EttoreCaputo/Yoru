@@ -11,15 +11,20 @@
 #include "esp_afe_sr_models.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_mn_iface.h"
+#include "esp_mn_models.h"
+#include "esp_mn_speech_commands.h"
 #include "esp_pm.h"
 #include "esp_timer.h"
 #include "esp_vadn_models.h"
 #include "esp_wn_models.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "lvgl_port.h"
+#include "metrics_model.h"
 #include "model_path.h"
 #include "playback.h"
 #include "rpc.h"
@@ -88,6 +93,13 @@ static const char *TAG = "voice";
 #else
 #define BARGE_IN false
 #endif
+/* Without a host, MultiNet listens this long after the wake word for one
+ * of the phrases it knows. */
+#define LOCAL_TIMEOUT_MS 6000
+/* MultiNet stays unloaded if loading it would leave less internal RAM than
+ * this: the WiFi needs it more. */
+#define LOCAL_MIN_INTERNAL (64 * 1024)
+#define LOCAL_PHRASES_MAX 200
 #define TASK_CORE 1
 #define TASK_PRIORITY 5
 
@@ -139,6 +151,24 @@ typedef struct {
 } stream_t;
 
 static stream_t s_stream;
+
+/* Hearing a phrase on the board, without a host. Only the fetch task
+ * touches it. */
+static struct {
+    bool active;
+    int64_t level_us;
+} s_local;
+static const esp_mn_iface_t *s_mn;
+static model_iface_data_t *s_mn_data;
+/* Held while MultiNet listens or takes new phrases: building them takes it
+ * a second or two, done apart (phrases_task) so the AFE isn't kept waiting. */
+static SemaphoreHandle_t s_mn_lock;
+static TaskHandle_t s_phrases_task;
+/* The phrases voice_set_commands() set, until phrases_task takes them. */
+static SemaphoreHandle_t s_phrases_lock;
+static voice_phrase_t *s_phrases;
+static int s_phrase_count;
+static volatile voice_command_cb_t s_on_command;
 static volatile bool s_wake_sound = true;
 /* The wake word is listened for (the menu's switch), and whether WakeNet is
  * on in the AFE now: off during an utterance, and while the switch is. Only
@@ -592,6 +622,114 @@ static void stream_frame(const afe_fetch_result_t *res)
     }
 }
 
+/* ---- Phrases heard on the board ------------------------------------------ */
+
+/* No host lately: what's said is for MultiNet. */
+static bool use_local(void)
+{
+    return s_mn_data != NULL && !metrics_model_live();
+}
+
+static bool local_start(void)
+{
+    if (xSemaphoreTake(s_mn_lock, 0) != pdTRUE) {
+        return false; // still learning its phrases
+    }
+    s_local.active = true;
+    s_local.level_us = 0;
+    s_afe->disable_wakenet(s_afe_data);
+    s_wakenet_on = false;
+    s_mn->clean(s_mn_data);
+    ESP_LOGI(TAG, "no host: listening on the board");
+    voice_set_state(VOICE_LISTENING);
+    return true;
+}
+
+static void local_end(int command)
+{
+    if (!s_local.active) {
+        return;
+    }
+    s_local.active = false;
+    xSemaphoreGive(s_mn_lock);
+    if (s_wake_on) {
+        s_afe->enable_wakenet(s_afe_data);
+        s_wakenet_on = true;
+    }
+    lvgl_port_lock();
+    ui_voice_set_level(0);
+    lvgl_port_unlock();
+    voice_set_state(VOICE_IDLE);
+    const voice_command_cb_t cb = s_on_command;
+    if (cb != NULL) {
+        cb(command);
+    }
+}
+
+static void local_frame(const afe_fetch_result_t *res)
+{
+    const int64_t now = esp_timer_get_time();
+    if (now - s_local.level_us >= LEVEL_EVERY_MS * 1000) {
+        s_local.level_us = now;
+        float level = (res->data_volume - LEVEL_FLOOR_DB) / (LEVEL_CEIL_DB - LEVEL_FLOOR_DB);
+        lvgl_port_lock();
+        ui_voice_set_level(level < 0 ? 0 : level > 1 ? 1 : level);
+        lvgl_port_unlock();
+    }
+    const esp_mn_state_t state = s_mn->detect(s_mn_data, res->data);
+    if (state == ESP_MN_STATE_DETECTED) {
+        const esp_mn_results_t *r = s_mn->get_results(s_mn_data);
+        if (r->num > 0) {
+            ESP_LOGI(TAG, "heard \"%s\" (%d, %.2f)", r->string, r->command_id[0], r->prob[0]);
+            local_end(r->command_id[0]);
+            return;
+        }
+    }
+    if (state != ESP_MN_STATE_DETECTING) {
+        ESP_LOGI(TAG, "no phrase heard");
+        local_end(VOICE_COMMAND_NONE);
+    }
+}
+
+/* MultiNet takes the phrases voice_set_commands() set, while it isn't
+ * listening, below the voice tasks. */
+static void phrases_task(void *arg)
+{
+    while (true) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        xSemaphoreTake(s_mn_lock, portMAX_DELAY);
+        xSemaphoreTake(s_phrases_lock, portMAX_DELAY);
+        esp_mn_commands_clear();
+        for (int i = 0; i < s_phrase_count; i++) {
+            esp_mn_commands_add(s_phrases[i].id, s_phrases[i].text);
+        }
+        const int n = s_phrase_count;
+        xSemaphoreGive(s_phrases_lock);
+        const esp_mn_error_t *err = esp_mn_commands_update();
+        xSemaphoreGive(s_mn_lock);
+        ESP_LOGI(TAG, "%d phrases, %d refused", n, err != NULL ? err->num : 0);
+    }
+}
+
+bool voice_commands_available(void)
+{
+    return s_mn_data != NULL;
+}
+
+void voice_set_commands(const voice_phrase_t *list, int n, voice_command_cb_t cb)
+{
+    if (s_mn_data == NULL) {
+        return;
+    }
+    n = n < LOCAL_PHRASES_MAX ? n : LOCAL_PHRASES_MAX;
+    xSemaphoreTake(s_phrases_lock, portMAX_DELAY);
+    memcpy(s_phrases, list, (size_t) n * sizeof(voice_phrase_t));
+    s_phrase_count = n;
+    s_on_command = cb;
+    xSemaphoreGive(s_phrases_lock);
+    xTaskNotifyGive(s_phrases_task);
+}
+
 static void on_wake(const afe_fetch_result_t *res)
 {
     ESP_LOGI(TAG, "wake word \"%s\" (%.1f dBFS)", voice_wake_word(), res->data_volume);
@@ -605,7 +743,9 @@ static void on_wake(const afe_fetch_result_t *res)
         // WAKE_TAIL_MS anyway.
         playback_sound(SOUND_WAKE);
     }
-    stream_start("wake", WAKE_TAIL_MS, NO_SPEECH_MS, END_SILENCE_MS);
+    if (!use_local() || !local_start()) {
+        stream_start("wake", WAKE_TAIL_MS, NO_SPEECH_MS, END_SILENCE_MS);
+    }
 }
 
 static void feed_task(void *arg)
@@ -645,19 +785,26 @@ static void fetch_task(void *arg)
         xSemaphoreTake(s_fetch, portMAX_DELAY);
         if (!(run & RUN_BIT)) {
             stream_end(END_MUTED);
+            local_end(VOICE_COMMAND_NONE);
         } else {
             if (req & STOP_BIT) {
                 stream_end(END_HOST);
+                local_end(VOICE_COMMAND_NONE);
             }
             if (req & TALK_BIT) {
                 // PWR wins over whatever was being heard.
                 stream_end(END_HOST);
-                stream_start("button", 0, MAX_TALK_MS, END_SILENCE_MS);
+                local_end(VOICE_COMMAND_NONE);
+                // Without a host it ends with the phrase, not the key.
+                if (!use_local() || !local_start()) {
+                    stream_start("button", 0, MAX_TALK_MS, END_SILENCE_MS);
+                }
             }
             if ((req & RELEASE_BIT) && s_stream.button) {
                 stream_end(END_RELEASED);
             }
             if ((req & LISTEN_BIT) && !s_stream.active) {
+                local_end(VOICE_COMMAND_NONE); // the host is back, and asks
                 if (req & FOLLOW_UP_BIT) {
                     const int wait = s_follow_up_wait_ms, pause = s_follow_up_pause_ms;
                     stream_start("follow_up", FOLLOW_UP_TAIL_MS, wait > 0 ? wait : FOLLOW_UP_NO_SPEECH_MS,
@@ -669,7 +816,7 @@ static void fetch_task(void *arg)
             if ((req & PAUSE_BIT) && s_stream.active && s_stream.id == s_pause_id) {
                 s_stream.end_silence_ms = s_pause_ms;
             }
-            if (!s_stream.active && s_wakenet_on != s_wake_on) {
+            if (!s_stream.active && !s_local.active && s_wakenet_on != s_wake_on) {
                 // The menu's switch: WakeNet's CPU is free while it's off.
                 if (s_wake_on) {
                     s_afe->enable_wakenet(s_afe_data);
@@ -682,6 +829,8 @@ static void fetch_task(void *arg)
             if (res != NULL && res->ret_value != ESP_FAIL) {
                 if (s_stream.active) {
                     stream_frame(res);
+                } else if (s_local.active) {
+                    local_frame(res);
                 } else if (res->wakeup_state == WAKENET_DETECTED) {
                     if (esp_timer_get_time() >= s_speaker_until_us) {
                         on_wake(res);
@@ -697,7 +846,7 @@ static void fetch_task(void *arg)
                 }
             }
         }
-        bool streaming = s_stream.active;
+        bool streaming = s_stream.active || s_local.active;
         xSemaphoreGive(s_fetch);
         if (!streaming && s_state != VOICE_IDLE && esp_timer_get_time() >= s_state_until_us) {
             voice_set_state(VOICE_IDLE);
@@ -763,6 +912,43 @@ void voice_stop_listening(void)
     }
 }
 
+/* MultiNet for the phrases heard without a host, if the partition has it
+ * and internal RAM can spare it. */
+static void load_multinet(void)
+{
+    char *name = esp_srmodel_filter(s_models, ESP_MN_PREFIX, ESP_MN_ENGLISH);
+    if (name == NULL) {
+        ESP_LOGI(TAG, "no MultiNet: without a host, nothing is heard");
+        return;
+    }
+    const size_t before = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    s_mn = esp_mn_handle_from_name(name);
+    s_mn_data = s_mn != NULL ? s_mn->create(name, LOCAL_TIMEOUT_MS) : NULL;
+    if (s_mn_data == NULL) {
+        ESP_LOGE(TAG, "MultiNet %s failed", name);
+        return;
+    }
+    const size_t after = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    const int mn_chunk = s_mn->get_samp_chunksize(s_mn_data);
+    const int afe_chunk = s_afe->get_fetch_chunksize(s_afe_data);
+    s_mn_lock = xSemaphoreCreateMutex();
+    s_phrases_lock = xSemaphoreCreateMutex();
+    s_phrases = heap_caps_calloc(LOCAL_PHRASES_MAX, sizeof(voice_phrase_t), MALLOC_CAP_SPIRAM);
+    if (after < LOCAL_MIN_INTERNAL || mn_chunk != afe_chunk || s_mn_lock == NULL || s_phrases_lock == NULL
+        || s_phrases == NULL || esp_mn_commands_alloc(s_mn, s_mn_data) != ESP_OK
+        || xTaskCreatePinnedToCoreWithCaps(phrases_task, "voice_phrases", 8192, NULL, 2, &s_phrases_task, TASK_CORE,
+                                           MALLOC_CAP_SPIRAM)
+               != pdPASS) {
+        ESP_LOGW(TAG, "MultiNet %s left out: %u KB internal free, chunk %d for %d", name, (unsigned) (after / 1024),
+                 mn_chunk, afe_chunk);
+        s_mn->destroy(s_mn_data);
+        s_mn_data = NULL;
+        return;
+    }
+    ESP_LOGI(TAG, "MultiNet %s: %u KB of internal RAM, %u KB left", name, (unsigned) ((before - after) / 1024),
+             (unsigned) (after / 1024));
+}
+
 /** Build the AFE with the WakeNet `model`. */
 static esp_afe_sr_data_t *create_afe(const char *model)
 {
@@ -817,6 +1003,7 @@ esp_err_t voice_set_wake_word(const char *id)
     xSemaphoreTake(s_mic, portMAX_DELAY);
     xSemaphoreTake(s_fetch, portMAX_DELAY);
     stream_end(END_HOST);
+    local_end(VOICE_COMMAND_NONE);
     s_afe->destroy(s_afe_data);
     esp_err_t err = ESP_OK;
     s_afe_data = create_afe(model);
@@ -884,6 +1071,7 @@ void voice_start(bool muted, const char *wake_word)
         return;
     }
     s_chunk = s_afe->get_feed_chunksize(s_afe_data);
+    load_multinet();
 
     s_mic = xSemaphoreCreateMutex();
     s_fetch = xSemaphoreCreateMutex();

@@ -9,6 +9,7 @@
 #include "board_pmu.h"
 #include "board_settings.h"
 #include "card.h"
+#include "clock.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
@@ -384,6 +385,8 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
     cJSON_AddNumberToObject(in, "unread", inbox_unread(NULL));
     cJSON_AddBoolToObject(in, "view", inbox_ui_is_open());
     cJSON_AddNumberToObject(st, "timers", timers_count());
+    // The board's own clock: local minutes since midnight, -1 if not known.
+    cJSON_AddNumberToObject(st, "minute", clock_minute());
     cJSON *hb = cJSON_AddObjectToObject(st, "habits");
     cJSON_AddNumberToObject(hb, "count", habits_count());
     cJSON_AddNumberToObject(hb, "done", habits_done());

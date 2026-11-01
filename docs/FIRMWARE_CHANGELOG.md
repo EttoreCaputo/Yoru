@@ -1,5 +1,16 @@
 # Firmware changelog
 
+## 0.13.0
+
+Yoru does more on his own, without the Mac.
+
+- **He knows what time it is.** With the WiFi set up he takes the time from the internet; with Yoru Hub on, from the Mac, time zone included (changes of summer time too). The night brightness works without the Mac now, and so does his sense of the day.
+- **Timers from the board.** The Timers app has round buttons at the bottom: tap 1, 3, 5, 10, 15, 25, 30 or 60 minutes for a timer, or "25+5" for a pomodoro (25 minutes of focus and 5 of break, four times). Yoru rings them himself, and a pomodoro goes on to its break and back by itself. When Yoru Hub is back, it takes them over and says them out loud as usual. Without the Mac, Yoru also rings the timers Yoru Hub had set when they're up.
+- **Habits without the Mac.** Your habits stay on the board, also after a restart: tap to tick them off as always, and at midnight a new day starts with its streaks, even with the Mac off. What you ticked meanwhile goes to Yoru Hub when it's back.
+- **A few words without the Mac.** Say "Alexa" (or hold PWR) and then, in English: "set a timer for five minutes" (or "five minute timer"), "start a pomodoro", "stop the timer", "pause the timer", "how much time is left", "what time is it", "go to sleep", "let's play", "show my habits", "volume up", "check water" (any of your habits by name)... He shows what he did in a line at the bottom; anything else gets a puzzled "hm?". Only English for now: there's no Italian model for this. With Yoru Hub on, you talk to him as before, in any language.
+- If Yoru Hub goes away, Yoru no longer thinks you're still at the computer, so he gets sleepy and naps as he should.
+- This update rearranges the board's memory to fit the voice model: install it from Yoru Hub, which writes everything at once.
+
 ## 0.12.2
 
 Yoru holds your finger.

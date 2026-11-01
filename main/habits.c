@@ -5,8 +5,10 @@
 #include <string.h>
 
 #include "card.h"
+#include "clock.h"
 #include "esp_attr.h"
 #include "esp_log.h"
+#include "nvs.h"
 #include "rpc.h"
 
 static const char *TAG = "habits";
@@ -16,13 +18,59 @@ static const char *TAG = "habits";
 static const uint32_t PALETTE[] = {0xFF375F, 0x30D158, 0x40C8E0, 0xFFD60A, 0xBF5AF2, 0xFF9F0A, 0x64D2FF, 0xFF6482};
 #define PALETTE_N ((int) (sizeof(PALETTE) / sizeof(PALETTE[0])))
 
-EXT_RAM_BSS_ATTR static habit_t s_list[HABITS_MAX];
+#define NVS_NS "habits"
+#define NVS_KEY "list"
+/* Bumped when `saved_t` changes: an older one is dropped. */
+#define SAVED_VERSION 1
+
+/* What NVS keeps, so the list, today's ticks and the streaks outlive a
+ * restart and go on without the host. */
+typedef struct {
+    uint32_t version;
+    /* The local day (clock_day()) the counts are for; -1 if not known. */
+    int32_t day;
+    int32_t n;
+    habit_t list[HABITS_MAX];
+    /* Ticked on the board since the host last sent its list. */
+    bool dirty[HABITS_MAX];
+} saved_t;
+
+EXT_RAM_BSS_ATTR static saved_t s_saved;
 EXT_RAM_BSS_ATTR static habit_t s_new[HABITS_MAX];
 
 static struct {
-    int n;
     uint32_t version;
 } s;
+
+static void save(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(NVS_NS, NVS_READWRITE, &h) != ESP_OK) {
+        return;
+    }
+    s_saved.version = SAVED_VERSION;
+    if (nvs_set_blob(h, NVS_KEY, &s_saved, sizeof(s_saved)) != ESP_OK || nvs_commit(h) != ESP_OK) {
+        ESP_LOGW(TAG, "not saved");
+    }
+    nvs_close(h);
+}
+
+void habits_init(void)
+{
+    s_saved.day = -1;
+    nvs_handle_t h;
+    if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK) {
+        return;
+    }
+    size_t len = sizeof(s_saved);
+    if (nvs_get_blob(h, NVS_KEY, &s_saved, &len) != ESP_OK || len != sizeof(s_saved)
+        || s_saved.version != SAVED_VERSION || s_saved.n < 0 || s_saved.n > HABITS_MAX) {
+        memset(&s_saved, 0, sizeof(s_saved));
+        s_saved.day = -1;
+    }
+    nvs_close(h);
+    ESP_LOGI(TAG, "%d habits kept, day %ld", (int) s_saved.n, (long) s_saved.day);
+}
 
 static bool parse_rgb(const char *text, uint32_t *out)
 {
@@ -89,21 +137,79 @@ bool habits_set(const cJSON *args, char *err, size_t len)
         }
         n++;
     }
-    memcpy(s_list, s_new, (size_t) n * sizeof(habit_t));
-    s.n = n;
+    // What was ticked on the board while the host wasn't there (the same
+    // day) wins over the host's count, and the host is told.
+    const int32_t today = clock_day();
+    for (int i = 0; i < n; i++) {
+        habit_t *hb = &s_new[i];
+        const habit_t *was = NULL;
+        for (int k = 0; k < s_saved.n && was == NULL; k++) {
+            if (s_saved.dirty[k] && strcmp(s_saved.list[k].id, hb->id) == 0) {
+                was = &s_saved.list[k];
+            }
+        }
+        if (was == NULL || s_saved.day != today) {
+            continue;
+        }
+        const int done = was->done > hb->goal ? hb->goal : was->done;
+        if (done == hb->done) {
+            continue;
+        }
+        if (done >= hb->goal && hb->done < hb->goal) {
+            hb->streak++;
+        } else if (done < hb->goal && hb->done >= hb->goal && hb->streak > 0) {
+            hb->streak--;
+        }
+        hb->done = done;
+        cJSON *params = cJSON_CreateObject();
+        cJSON_AddStringToObject(params, "id", hb->id);
+        cJSON_AddNumberToObject(params, "done", done);
+        rpc_notify("habit_check", params);
+        ESP_LOGI(TAG, "%s: %d, ticked on the board", hb->id, done);
+    }
+    memcpy(s_saved.list, s_new, (size_t) n * sizeof(habit_t));
+    memset(s_saved.dirty, 0, sizeof(s_saved.dirty));
+    s_saved.n = n;
+    s_saved.day = today;
     s.version++;
+    save();
     ESP_LOGI(TAG, "%d habits, %d done", n, habits_done());
     return true;
 }
 
+void habits_poll(void)
+{
+    const int32_t today = clock_day();
+    if (today < 0 || today == s_saved.day) {
+        return;
+    }
+    // A new day without the host: the counts start afresh, and a habit not
+    // done yesterday (or a day missed) breaks its streak.
+    const bool known = s_saved.day >= 0 && today > s_saved.day;
+    for (int i = 0; i < s_saved.n && known; i++) {
+        habit_t *h = &s_saved.list[i];
+        if (today - s_saved.day > 1 || h->done < h->goal) {
+            h->streak = 0;
+        }
+        h->done = 0;
+        s_saved.dirty[i] = false;
+    }
+    ESP_LOGI(TAG, "day %ld%s", (long) today, known ? ": a new day" : "");
+    s_saved.day = today;
+    if (known) {
+        s.version++;
+    }
+    save();
+}
+
 int habits_count(void)
 {
-    return s.n;
+    return s_saved.n;
 }
 
 const habit_t *habits_at(int i)
 {
-    return i >= 0 && i < s.n ? &s_list[i] : NULL;
+    return i >= 0 && i < s_saved.n ? &s_saved.list[i] : NULL;
 }
 
 uint32_t habits_version(void)
@@ -113,31 +219,31 @@ uint32_t habits_version(void)
 
 float habits_progress(void)
 {
-    if (s.n == 0) {
+    if (s_saved.n == 0) {
         return 0;
     }
     float sum = 0;
-    for (int i = 0; i < s.n; i++) {
-        sum += (float) s_list[i].done / (float) s_list[i].goal;
+    for (int i = 0; i < s_saved.n; i++) {
+        sum += (float) s_saved.list[i].done / (float) s_saved.list[i].goal;
     }
-    return sum / (float) s.n;
+    return sum / (float) s_saved.n;
 }
 
 int habits_done(void)
 {
     int n = 0;
-    for (int i = 0; i < s.n; i++) {
-        n += s_list[i].done >= s_list[i].goal;
+    for (int i = 0; i < s_saved.n; i++) {
+        n += s_saved.list[i].done >= s_saved.list[i].goal;
     }
     return n;
 }
 
 int habits_tick(int i, int delta)
 {
-    if (i < 0 || i >= s.n) {
+    if (i < 0 || i >= s_saved.n) {
         return -1;
     }
-    habit_t *h = &s_list[i];
+    habit_t *h = &s_saved.list[i];
     const int done = h->done + delta;
     if (done < 0 || done > h->goal) {
         return -1;
@@ -150,7 +256,9 @@ int habits_tick(int i, int delta)
         h->streak--;
     }
     h->done = done;
+    s_saved.dirty[i] = true;
     s.version++;
+    save();
     cJSON *params = cJSON_CreateObject();
     cJSON_AddStringToObject(params, "id", h->id);
     cJSON_AddNumberToObject(params, "done", done);

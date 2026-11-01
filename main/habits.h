@@ -3,8 +3,11 @@
 /* Your habits for today (docs/protocol.md, Habits): the host keeps them and
  * starts each day afresh; it sends the whole list with `set_habits`. A tap on
  * the board ticks one off (`habit_check` tells the host the new count), so a
- * glass of water or a walk is one touch away. habits_ui.c shows them. All
- * calls with the LVGL lock held. */
+ * glass of water or a walk is one touch away. The board keeps the last list
+ * in NVS and goes on without the host: ticks, a new day at midnight (on its
+ * own clock, clock.c), streaks; the next list from a host takes the ticks
+ * made meanwhile. habits_ui.c shows them. All calls with the LVGL lock
+ * held. */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -30,6 +33,11 @@ typedef struct {
     int streak;
     uint32_t rgb;
 } habit_t;
+
+/** Load the list kept in NVS (NVS must be up). */
+void habits_init(void);
+/** A new day starts the counts afresh: every tick. */
+void habits_poll(void);
 
 /** `set_habits`' arguments; false with the reason in `err`. */
 bool habits_set(const cJSON *args, char *err, size_t len);

@@ -50,6 +50,10 @@ void behaviour_voice(voice_state_t state);
 /** Play one of the scenes (names as in DualEye) now, waking it if
  * asleep; false for an unknown one. With the LVGL lock held. */
 bool behaviour_play(const char *name);
+/** To sleep, as a tap of PWR does, out of the menu or the inbox first.
+ * With the LVGL lock held. */
+void behaviour_sleep(void);
+
 /** The scenes' names, at most `max`; returns how many. */
 int behaviour_scenes(const char **names, int max);
 

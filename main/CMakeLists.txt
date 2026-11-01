@@ -42,6 +42,8 @@ idf_component_register(SRCS "approval.c" "toast.c" "inbox_ui.c" "inbox.c" "main.
                             "habits.c"
                             "habits_ui.c"
                             "errand.c"
+                            "clock.c"
+                            "commands.c"
                        INCLUDE_DIRS "."
                        LDFRAGMENTS "linker.lf"
                        REQUIRES esp_app_format esp_codec_dev esp-sr esp_driver_gpio esp_driver_i2c esp_driver_i2s

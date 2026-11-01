@@ -7,11 +7,14 @@
 #include "board_pmu.h"
 #include "board_settings.h"
 #include "board_touch.h"
+#include "clock.h"
+#include "commands.h"
 #include "ears_dir.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "eyes.h"
+#include "habits.h"
 #include "life.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
@@ -156,6 +159,7 @@ static void start_audio(void)
     voice_set_wake_on(board_settings_on(SETTING_WAKE_WORD_ON));
     ears_dir_on(behaviour_heard_from);
     voice_start(board_settings_on(SETTING_MIC_MUTED), word);
+    commands_start();
     playback_start();
     apply_pet_sounds();
     playback_sound(SOUND_BOOT);
@@ -168,6 +172,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Yoru %s", esp_app_get_description()->version);
     board_settings_init();
     board_settings_on_change(on_setting);
+    clock_init();
+    habits_init();
     // Before anything takes the power locks it sets up.
     power_init();
     metrics_model_init();

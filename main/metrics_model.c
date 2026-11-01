@@ -44,3 +44,15 @@ void metrics_model_set(const metrics_snapshot_t *in)
     s_snapshot = copy;
     xSemaphoreGive(s_lock);
 }
+
+bool metrics_model_live(void)
+{
+    if (s_lock == NULL) {
+        return false;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    const bool live = s_snapshot.state == METRICS_UI_LIVE && s_snapshot.updated_ms != 0
+                      && (uint32_t) (esp_timer_get_time() / 1000) - s_snapshot.updated_ms <= METRICS_STALE_MS_DEFAULT;
+    xSemaphoreGive(s_lock);
+    return live;
+}

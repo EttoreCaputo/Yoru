@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <string.h>
 
+#include "clock.h"
 #include "esp_app_desc.h"
 #include "esp_event.h"
 #include "esp_heap_caps.h"
@@ -429,6 +430,8 @@ static bool bring_up(void)
         return false;
     }
     esp_netif_set_hostname(netif, s_host);
+    // The time of day without the host, once the network answers.
+    clock_start_sntp();
     esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_event, NULL);
     esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL);
     esp_wifi_set_mode(WIFI_MODE_STA);

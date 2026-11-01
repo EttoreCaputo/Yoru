@@ -548,6 +548,8 @@ static bool parse_host_object(js_t *j, metrics_host_t *host)
         } else if (strcmp(key, "idle") == 0) {
             ok = read_number_field(j, &value);
             host->idle_s = value > 0 ? (int) value : 0;
+        } else if (strcmp(key, "tz") == 0) {
+            ok = parse_string(j, host->tz, sizeof(host->tz));
         } else {
             ok = skip_value(j, 1);
         }

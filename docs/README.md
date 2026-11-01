@@ -7,7 +7,7 @@
 
 A desk companion that lives in the black of a round AMOLED: a small matte sphere with two tiny eyes and two floating hands, in the dark, that you can make your own. It lives a life of its own on the desk, and it is the body of a personal assistant on your computer: it tells you what is worth knowing and answers when you talk to it.
 
-Status: early development, firmware 0.12.0. What is in and what is left: [the roadmap](ROADMAP.md).
+Status: early development, firmware 0.13.0. What is in and what is left: [the roadmap](ROADMAP.md).
 
 - [The character](CONCEPT.md)
 - [Roadmap and hardware](ROADMAP.md)
@@ -22,6 +22,7 @@ Status: early development, firmware 0.12.0. What is in and what is left: [the ro
 - **Voice:** a wake word (Alexa, Hi ESP, Jarvis or Computer, until "Yoru" exists), push-to-talk on PWR, listening on after an answer, and the host's voice on the speaker.
 - **The menu,** a watch's honeycomb of round apps around Yoru (swipe down from the top): Notifications, Timers, Habits, Games, Do not disturb and Settings.
 - **The host's side:** the inbox of notifications, timers and reminders, your daily habits, the Allow and Deny card before Yoru acts for you, and Yoru's errands while the assistant calls one of your services.
+- **Without the host:** Yoru keeps the time itself (from the internet over WiFi, or the computer's), starts timers and pomodoros from the Timers app or by voice, keeps your habits and their streaks day after day, and understands a few phrases in English after the wake word: timers, the time, sleep, the apps, the volume, ticking off a habit ([the list](protocol.md#offline-commands)). What it did meanwhile goes to Yoru Hub when it's back.
 - **Games:** Tilt ball, Slingshot and Constellations.
 - **Battery:** Yoru notices it: a bolt of energy when you plug him in, a charge ring while he charges, a clap when he's full, and a tired face and a small battery by his head when he runs low. Power profiles that save what they can while Yoru is idle (Balanced, or Saver with the mics off while it sleeps), a dark screen that really switches off, and hibernation after a while in the dark, until it's picked up.
 
@@ -55,7 +56,7 @@ python3 tools/audio_selftest.py tone
 
 `tools/yoru_link.py` is the small library they share: `Link().hello()`, `call("tools/call", {"name": "get_state", "arguments": {}})`, and `frames()` for the log lines.
 
-Say "Alexa" (or another wake word, with `set_wake_word`) and Yoru listens: its eyes open wide and look at you. Without a host nobody answers: if you said something it thinks for up to 30 s, then goes back to its own life.
+Say "Alexa" (or another wake word, with `set_wake_word`) and Yoru listens: its eyes open wide and look at you. Without a host it understands only [a few phrases in English](protocol.md#offline-commands), such as "set a timer for five minutes" or "what time is it".
 
 ## Credits
 

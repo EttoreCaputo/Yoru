@@ -249,15 +249,64 @@ static void add_empty(void)
 {
     lv_obj_t *box = lv_obj_create(s.list);
     lv_obj_remove_style_all(box);
-    lv_obj_set_size(box, ROW_W, 190);
+    lv_obj_set_size(box, ROW_W, 110);
     lv_obj_t *bell = card_label(box, &lv_font_montserrat_40, lv_color_hex(0x5A3A10), LV_SYMBOL_BELL);
     lv_obj_align(bell, LV_ALIGN_TOP_MID, 0, 6);
     lv_obj_t *none = card_label(box, &lv_font_montserrat_24, CARD_TEXT, card_tr("No timers", "Nessun timer"));
     lv_obj_align(none, LV_ALIGN_TOP_MID, 0, 66);
-    lv_obj_t *hint = card_label(box, &lv_font_montserrat_20, CARD_DIM,
-                                card_tr("Ask Yoru: \"a timer for\n10 minutes\"", "Chiedi a Yoru: \"un timer\ndi 10 minuti\""));
-    lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(hint, LV_ALIGN_TOP_MID, 0, 104);
+}
+
+/* ---- New timers ---------------------------------------------------------------- */
+
+/* Minutes a tap starts on the board; POMODORO for 25 + 5, four times. */
+#define POMODORO (-1)
+static const int CHIPS[] = {1, 3, 5, 10, 15, 25, 30, 60, POMODORO};
+#define CHIP_D 84
+
+static void chip_cb(lv_event_t *e)
+{
+    const int min = (int) (intptr_t) lv_event_get_user_data(e);
+    const bool ok = min == POMODORO ? timers_start_pomodoro() : timers_start(min * 60, NULL);
+    playback_sound(ok ? SOUND_BOOP : SOUND_PFFT);
+    timers_ui_refresh();
+}
+
+/* A honeycomb-ish grid of round buttons: a tap starts a timer on the board,
+ * with or without the host. */
+static void add_chips(void)
+{
+    lv_obj_t *head = card_label(s.list, &lv_font_montserrat_20, CARD_DIM, card_tr("New timer", "Nuovo timer"));
+    lv_obj_set_style_pad_top(head, 10, 0);
+    lv_obj_t *grid = lv_obj_create(s.list);
+    lv_obj_remove_style_all(grid);
+    lv_obj_set_size(grid, 3 * CHIP_D + 2 * 14, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(grid, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(grid, 12, 0);
+    lv_obj_set_style_pad_column(grid, 14, 0);
+    lv_obj_remove_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
+    for (size_t i = 0; i < sizeof(CHIPS) / sizeof(CHIPS[0]); i++) {
+        const bool pomo = CHIPS[i] == POMODORO;
+        const lv_color_t c = pomo ? COL_WORK : COL_TIMER;
+        lv_obj_t *chip = lv_obj_create(grid);
+        lv_obj_remove_style_all(chip);
+        lv_obj_set_size(chip, CHIP_D, CHIP_D);
+        lv_obj_set_style_radius(chip, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_opa(chip, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(chip, CARD_ROW, 0);
+        lv_obj_set_style_bg_color(chip, lv_color_mix(c, CARD_ROW, 90), LV_STATE_PRESSED);
+        lv_obj_set_style_border_width(chip, 3, 0);
+        lv_obj_set_style_border_color(chip, lv_color_mix(c, lv_color_black(), 140), 0);
+        lv_obj_remove_flag(chip, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(chip, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(chip, chip_cb, LV_EVENT_SHORT_CLICKED, (void *) (intptr_t) CHIPS[i]);
+        char text[8];
+        snprintf(text, sizeof(text), "%d", CHIPS[i]);
+        lv_obj_t *big = card_label(chip, pomo ? &lv_font_montserrat_20 : &lv_font_montserrat_28, c, pomo ? "25+5" : text);
+        lv_obj_align(big, LV_ALIGN_CENTER, 0, pomo ? -8 : -6);
+        lv_obj_t *unit = card_label(chip, &lv_font_montserrat_14, CARD_DIM, pomo ? "pomodoro" : "min");
+        lv_obj_align(unit, LV_ALIGN_CENTER, 0, pomo ? 14 : 18);
+    }
 }
 
 static void build_list(void)
@@ -292,6 +341,7 @@ static void build_list(void)
     if (s.n == 0) {
         add_empty();
     }
+    add_chips();
     lv_obj_update_layout(s.list);
     lv_obj_send_event(s.list, LV_EVENT_SCROLL, NULL);
 }

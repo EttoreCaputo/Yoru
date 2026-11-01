@@ -40,6 +40,12 @@ The TCP port is the same, 7340.
 
 The same snapshot. Since 0.10.0 a snapshot needs only `pet` (the host's time and idle time): `cpu` and `gpu` are optional, and one with none of the three is still ignored. Since 0.8.0 Yoru reads only the host's time and idle time (night brightness, and the sleep times count from your last input on the computer); it shows none of the rest. A timer's `screen` is ignored.
 
+**The board's clock (0.13.0).** The board keeps the time of day itself (`clock.c`): from the internet (SNTP, `pool.ntp.org`) once its WiFi is up, and from each snapshot: `ts` (UTC seconds) sets it when it is more than 2 s off, and `pet.tz`, the host's time zone as POSIX writes it (`"CET-1CEST,M3.5.0,M10.5.0/3"`, at most 47 characters), sets the zone, kept in NVS. A host without `tz` gives its offset from `pet.min` against `ts`, to a quarter of an hour. Until a host has said a zone, the board uses Central European Time. Night brightness, the habits' day and "what time is it" use this clock, with or without a host. A host whose snapshots stopped more than 3 s ago is taken as gone: its idle time no longer counts, the board rings its timers and hears spoken commands itself (Offline commands).
+
+```json
+{"v":2,"ts":1793574000,"pet":{"min":915,"idle":4,"tz":"CET-1CEST,M3.5.0,M10.5.0/3"}}
+```
+
 ## Board tools
 
 Settings are kept in NVS and survive a reboot.
@@ -54,7 +60,7 @@ Settings are kept in NVS and survive a reboot.
 | `play_sound` | `name` | As on DualEye: the same sounds, plus Yoru's own: `unplug` and, an earcon played with pet sounds off too, `battery_low` (0.12.1) |
 | `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it), `power_saver` (on battery, the Saver profile instead of Balanced; 0.12.0, see Power), `hibernate` (on battery, minutes of dark screen before hibernating, 0 never; 0.12.0). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
 | `set_setting` | `name`, `value`: integer | Change one setting within its range (switches are 0 or 1); it applies at once |
-| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`) and `errand` (Yoru is on one) |
+| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time) |
 | `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `habits` · `games` (0.11.8 and later) · `settings` · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it. Since 0.11.0; before, the menu was a ring and `inbox` one of its pages |
 | `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Yoru asks before it acts for you, over the eyes, with Allow and Deny (see Confirmations). A second call replaces it |
 | `hide_approval` | `id`: string | Take that card away: it was answered in the app, or gave up. An `id` that isn't shown is fine |
@@ -209,6 +215,14 @@ What the user does comes back as `timer_action`:
 
 `id` comes back as a string. The board shows the change at once; the host's next `set_timers` has the last word.
 
+**The board's own timers (0.13.0).** The Timers app has round buttons for a new timer (1, 3, 5, 10, 15, 25, 30 or 60 minutes, or a pomodoro of 25 + 5 minutes four times), and spoken commands start them too without a host (Offline commands). The board keeps them (ids starting with `b`), rings them itself and, while it's ringing, a pomodoro goes on to its next phase. Without a host the board also rings the host's timers when they're up, and drops a ringing one after a minute. A host that is there is offered each of the board's own, once per connection and again after a pause, a resume or a new phase:
+
+```json
+{"jsonrpc":"2.0","method":"timer_new","params":{"id":"b3f09a1c2","kind":"work","state":"run","left_s":1412.5,"total_s":1500,"language":"it","pomodoro":{"work_s":1500,"break_s":300,"round":1,"rounds":4}}}
+```
+
+`label` comes when it has one, `pomodoro` only for a `work` or `break` phase, `language` is the board's (`it` or `en`), for what the host says when it rings. A host that takes it over puts it in its list with `was` set to the board's id, and the board drops its own copy then; offered again, the host updates the one it has instead of adding another. A host that doesn't know `timer_new` ignores it, and the timer stays the board's. Yoru Hub: `Timers::adopt` in `core/src/timers.rs`. Hibernation waits while any timer is there; the board's own don't survive a restart.
+
 ## Habits
 
 Since 0.11.0, with the `habits` capability. Yoru Hub keeps them in `core/src/assistant/habits.rs` (set by voice or on its Routines page). The host keeps the user's habits, how many times each is done today and the streaks, starts each day afresh at midnight, and sends today's list whenever it changes and on connect.
@@ -226,6 +240,28 @@ The menu's Habits app shows the first three as rings around how many are done to
 ```json
 {"jsonrpc":"2.0","method":"habit_check","params":{"id":"water","done":4}}
 ```
+
+**Without the host (0.13.0).** The board keeps the last list in NVS, so it is there after a restart and goes on without a host: a tap still ticks one off, at midnight on the board's clock the counts start afresh and a habit not done the day before (or a day missed) loses its streak. The next `set_habits` from a host is the host's list, except for the counts ticked on the board since the last list, on the same day: those stay, and the board sends a `habit_check` for each, so the host catches up. Ticks from an earlier day are dropped.
+
+## Offline commands
+
+Since 0.13.0. When no host has sent a snapshot for 3 s, what is said after the wake word (or with PWR held) is heard on the board, by ESP-SR's MultiNet 7 (`mn7_en`, English only: there is no Italian model), and nothing goes on `audio_up`. It listens for up to 6 s, the ring showing the voice's level, and does one of these (`commands.c`), with a line over the bottom rim saying what it did:
+
+| Phrase | What it does |
+|---|---|
+| "set a timer for five minutes", "timer for five minutes", "five minute timer" | A timer on the board: 1–10, 12, 15, 20, 25, 30, 40 or 45 minutes, one hour, an hour and a half or two hours |
+| "start a pomodoro", "start pomodoro", "focus time" | A pomodoro on the board |
+| "stop the timer", "cancel the timer", "stop the alarm", "stop" | Stops the one ringing, or else cancels the one that ends first |
+| "pause the timer"; "resume the timer", "continue the timer" | Pauses the first running timer; resumes the first paused one |
+| "how much time is left", "how long is left" | Shows what is left on the first timer |
+| "what time is it", "what is the time" | Shows the time on the board's clock |
+| "go to sleep", "good night" | To sleep, as a tap of PWR |
+| "lets play", "play a game"; "show my timers", "open timers"; "show my habits", "open habits"; "show my notifications", "open notifications" | Opens Games, Timers, Habits or Notifications |
+| "volume up", "louder"; "volume down", "quieter" | The volume by 15 |
+| "hello there", "how are you" | Yoru waves |
+| "check water", "water done" | Ticks off that habit, by its name in letters (three at least) |
+
+Anything else gets a puzzled "hm?" and a line saying that without the Mac it knows only a few words. The phrases are rebuilt when the habits' names change, in a task of its own (it takes a second or two). MultiNet takes about 13 KB of internal RAM and stays unloaded if less than 64 KB would be left. With a host there, everything goes to it as before.
 
 ## Fetch
 

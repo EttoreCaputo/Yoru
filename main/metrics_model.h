@@ -148,6 +148,8 @@ typedef struct {
     int minute;
     /* Seconds without input. */
     int idle_s;
+    /* Its POSIX time zone ("CET-1CEST,M3.5.0,M10.5.0/3"); empty if not sent. */
+    char tz[48];
 } metrics_host_t;
 
 typedef struct {
@@ -170,6 +172,8 @@ typedef struct {
 void metrics_model_init(void);
 void metrics_model_get(metrics_snapshot_t *out);
 void metrics_model_set(const metrics_snapshot_t *in);
+/** A host is sending snapshots now: it is there. */
+bool metrics_model_live(void);
 
 #ifdef __cplusplus
 }

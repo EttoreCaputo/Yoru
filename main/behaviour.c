@@ -12,10 +12,13 @@
 #include "board_display.h"
 #include "board_settings.h"
 #include "card.h"
+#include "clock.h"
+#include "commands.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "errand.h"
 #include "eyes.h"
+#include "habits.h"
 #include "inbox.h"
 #include "inbox_ui.h"
 #include "life.h"
@@ -202,17 +205,18 @@ static void set_brightness(int percent)
     }
 }
 
-/* The host's clock and idle time, from its snapshots (minute -1 and idle 0
- * until it sends them). */
+/* The time of day, from the board's clock (clock.c: SNTP or the host's), and
+ * the host's idle time from its snapshots; minute -1 while nobody said it. */
 static void host_now(int *minute, uint32_t *idle_ms)
 {
     static metrics_snapshot_t snap; // big for the LVGL task's stack
     metrics_model_get(&snap);
-    *minute = snap.host.valid ? snap.host.minute : -1;
-    *idle_ms = snap.host.valid ? (uint32_t) snap.host.idle_s * 1000 : UINT32_MAX;
+    *minute = clock_valid() ? clock_minute() : snap.host.valid ? snap.host.minute : -1;
+    // A host that went left its last idle time behind: nobody is at it now.
+    *idle_ms = snap.host.valid && metrics_model_live() ? (uint32_t) snap.host.idle_s * 1000 : UINT32_MAX;
 }
 
-/* At night (the host sends the time) the screen is dimmer. */
+/* At night the screen is dimmer. */
 static bool night(void)
 {
     int minute;
@@ -598,10 +602,11 @@ static void inbox_tick(uint32_t now)
 }
 
 /* A timer or a reminder rang (timers.c): Yoru jumps like an alarm clock,
- * flapping its hands, with the alarm and a line saying which one. The host
- * says it out loud too. */
+ * flapping its hands, with the alarm and a line saying which one. A host
+ * says it out loud too, if there is one. */
 static void timers_tick(void)
 {
+    timers_poll();
     char label[TIMERS_LABEL_CHARS + 1];
     if (!timers_take_ring(label, sizeof(label)) || s.face_down) {
         return;
@@ -762,6 +767,8 @@ static void tick_cb(lv_timer_t *timer)
     apply_rotation();
     inbox_tick(now);
     timers_tick();
+    habits_poll();
+    commands_poll();
     battery_tick(now);
     if (card_up()) {
         wait_for_answer(now);
@@ -1119,6 +1126,19 @@ static void power_tap(void)
     } else if (s.asleep) {
         wake_up();
     } else if (s.voice == VOICE_IDLE) {
+        eyes_look_around();
+        fall_asleep();
+    }
+}
+
+void behaviour_sleep(void)
+{
+    if (card_up()) {
+        return; // a question waits for its answer
+    }
+    menu_close();
+    inbox_ui_close();
+    if (!s.asleep) {
         eyes_look_around();
         fall_asleep();
     }

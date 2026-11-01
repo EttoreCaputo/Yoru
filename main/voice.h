@@ -3,11 +3,14 @@
 /* Always-on wake word: I2S mic + speaker loopback -> ESP-SR AFE (AEC,
  * VAD) -> WakeNet, on core 1. After the wake word the AFE's output is
  * streamed to the host on `audio_up` until the speaker stops (VAD), between
- * `utterance_start` and `utterance_end` notifications. Drives the voice state
- * the "eyes" overlay shows and tells the host with `wake` and `voice_state`
- * (docs/protocol.md). */
+ * `utterance_start` and `utterance_end` notifications. Without a host
+ * (no snapshot lately) MultiNet hears it on the board instead, for a few
+ * phrases in English (voice_set_commands(), commands.c). Drives the voice
+ * state the "eyes" overlay shows and tells the host with `wake` and
+ * `voice_state` (docs/protocol.md). */
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "esp_err.h"
 
@@ -102,6 +105,27 @@ const char *voice_wake_word_id(void);
 /** The wake-word ids the `model` partition has models for ("alexa",
  * "hiesp"), at most `max`; returns how many. */
 int voice_wake_words(const char **ids, int max);
+
+/* MultiNet's longest phrase, in bytes. */
+#define VOICE_PHRASE_MAX 63
+/* Command id for "heard nothing it knows". */
+#define VOICE_COMMAND_NONE (-1)
+
+typedef struct {
+    int id;
+    char text[VOICE_PHRASE_MAX + 1];
+} voice_phrase_t;
+
+/** A phrase was heard without a host: its id, or VOICE_COMMAND_NONE when
+ * nothing it knows was said. From the voice task, without the LVGL lock;
+ * it mustn't call voice_set_wake_word(). */
+typedef void (*voice_command_cb_t)(int id);
+
+/** MultiNet is loaded: without a host, phrases are heard on the board. */
+bool voice_commands_available(void);
+/** The phrases understood without a host (lower case English, copied), and
+ * who is told; they take effect within a moment. Any task. */
+void voice_set_commands(const voice_phrase_t *list, int n, voice_command_cb_t cb);
 
 /** Listen for another wake word from now on: rebuilds the AFE, which takes
  * a moment (and waits for a self-test `rec` to finish). ESP_ERR_NOT_FOUND
