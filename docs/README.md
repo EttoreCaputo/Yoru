@@ -17,12 +17,12 @@ Status: early development, firmware 0.13.0. What is in and what is left: [the ro
 
 ## What is on the board
 
-- **Yoru itself:** the sphere with its eyes and hands, moving through a space in perspective. It floats near you, gets sleepy and naps when nobody is around, and comes to the glass when something urgent waits for you. Its needs and the life they drive (fireflies, play, exploring) come back later.
+- **Yoru itself:** the sphere with its eyes and hands, moving through a space in perspective. It floats near you, gets sleepy and naps when nobody is around, and comes to the glass when something urgent waits for you. Now and then it does something of its own (peeks out past the edge, stretches, dances, gazes up at the sky it came from, loops, sneezes), greets you when you're back after a while and in the morning, and has a cheer your attention keeps up: left alone too long it gets glum and comes looking for you. Its needs and fireflies come later.
 - **Senses:** touch (pokes, strokes, flicks, and a long press he answers by holding your finger), motion (lifted, shaken, knocked, rocked, face down, dropped, spun, tilted) and where a sudden sound comes from.
 - **Voice:** a wake word (Alexa, Hi ESP, Jarvis or Computer, until "Yoru" exists), push-to-talk on PWR, listening on after an answer, and the host's voice on the speaker.
 - **The menu,** a watch's honeycomb of round apps around Yoru (swipe down from the top): Notifications, Timers, Habits, Games, Do not disturb and Settings.
 - **The host's side:** the inbox of notifications, timers and reminders, your daily habits, the Allow and Deny card before Yoru acts for you, and Yoru's errands while the assistant calls one of your services.
-- **Without the host:** Yoru keeps the time itself (from the internet over WiFi, or the computer's), starts timers and pomodoros from the Timers app or by voice, keeps your habits and their streaks day after day, and understands a few phrases in English after the wake word: timers, the time, sleep, the apps, the volume, ticking off a habit ([the list](protocol.md#offline-commands)). What it did meanwhile goes to Yoru Hub when it's back.
+- **Without the host:** Yoru talks with you over WiFi on its own, in any language, through the online services Yoru Hub hands over (speech to text, the assistant's brain, its voice: [Cloud voice](protocol.md#cloud-voice)), and sets timers, pomodoros, habits, the volume or its face as you ask. It keeps the time itself (from the internet over WiFi, or the computer's), starts timers and pomodoros from the Timers app, and keeps your habits and their streaks day after day. Without WiFi or services it understands a few phrases in English after the wake word ([the list](protocol.md#offline-commands)). What it did meanwhile goes to Yoru Hub when it's back.
 - **Games:** Tilt ball, Slingshot and Constellations.
 - **Battery:** Yoru notices it: a bolt of energy when you plug him in, a charge ring while he charges, a clap when he's full, and a tired face and a small battery by his head when he runs low. Power profiles that save what they can while Yoru is idle (Balanced, or Saver with the mics off while it sleeps), a dark screen that really switches off, and hibernation after a while in the dark, until it's picked up.
 
@@ -56,7 +56,7 @@ python3 tools/audio_selftest.py tone
 
 `tools/yoru_link.py` is the small library they share: `Link().hello()`, `call("tools/call", {"name": "get_state", "arguments": {}})`, and `frames()` for the log lines.
 
-Say "Alexa" (or another wake word, with `set_wake_word`) and Yoru listens: its eyes open wide and look at you. Without a host it understands only [a few phrases in English](protocol.md#offline-commands), such as "set a timer for five minutes" or "what time is it".
+Say "Alexa" (or another wake word, with `set_wake_word`) and Yoru listens: its eyes open wide and look at you. Without a host it answers itself over WiFi with the services Yoru Hub gave it ([Cloud voice](protocol.md#cloud-voice)); without those, it understands only [a few phrases in English](protocol.md#offline-commands), such as "set a timer for five minutes" or "what time is it".
 
 ## Credits
 

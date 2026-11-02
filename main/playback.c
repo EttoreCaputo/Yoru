@@ -31,6 +31,11 @@ static const char *TAG = "playback";
 #define PREBUFFER_MS 150
 /* A stream whose end never came: the host went away. */
 #define STARVED_MS 1500
+/* The board's own speech (playback_push) comes from the internet, in bursts
+ * and a sentence at a time: more ahead before it starts, more patience. */
+#define PUSHED_PREBUFFER_MS 400
+#define PUSHED_STARVED_MS 8000
+#define PUSH_WAIT_MS 30
 #define CHUNK_SAMPLES 256
 /* Silence written at the end to push the DMA tail out (6 x 240 frames). */
 #define FLUSH_CHUNKS 6
@@ -64,6 +69,7 @@ typedef struct {
     bool active;   /* frames of `id` are coming or buffered */
     bool end;      /* its last frame arrived */
     bool local;    /* the board's own sounds, not the host's */
+    bool pushed;   /* speech the board fetched itself (playback_push) */
     uint8_t id;
     uint16_t next_seq;
     uint32_t received; /* samples */
@@ -168,6 +174,50 @@ void playback_receive(uint8_t *payload, size_t len)
     }
     xSemaphoreGive(s_lock);
     xTaskNotifyGive(s_task);
+}
+
+bool playback_push(uint8_t id, const int16_t *pcm, uint32_t n, bool end)
+{
+    if (!s_available) {
+        return false;
+    }
+    while (true) {
+        xSemaphoreTake(s_lock, portMAX_DELAY);
+        stream_t *st = &s_stream;
+        if (!st->active || st->local || st->id != id) {
+            // Stopped (barge-in), or someone else's speech: it's over.
+            if (id == s_last_id || (st->active && !st->local)) {
+                xSemaphoreGive(s_lock);
+                return false;
+            }
+            if (st->active) {
+                xQueueReset(s_sounds);
+                end_locked(END_REPLACED);
+            }
+            memset(st, 0, sizeof(*st));
+            st->active = true;
+            st->pushed = true;
+            st->id = id;
+        }
+        const uint32_t room = BUFFER_SAMPLES - buffered();
+        const uint32_t take = n < room ? n : room;
+        for (uint32_t i = 0; i < take; i++) {
+            s_buf[(s_write + i) % BUFFER_SAMPLES] = pcm[i];
+        }
+        s_write += take;
+        st->received += take;
+        pcm += take;
+        n -= take;
+        if (n == 0 && end) {
+            st->end = true;
+        }
+        xSemaphoreGive(s_lock);
+        xTaskNotifyGive(s_task);
+        if (n == 0) {
+            return true;
+        }
+        vTaskDelay(pdMS_TO_TICKS(PUSH_WAIT_MS));
+    }
 }
 
 static void stop(end_reason_t reason)
@@ -349,8 +399,9 @@ static void playback_task(void *arg)
         s_ended_pending = false;
         stream_t *st = &s_stream;
         uint32_t n = 0;
+        const uint32_t ahead = st->pushed ? PUSHED_PREBUFFER_MS : PREBUFFER_MS;
         bool start = !playing && st->active
-                     && (st->local || st->end || buffered() >= PREBUFFER_MS * (BOARD_AUDIO_SAMPLE_RATE / 1000));
+                     && (st->local || st->end || buffered() >= ahead * (BOARD_AUDIO_SAMPLE_RATE / 1000));
         if (playing || start) {
             n = buffered() < CHUNK_SAMPLES ? buffered() : CHUNK_SAMPLES;
             for (uint32_t i = 0; i < n; i++) {
@@ -401,7 +452,7 @@ static void playback_task(void *arg)
                 xSemaphoreTake(s_lock, portMAX_DELAY);
                 s_stream.underruns++;
                 xSemaphoreGive(s_lock);
-            } else if ((t - starved_since) / 1000 >= STARVED_MS) {
+            } else if ((t - starved_since) / 1000 >= (now.pushed ? PUSHED_STARVED_MS : STARVED_MS)) {
                 xSemaphoreTake(s_lock, portMAX_DELAY);
                 end_locked(END_STARVED);
                 xSemaphoreGive(s_lock);

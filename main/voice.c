@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "board_audio.h"
+#include "cloud.h"
 #include "link.h"
 #include "cJSON.h"
 #include "ears_dir.h"
@@ -141,6 +142,7 @@ typedef struct {
     int no_speech_ms;  /* given up after this without speech */
     int end_silence_ms; /* this much silence after speech ends it */
     bool follow_up;    /* no wake word: speech must be near and last */
+    bool cloud;        /* no host: recorded for cloud.c, not streamed */
     int loud_ms;       /* follow-up: speech near enough so far */
     int64_t loud_us;   /* its last frame */
     bool paused;       /* in a pause after speech, told to the host */
@@ -485,6 +487,8 @@ static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms, i
     st->samples = 0;
     st->dropped = 0;
     st->level_us = 0;
+    // Without a host, the board sends it to the services itself.
+    st->cloud = !metrics_model_live() && cloud_begin();
     // "Alexa" said again mid-sentence isn't a new wake, and WakeNet's CPU is
     // free meanwhile.
     s_afe->disable_wakenet(s_afe_data);
@@ -536,6 +540,13 @@ static void stream_end(end_reason_t reason)
     // PWR means someone spoke, whatever the VAD made of it.
     const bool heard = st->speech_us != 0 || (st->button && ms >= MIN_TALK_MS);
     voice_set_state(heard && reason != END_MUTED ? VOICE_THINKING : VOICE_IDLE);
+    if (st->cloud) {
+        if (heard && reason != END_MUTED) {
+            cloud_submit();
+        } else {
+            cloud_drop();
+        }
+    }
     lvgl_port_lock();
     ui_voice_set_level(0);
     ui_voice_countdown(0);
@@ -575,9 +586,13 @@ static void stream_frame(const afe_fetch_result_t *res)
     st->frame[1] = 0;
     st->frame[2] = (uint8_t) (st->seq & 0xff);
     st->frame[3] = (uint8_t) (st->seq >> 8);
-    memcpy(st->frame + AUDIO_HEADER, res->data, bytes);
-    if (link_send_timeout(LINK_CHAN_AUDIO_UP, st->frame, AUDIO_HEADER + bytes, AUDIO_SEND_WAIT_MS) != ESP_OK) {
-        st->dropped++;
+    if (st->cloud) {
+        cloud_feed(res->data, bytes / sizeof(int16_t));
+    } else {
+        memcpy(st->frame + AUDIO_HEADER, res->data, bytes);
+        if (link_send_timeout(LINK_CHAN_AUDIO_UP, st->frame, AUDIO_HEADER + bytes, AUDIO_SEND_WAIT_MS) != ESP_OK) {
+            st->dropped++;
+        }
     }
     st->seq++;
     st->samples += bytes / sizeof(int16_t);
@@ -624,10 +639,11 @@ static void stream_frame(const afe_fetch_result_t *res)
 
 /* ---- Phrases heard on the board ------------------------------------------ */
 
-/* No host lately: what's said is for MultiNet. */
+/* No host lately, and no services to send it to (cloud.c): what's said is
+ * for MultiNet. */
 static bool use_local(void)
 {
-    return s_mn_data != NULL && !metrics_model_live();
+    return s_mn_data != NULL && !metrics_model_live() && !cloud_ready();
 }
 
 static bool local_start(void)

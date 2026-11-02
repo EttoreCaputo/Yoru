@@ -541,6 +541,9 @@ static life_ctx_t life_context(uint32_t now, bool playing)
         // Low on battery it's tired whoever is around: sleepy eyes, slower.
         .drowsy = lonely_ms >= (uint32_t) board_settings_get(SETTING_SLEEPY_AFTER_S) * 1000 || battery_low(),
         .lonely = lonely_ms >= (uint32_t) board_settings_get(SETTING_ASLEEP_AFTER_S) * 1000,
+        .alone_ms = alone_ms,
+        .minute = minute,
+        .day = clock_valid() ? clock_day() : -1,
     };
 }
 

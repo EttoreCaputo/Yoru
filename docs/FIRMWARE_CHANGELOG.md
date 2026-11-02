@@ -1,5 +1,18 @@
 # Firmware changelog
 
+## 0.14.0
+
+Yoru talks with you without the Mac, and has a life of his own.
+
+- **He answers you himself.** With the Mac away and the WiFi up, say "Alexa" (or hold PWR) and talk to him as you do with Yoru Hub, in Italian or any language: he hears you, thinks and answers out loud with his own voice, then keeps listening for your reply. He uses the same online services as Yoru Hub (its speech to text, the assistant's brain, its voice), which Yoru Hub hands over to the board by itself whenever they're connected. He knows the day and the time, your timers and habits, and what Yoru Hub remembers about you.
+- **He does what you ask.** "Mettimi un timer di dieci minuti", "facciamo un pomodoro", "ferma il timer", "ho bevuto l'acqua", "alza il volume", "andiamo a dormire": he does it and tells you, and his face follows what he says.
+- **Quick after the first time.** The first answer after a while takes a few seconds while he connects; while the conversation goes on, he answers in about a second and a half. He starts connecting as soon as you start talking.
+- If the internet or a service doesn't answer, a line at the bottom says so (no internet, a key refused, too many requests). Without WiFi he still understands the few English phrases of 0.13.0.
+- **Whims of his own.** Every minute or two, while he floats about, he does something by himself: peeks out past the edge of the screen, stretches, does a little hopping dance and claps, floats up to gaze at the sky he came from (more at night), loops the loop, sneezes.
+- **He greets you.** When you're back after a quarter of an hour away, or the first time you're around in the morning, he comes forward and waves (stretching first, in the morning).
+- **His cheer.** Touching him, talking to him and being around keep him cheerful: then he dances and loops more, and is happy more often. Left alone a long time he gets glum, looks bored and now and then comes up to the glass to look for you, left and right, with a small whimper.
+- This update makes room for the new code: install it from Yoru Hub, which writes everything at once.
+
 ## 0.13.0
 
 Yoru does more on his own, without the Mac.

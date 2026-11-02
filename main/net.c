@@ -584,6 +584,14 @@ const char *net_board_id(void)
     return s_id;
 }
 
+bool net_online(void)
+{
+    lock();
+    const bool up = s_state == ST_CONNECTED && !s_hibernating;
+    unlock();
+    return up;
+}
+
 cJSON *net_status(void)
 {
     cJSON *st = cJSON_CreateObject();

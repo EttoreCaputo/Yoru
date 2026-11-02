@@ -1,8 +1,13 @@
 #pragma once
 /* What Yoru does when nothing else has its attention: it floats about near
  * you, gets sleepy when nobody is around and drifts off to sleep; when
- * something important arrives for you it comes up to the glass and knocks. No needs and no moods of its own for now: the pet comes back
- * later (docs/ROADMAP.md).
+ * something important arrives for you it comes up to the glass and knocks.
+ * Now and then it has a whim of its own (peeks out past the edge, stretches,
+ * dances, gazes up at the sky it came from, loops, sneezes), greets you when
+ * you come back after a while and in the morning, and has a cheer that your
+ * attention raises and time alone wears down: cheerful it dances and loops
+ * more, glum it looks bored and comes to look for you. The needs and the
+ * fireflies come later (docs/ROADMAP.md).
  * It only moves the eyes (eyes.c) and plays its sounds; behaviour.c says when
  * it may, and puts it to sleep when it asks. All calls with the LVGL lock
  * held. */
@@ -25,6 +30,12 @@ typedef struct {
     bool drowsy;
     /* Nobody for the "asleep after" setting: time for a nap. */
     bool lonely;
+    /* Since someone was last around: touched, talked, moved the case, used
+     * the computer. */
+    uint32_t alone_ms;
+    /* The minute of the day and the day, -1 while the time isn't known. */
+    int minute;
+    int32_t day;
 } life_ctx_t;
 
 typedef enum {
@@ -46,8 +57,11 @@ void life_woke(void);
 bool life_call(void);
 /** It is at the glass for you right now: a touch means "I'm coming". */
 bool life_calling(void);
-/** What it is doing (lounge, call, nap, sleep, come), for get_state. */
+/** What it is doing (lounge, call, nap, sleep, come, whim, greet), for
+ * get_state. */
 const char *life_activity(void);
+/** Its cheer, 0 (glum) to 1 (delighted), for get_state. */
+float life_cheer(void);
 
 #ifdef __cplusplus
 }

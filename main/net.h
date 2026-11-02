@@ -68,6 +68,9 @@ const char *net_board_id(void);
 /** The WiFi's state for get_state and wifi/status (no secrets). */
 cJSON *net_status(void);
 
+/** Joined to the WiFi, with an address: the internet may be reachable. */
+bool net_online(void);
+
 /** `wifi/...` requests (rpc.c). `usb`: the request came over USB, which may
  * change the WiFi and read the pairing key. Returns the result, or NULL with
  * `*code` and `*message` set. */

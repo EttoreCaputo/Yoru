@@ -18,6 +18,7 @@ Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main
 - `timers` (0.11.0 and later): the menu's Timers app (see Timers): the `set_timers` tool and the `timer_action` notification.
 - `habits` (0.11.0 and later): the menu's Habits app (see Habits): the `set_habits` tool and the `habit_check` notification.
 - `fetch` (0.11.0 and later): Yoru's errands (see Fetch): the `show_fetch` tool.
+- `cloud` (0.14.0 and later): talking without the host (see Cloud voice): the `cloud/set` and `cloud/get` methods.
 - There is no `media` or `music` capability: Yoru has no image or music face, so `media/...` and `music/...` answer `-32601`.
 - `eyes/gaze` turns Yoru's eyes towards the host's pointer for 6 s after the last one, unless a finger is on the screen, a conversation is on or it is asleep.
 - `voice/state` drives the eyes: `listening` (wide, looking at you), `thinking` (dots), `speaking` (warm, swelling with the speaker's level), `error` (sad). The wake word wakes Yoru up if it was asleep.
@@ -261,7 +262,38 @@ Since 0.13.0. When no host has sent a snapshot for 3 s, what is said after the w
 | "hello there", "how are you" | Yoru waves |
 | "check water", "water done" | Ticks off that habit, by its name in letters (three at least) |
 
-Anything else gets a puzzled "hm?" and a line saying that without the Mac it knows only a few words. The phrases are rebuilt when the habits' names change, in a task of its own (it takes a second or two). MultiNet takes about 13 KB of internal RAM and stays unloaded if less than 64 KB would be left. With a host there, everything goes to it as before.
+Since 0.14.0 these phrases are only the fallback: with the services of the Cloud voice set and the WiFi up, what is said goes to them instead. Anything else gets a puzzled "hm?" and a line saying that without the Mac it knows only a few words. The phrases are rebuilt when the habits' names change, in a task of its own (it takes a second or two). MultiNet takes about 13 KB of internal RAM and stays unloaded if less than 64 KB would be left. With a host there, everything goes to it as before.
+
+## Cloud voice
+
+Since 0.14.0, with the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/bridge/cloud.rs`). When no host has sent a snapshot for 3 s and the WiFi is up, the board talks to online services itself, with the keys a host handed over: what is said after the wake word (or with PWR held, 15 s at most) is recorded in PSRAM and sent to a speech-to-text service; the text goes with Yoru's character, what it knows of the user and what the board knows now (date and time, timers, habits, battery) to the brain; the answer is said by a voice, streamed to the speaker as it arrives. Then it listens for a follow-up without the wake word, as with a host. The last eight messages are kept for the next question, for ten minutes.
+
+`cloud/set` is a method of its own, not a tool, so a model calling the board's tools never sees it. A host sends it on every handshake and whenever the services change; the board keeps them in NVS (namespace `cloud`) and writes the flash only when they differ. `{"clear": true}` forgets them. The answer is `cloud/get`'s.
+
+```json
+{"name":"Yoru","character":"You are friendly and to the point...","memory":"# What Yoru knows about you ...",
+ "stt":{"url":"https://api.groq.com/openai/v1/audio/transcriptions","key":"gsk_...","model":"whisper-large-v3-turbo","language":"it"},
+ "llm":{"api":"openai","url":"https://api.openai.com/v1/chat/completions","key":"sk-...","model":"gpt-6-luna","params":{"reasoning_effort":"none"}},
+ "tts":{"api":"elevenlabs","url":"https://api.elevenlabs.io","key":"...","model":"eleven_v4_turbo","voice":"<voice_id>"}}
+```
+
+| Field | What it is |
+|---|---|
+| `stt` | An OpenAI-style `/audio/transcriptions` endpoint (Groq, OpenAI): the full `url`, `model`, `language` (optional) |
+| `llm` | `api`: `openai` (Chat Completions at `url`, with `params` merged into each request) or `anthropic` (Messages at `url`, `max_tokens` 400) |
+| `tts` | `api`: `elevenlabs` (`url` is the base; `voice` the voice id; PCM at 16 kHz) or `openai` (`url` the base, `/audio/speech`; `voice`; `format` `pcm` at `rate`, 24000 by default, or `wav`; `max_chars` per request, the text cut at sentences) |
+| `name`, `character`, `memory` | Optional: Yoru's name, a line on how it talks, what it knows of the user (a host sends 1,200 characters at most) |
+
+The whole object must fit in 3,900 bytes. Every URL must be `https`; the certificates are ESP-IDF's bundle plus GlobalSign Root CA (`main/certs/extra_roots.pem`), which Groq's, Anthropic's and ElevenLabs' chains end in.
+
+`cloud/get` (no params): `{"set":true,"stt":"whisper-large-v3-turbo","llm":"gpt-6-luna","tts":"eleven_v4_turbo","ready":true}`, the models and whether it would answer now (services, WiFi); never the keys.
+
+The brain's answer may carry tags, which are taken out before it is said and act on the board (`commands_tag()`): `[timer SECONDS]`, `[pomodoro]`, `[stop]`, `[pause]`, `[resume]`, `[habit NUMBER]` (of the habits listed in the prompt), `[volume up]`, `[volume down]`, `[open games|timers|habits|inbox]`, `[sleep]` and `[face NAME]` (happy, excited, love, curious, proud, wink, surprised, sad, shy, sleepy, dance, wave, thinking).
+
+- **Speed.** Each service keeps one connection open between requests, and its TLS session to resume a new one; all three are opened (a `HEAD`) while the user is still talking. A fresh connection takes the board 1 to 4 s; a kept one a few milliseconds.
+- **Failures** show in a line over the bottom rim (no internet, a key refused, too many requests) with the red ring; nothing is said.
+- **Not while a host is there:** with one, everything goes to it as before. Without the services or the WiFi, the offline phrases above.
+- `debug/cloud` `{"text": "..."}` answers a text as if it had been heard, for tests.
 
 ## Fetch
 

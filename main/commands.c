@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "behaviour.h"
@@ -232,17 +233,19 @@ static bool first_timer(int state, timer_view_t *out)
     return false;
 }
 
-static void new_timer(int min)
+static void new_timer(int secs)
 {
     char text[40];
-    if (!timers_start(min * 60, NULL)) {
+    if (!timers_start(secs, NULL)) {
         say(card_tr("No room for more timers", "Non c'e' posto per altri timer"), TOAST_ERROR);
         return;
     }
-    if (min % 60 == 0) {
-        snprintf(text, sizeof(text), "Timer %d h", min / 60);
+    if (secs % 3600 == 0) {
+        snprintf(text, sizeof(text), "Timer %d h", secs / 3600);
+    } else if (secs % 60 == 0) {
+        snprintf(text, sizeof(text), "Timer %d min", secs / 60);
     } else {
-        snprintf(text, sizeof(text), "Timer %d min", min);
+        snprintf(text, sizeof(text), "Timer %d:%02d", secs / 60, secs % 60);
     }
     say(text, TOAST_DONE);
     behaviour_play("happy");
@@ -345,7 +348,7 @@ static void handle(int id)
     if (id >= CMD_HABIT) {
         tick_habit(id - CMD_HABIT);
     } else if (id >= CMD_TIMER) {
-        new_timer(id - CMD_TIMER);
+        new_timer((id - CMD_TIMER) * 60);
     } else {
         switch (id) {
         case CMD_POMODORO:
@@ -399,4 +402,75 @@ static void handle(int id)
         }
     }
     lvgl_port_unlock();
+}
+
+/* ---- Tags from the brain in the cloud (cloud.c) ---------------------------------- */
+
+/* The faces the brain may show: behaviour.c's scenes that suit a word. */
+static const char *const FACES[] = {"happy", "excited", "love", "curious", "proud", "wink", "surprised",
+                                    "sad",   "shy",     "sleepy", "dance", "wave",  "thinking"};
+
+/* A timer the brain asked for, in seconds: up to a day. */
+#define TAG_TIMER_MAX_S (24 * 3600)
+
+bool commands_tag(const char *tag)
+{
+    char word[16] = "";
+    char arg[24] = "";
+    sscanf(tag, "%15s %23s", word, arg);
+    for (char *p = word; *p != '\0'; p++) {
+        *p = (char) tolower((unsigned char) *p);
+    }
+    ESP_LOGI(TAG, "tag [%s]", tag);
+    int id = 0;
+    if (strcmp(word, "timer") == 0) {
+        const int secs = atoi(arg);
+        if (secs <= 0 || secs > TAG_TIMER_MAX_S) {
+            return false;
+        }
+        lvgl_port_lock();
+        new_timer(secs);
+        lvgl_port_unlock();
+        return true;
+    } else if (strcmp(word, "habit") == 0) {
+        const int i = atoi(arg) - 1;
+        if (i < 0 || i >= HABITS_MAX) {
+            return false;
+        }
+        id = CMD_HABIT + i;
+    } else if (strcmp(word, "face") == 0) {
+        for (size_t i = 0; i < sizeof(FACES) / sizeof(FACES[0]); i++) {
+            if (strcmp(arg, FACES[i]) == 0) {
+                lvgl_port_lock();
+                behaviour_play(arg);
+                lvgl_port_unlock();
+                return true;
+            }
+        }
+        return false;
+    } else if (strcmp(word, "open") == 0) {
+        id = strcmp(arg, "games") == 0    ? CMD_PLAY
+             : strcmp(arg, "timers") == 0 ? CMD_TIMERS
+             : strcmp(arg, "habits") == 0 ? CMD_HABITS
+             : strcmp(arg, "inbox") == 0  ? CMD_INBOX
+                                          : 0;
+    } else if (strcmp(word, "volume") == 0) {
+        id = strcmp(arg, "up") == 0 ? CMD_LOUDER : strcmp(arg, "down") == 0 ? CMD_QUIETER : 0;
+    } else {
+        static const struct {
+            const char *word;
+            int id;
+        } WORDS[] = {{"pomodoro", CMD_POMODORO}, {"stop", CMD_STOP},   {"pause", CMD_PAUSE},
+                     {"resume", CMD_RESUME},     {"sleep", CMD_SLEEP}};
+        for (size_t i = 0; i < sizeof(WORDS) / sizeof(WORDS[0]); i++) {
+            if (strcmp(word, WORDS[i].word) == 0) {
+                id = WORDS[i].id;
+            }
+        }
+    }
+    if (id == 0) {
+        return false;
+    }
+    handle(id);
+    return true;
 }

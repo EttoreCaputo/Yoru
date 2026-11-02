@@ -8,6 +8,7 @@
 #include "board_settings.h"
 #include "board_touch.h"
 #include "clock.h"
+#include "cloud.h"
 #include "commands.h"
 #include "ears_dir.h"
 #include "esp_app_desc.h"
@@ -140,8 +141,11 @@ static void stats_task(void *arg)
         lvgl_port_lock();
         const char *eyes = eyes_mood_name(eyes_get_mood());
         lvgl_port_unlock();
-        ESP_LOGI(TAG, "lvgl %.1f%% busy, longest %lu us, eyes %s, %s", st.busy_pct, (unsigned long) st.max_us,
-                 eyes, life_activity());
+        // PSRAM runs short with ESP-SR, the sprites and the cloud's buffers.
+        ESP_LOGI(TAG, "lvgl %.1f%% busy, longest %lu us, eyes %s, %s; PSRAM %u KB free, %u KB largest",
+                 st.busy_pct, (unsigned long) st.max_us, eyes, life_activity(),
+                 (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024),
+                 (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
     }
 }
 
@@ -158,6 +162,7 @@ static void start_audio(void)
     voice_set_wake_sound(board_settings_on(SETTING_WAKE_SOUND));
     voice_set_wake_on(board_settings_on(SETTING_WAKE_WORD_ON));
     ears_dir_on(behaviour_heard_from);
+    cloud_init();
     voice_start(board_settings_on(SETTING_MIC_MUTED), word);
     commands_start();
     playback_start();

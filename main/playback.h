@@ -24,6 +24,11 @@ bool playback_available(void);
 /** The link's callback for `audio_down` frames. */
 void playback_receive(uint8_t *payload, size_t len);
 
+/** Speech the board fetched itself (cloud.c): `n` samples of stream `id`,
+ * waiting for room in the buffer; `end` with the last. False once the
+ * stream was stopped (barge-in) or another took the speaker. From one task. */
+bool playback_push(uint8_t id, const int16_t *pcm, uint32_t n, bool end);
+
 /** Drop what's buffered and end the stream being played, if any. */
 void playback_stop(void);
 

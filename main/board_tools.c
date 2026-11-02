@@ -336,6 +336,7 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
         cJSON_AddStringToObject(voice, "state", voice_state_name(voice_state()));
     }
     cJSON_AddStringToObject(st, "activity", life_activity());
+    cJSON_AddNumberToObject(st, "cheer", (int) (life_cheer() * 100 + 0.5f) / 100.0);
     cJSON *audio = cJSON_AddObjectToObject(st, "audio");
     cJSON_AddBoolToObject(audio, "speaker", playback_available());
     cJSON_AddNumberToObject(audio, "volume", board_settings_get(SETTING_VOLUME));

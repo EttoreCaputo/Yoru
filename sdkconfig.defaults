@@ -79,3 +79,15 @@ CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
 CONFIG_PM_ENABLE=y
 CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
 CONFIG_PM_POWER_DOWN_CPU_IN_LIGHT_SLEEP=n
+
+# The board talks to the services itself without the host (cloud.c): TLS's
+# buffers, 20 KB and more a connection, go to PSRAM, not the internal RAM
+# WiFi and ESP-SR need.
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+# Groq's, Anthropic's and ElevenLabs' chains end in GTS roots cross-signed by
+# GlobalSign Root CA, which ESP-IDF's bundle leaves out.
+CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE=y
+CONFIG_MBEDTLS_CUSTOM_CERTIFICATE_BUNDLE_PATH="main/certs/extra_roots.pem"
+# A new connection to a service resumes the last TLS session: no certificate
+# sums again.
+CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS=y

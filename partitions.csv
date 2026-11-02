@@ -1,10 +1,11 @@
 # Yoru flash layout (16 MB; the 1.75C may have 32 MB, the rest stays unused).
 # `model` holds ESP-SR's models (M3): the wake words, VADNet and, since
 # 0.13.0, MultiNet 7 in English (2.6 MB); `assets` the eye styles and sounds
-# that can be loaded from the app (M6).
+# that can be loaded from the app (M6). The app grew to 4 MB in 0.14.0, with
+# the HTTPS client and its certificates for talking without the host.
 # Name,   Type, SubType,   Offset,   Size
 nvs,      data, nvs,       0x9000,   0x6000
 phy_init, data, phy,       0xf000,   0x1000
-factory,  app,  factory,   0x10000,  3M
-model,    data, spiffs,    0x310000, 4M
-assets,   data, undefined, 0x710000, 0x5F0000
+factory,  app,  factory,   0x10000,  4M
+model,    data, spiffs,    0x410000, 4M
+assets,   data, undefined, 0x810000, 0x7F0000

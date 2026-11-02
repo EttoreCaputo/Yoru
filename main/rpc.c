@@ -6,6 +6,7 @@
 #include "audio_selftest.h"
 #include "behaviour.h"
 #include "board_tools.h"
+#include "cloud.h"
 #include "cJSON.h"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
@@ -123,6 +124,10 @@ static cJSON *identity(void)
         cJSON_AddItemToArray(channels, cJSON_CreateString("audio_down"));
         cJSON_AddItemToArray(caps, cJSON_CreateString("speaker"));
     }
+    if (voice_available() && playback_available()) {
+        // Talking without the host, through services it hands over (cloud/set).
+        cJSON_AddItemToArray(caps, cJSON_CreateString("cloud"));
+    }
     return id;
 }
 
@@ -234,6 +239,19 @@ void rpc_handle(uint8_t *payload, size_t len)
         // Stop talking: what's buffered is dropped.
         playback_stop();
         result = cJSON_CreateObject();
+    } else if (strcmp(name, "cloud/set") == 0) {
+        // The services Yoru talks to without the host, with their keys: a
+        // method of its own, not a tool, so no model ever sees it. Only
+        // USB or the sealed WiFi link of a paired host carry it.
+        static char err[96];
+        if (cloud_set(params, err, sizeof(err))) {
+            result = cloud_status();
+        } else {
+            code = RPC_INVALID_PARAMS;
+            message = err;
+        }
+    } else if (strcmp(name, "cloud/get") == 0) {
+        result = cloud_status();
     } else if (strncmp(name, "wifi/", 5) == 0) {
         // Joining a network, and pairing hosts with the board for it.
         result = net_rpc(name, params, link_rx_transport() == LINK_USB, &code, &message);
@@ -247,6 +265,15 @@ void rpc_handle(uint8_t *payload, size_t len)
             message = "expected {\"x\": -1..1, \"y\": -1..1}";
         } else {
             behaviour_gaze((float) x->valuedouble, (float) y->valuedouble);
+            result = cJSON_CreateObject();
+        }
+    } else if (strcmp(name, "debug/cloud") == 0) {
+        // Ask the services something as if it had been said (tests).
+        const cJSON *text = cJSON_GetObjectItemCaseSensitive(params, "text");
+        if (!cJSON_IsString(text) || !cloud_ask(text->valuestring)) {
+            code = RPC_INVALID_PARAMS;
+            message = cloud_ready() ? "expected {\"text\": string}" : "no services or no WiFi";
+        } else {
             result = cJSON_CreateObject();
         }
     } else if (strcmp(name, "debug/audio") == 0) {

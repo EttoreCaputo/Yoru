@@ -8,18 +8,20 @@ Firmware 0.13.0 (2026-11-02).
 
 **In**
 - The look: the matte sphere with its eyes and hands, depth in perspective, state tint and halo, sleep as drifting away, 24-bit colour as an option (M5).
-- Life on the desk, reduced since 0.8.0: Yoru floats near the middle, turns to sudden sounds, reacts to touch and to the case, gets sleepy and naps when nobody is around, and comes to the glass when something urgent waits for you. The needs and the acts they chose (fireflies, play, exploring) are out for now (M5).
+- Life on the desk, reduced since 0.8.0: Yoru floats near the middle, turns to sudden sounds, reacts to touch and to the case, gets sleepy and naps when nobody is around, and comes to the glass when something urgent waits for you. Since 0.14.0 (`life.c`): whims of its own (peek, stretch, dance, the sky, a loop, a sneeze, looking for you), greetings when you're back after 15 minutes and in the morning, and a cheer that attention raises and time alone wears down. The needs and the acts they chose (fireflies, play, exploring) are out for now (M5).
 - Senses: touch, motion (`motion.c`: lifted, put down, shaken, knocked, rocked, face down, dropped, spun, tilt), the sound's direction (`ears_dir.c`), the PMU (M2).
 - The menu as a watch's: Notifications, Timers, Habits, Games, Do not disturb and Settings around Yoru; every setting on the board, in Italian and English (M2).
 - Voice and link: wake word (Alexa, Hi ESP, Jarvis, Computer), push-to-talk on PWR, listening on after an answer, the host judging the end of a sentence (Smart Turn), speech on the speaker, USB and WiFi (M3).
 - The assistant's body (M4): the inbox (`show_notification`), the Allow and Deny card, the Timers and Habits apps and the errands, all driven by Yoru Hub; BOOT opens the inbox, the screen goes dark after a minute asleep.
 - Games: Tilt ball, Slingshot, Constellations (since 0.11.9).
+- Talking without the host (0.14.0, `cloud.c`): speech to text, the brain and the voice called from the board over HTTPS with the keys Yoru Hub hands over (`cloud/set`), tags in the answer acting on the board, connections kept open and opened while you talk. The app partition grew to 4 MB for it.
 - Without the host (0.13.0): the board's own clock (`clock.c`: SNTP, or the host's time and zone), timers and pomodoros started on the board and handed to the host when it's back (`timer_new`), habits kept in NVS with their day and streaks, and a few phrases in English heard on the board by MultiNet 7 (`commands.c`).
 - Power (0.12.0, `power.c`): Desk on USB, Balanced or Saver on battery (WiFi modem sleep, frequency scaling, the speaker's amplifier and, in Saver, the mics off while asleep), the panel asleep with the dark screen, and hibernation in light sleep until the IMU's wake on motion, PWR, BOOT or USB.
 
 **Left**
 - Voice: the custom wake word "Yoru" (M6); the mic gain (M3); the second mic, with a two-mic AFE (M3); check the offline phrases with a real voice (in the first test, with the Mac's synthetic voice, "what time is it" and "volume up" were heard, the timer phrases weren't).
-- The pet's return: needs, moods and acts, with the late-night notice and the sounds' language (M5).
+- The pet's return: needs and the acts they choose (fireflies, play, exploring), with the late-night notice and the sounds' language (M5); 0.14.0 brought back whims, greetings and a cheer.
+- Cloud voice: try it with a real voice in the room; the keys in NVS are in the clear (NVS encryption, or keys scoped to the board); the brain's tags as real tool calls; something said now and then on its own.
 - Power: measure what the profiles draw on the board; the touch controller asleep with the dark screen; waking from hibernation for a timer (M2).
 - The menu: the Look items (name, colour, eye shape: the host can set `eye_color` and `eye_style`, the menu can't yet) and pairing a computer from the board (M2).
 - Checks on the board: which way the IMU's x and y and the two mics lie (M2); internal RAM with WiFi and ESP-SR on together (M3), which also decides Bluetooth.

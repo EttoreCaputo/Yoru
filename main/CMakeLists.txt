@@ -44,8 +44,9 @@ idf_component_register(SRCS "approval.c" "toast.c" "inbox_ui.c" "inbox.c" "main.
                             "errand.c"
                             "clock.c"
                             "commands.c"
+                            "cloud.c"
                        INCLUDE_DIRS "."
                        LDFRAGMENTS "linker.lf"
                        REQUIRES esp_app_format esp_codec_dev esp-sr esp_driver_gpio esp_driver_i2c esp_driver_i2s
-                                esp_driver_spi esp_driver_usb_serial_jtag esp_event esp_lcd esp_lcd_co5300
+                                esp_driver_spi esp_driver_usb_serial_jtag esp_event esp_http_client esp_lcd esp_lcd_co5300
                                 esp_lcd_touch_cst9217 esp_netif esp_timer esp_wifi lvgl lwip mbedtls nvs_flash spi_flash)
