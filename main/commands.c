@@ -12,6 +12,7 @@
 #include "esp_attr.h"
 #include "esp_log.h"
 #include "habits.h"
+#include "life.h"
 #include "lvgl_port.h"
 #include "menu.h"
 #include "playback.h"
@@ -331,6 +332,7 @@ static void tick_habit(int i)
     }
     snprintf(text, sizeof(text), "%s %d/%d", h->name, done, h->goal);
     say(text, TOAST_DONE);
+    life_feel(LIFE_FEEL_HABIT);
     behaviour_play(done >= h->goal ? "proud" : "happy");
 }
 

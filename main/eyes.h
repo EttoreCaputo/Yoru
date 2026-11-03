@@ -47,6 +47,13 @@ typedef enum {
     EYES_MOOD_PEEK,
     /* A permission request is up: small, head tilted, waiting for an answer. */
     EYES_MOOD_WAITING,
+    /* Up close these have shapes of their own (> <, hearts, stars); on the
+     * ball they are the happy, loving and surprised pills. */
+    EYES_MOOD_DELIGHTED,
+    EYES_MOOD_SMITTEN,
+    EYES_MOOD_STARRY,
+    /* Half-lidded and soft, looking up: lost in a daydream. */
+    EYES_MOOD_DREAMY,
     EYES_MOOD_COUNT,
 } eyes_mood_t;
 
@@ -190,6 +197,23 @@ eyes_pos_t eyes_where(void);
 eyes_pos_t eyes_unproject(int32_t x, int32_t y, float z);
 /** Screen point (x, y) is on Yoru's body. */
 bool eyes_hit(int32_t x, int32_t y);
+
+/** Up close: Yoru against the glass, so near that only its eyes show, big
+ * and light on the black (they are dark holes on the ball, and would vanish
+ * there). The views swap behind a blink; moves then move the pair (a hop
+ * hops it, nearer makes it bigger), the gaze sweeps the screen. A gesture, a
+ * status, sleep, the menu or a conversation take it back to the ball, which
+ * then floats back from the glass. Cheap to draw: a few shapes, no sphere. */
+void eyes_close_up(bool on);
+/** The eyes up close are on the screen now (the swap is done). */
+bool eyes_up_close(void);
+/** Shut one eye (0 left, 1 right) for `ms` (0: a quick wink). */
+void eyes_wink(int eye, uint32_t ms);
+/** Cross-eyed, 0 (not) .. 1: the eyes turn in towards each other. */
+void eyes_cross(float amount);
+/** A firefly at (x, y), screen pixels from the middle, flickering; `on`
+ * false takes it away. Move it by calling again. */
+void eyes_firefly(bool on, float x, float y);
 
 #ifdef __cplusplus
 }

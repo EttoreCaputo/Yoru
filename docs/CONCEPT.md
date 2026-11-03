@@ -86,7 +86,7 @@ There are no dashboard screens that turn Yoru into gauges. What happens in your 
 ### A life of its own
 Yoru doesn't play random animations. Like a Tamagotchi, a Sims character or Cozmo, it has needs, and what it does comes from them.
 
-> On the board this was in from 0.6.0 to 0.7.x (`needs.c`, `life.c`) and is out since 0.8.0: today Yoru floats near the middle, turns to sounds, reacts to touch and motion, naps when nobody is around and comes to the glass when something urgent waits for you. The needs come back later (`docs/ROADMAP.md`, M5); this section is what they will be.
+> On the board this was in from 0.6.0 to 0.7.x (`needs.c`, `life.c`) and is out since 0.8.0: since 0.15.0 Yoru has emotions, moods and acts again, firefly hunts and sulking included, without the needs (`docs/life.md`). The needs come back later (`docs/ROADMAP.md`, M5); this section is what they will be.
 
 
 | Need | Runs down | Met by |

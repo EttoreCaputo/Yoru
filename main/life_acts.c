@@ -1,0 +1,1138 @@
+/* What Yoru does on its own, a step at a time: each act is a few phases of
+ * moves, faces and sounds, and says when it's done. The state it runs in
+ * (life_mind.c) picks it and lends it a style: the face, how far and how
+ * fast it drifts. The ACTF_CLOSE ones run up close, with only the eyes on
+ * the screen; life_mind.c takes it there and back. */
+
+#include <math.h>
+#include <string.h>
+
+#include "esp_random.h"
+#include "life_int.h"
+#include "lvgl.h"
+#include "playback.h"
+
+const act_info_t ACTS[ACT_COUNT] = {
+    [ACT_DRIFT] = {"drift", 0, 0},
+    [ACT_LOOK] = {"look", 0, 10},
+    [ACT_TILT] = {"tilt", 0, 20},
+    [ACT_STRETCH] = {"stretch", 0, 120},
+    [ACT_SNEEZE] = {"sneeze", ACTF_LOUD, 400},
+    [ACT_HICCUP] = {"hiccup", ACTF_LOUD, 600},
+    [ACT_PEEK] = {"peek", 0, 60},
+    [ACT_SNIFF] = {"sniff", 0, 60},
+    [ACT_FIREFLY] = {"firefly", 0, 150},
+    [ACT_DANCE] = {"dance", ACTF_LOUD, 120},
+    [ACT_LOOP] = {"loop", ACTF_LOUD, 90},
+    [ACT_BOUNCE] = {"bounce", ACTF_LOUD, 90},
+    [ACT_STARS] = {"stars", 0, 180},
+    [ACT_HUM] = {"hum", ACTF_LOUD, 120},
+    [ACT_SIGH] = {"sigh", 0, 40},
+    [ACT_YAWN] = {"yawn", 0, 60},
+    [ACT_NOD] = {"nod", 0, 40},
+    [ACT_SULK] = {"sulk", 0, 0},
+    [ACT_C_DRIFT] = {"c_drift", ACTF_CLOSE, 0},
+    [ACT_C_GAZE] = {"c_gaze", ACTF_CLOSE, 0},
+    [ACT_C_BLINK] = {"c_blink", ACTF_CLOSE, 15},
+    [ACT_C_WINK] = {"c_wink", ACTF_CLOSE, 45},
+    [ACT_C_TILT] = {"c_tilt", ACTF_CLOSE, 20},
+    [ACT_C_HEARTS] = {"c_hearts", ACTF_CLOSE, 150},
+    [ACT_C_STARRY] = {"c_starry", ACTF_CLOSE, 150},
+    [ACT_C_TRICKS] = {"c_tricks", ACTF_CLOSE | ACTF_LOUD, 120},
+    [ACT_C_SCAN] = {"c_scan", ACTF_CLOSE, 60},
+    [ACT_C_PEEKABOO] = {"c_peekaboo", ACTF_CLOSE | ACTF_LOUD, 180},
+    [ACT_C_SNEAK] = {"c_sneak", ACTF_CLOSE, 120},
+    [ACT_C_BOUNCE] = {"c_bounce", ACTF_CLOSE | ACTF_LOUD, 90},
+    [ACT_C_DOZE] = {"c_doze", ACTF_CLOSE, 60},
+    [ACT_C_SEARCH] = {"c_search", ACTF_CLOSE, 20},
+    [ACT_C_SAD] = {"c_sad", ACTF_CLOSE, 30},
+};
+
+/* Up close the pair moves CLOSE_MOVE times as far as these numbers say
+ * (eyes.c): this takes it off the screen. */
+#define OFF_SCREEN 200
+
+/* The firefly's wander, in screen pixels from the middle. */
+#define FLY_RX 150
+#define FLY_RY 120
+#define FLY_MIN_MS 4500
+#define FLY_MAX_MS 8000
+
+static struct {
+    act_id_t id;
+    act_style_t style;
+    int phase;
+    uint32_t wait_until;
+    uint32_t t0;
+    int side;
+    int n;
+    float a, b; // the firefly's phases
+    bool caught;
+} A;
+
+static void wait_ms(uint32_t ms)
+{
+    A.wait_until = LT.now + ms;
+}
+
+static bool waiting(void)
+{
+    return (int32_t) (LT.now - A.wait_until) < 0;
+}
+
+static bool busy(void)
+{
+    return waiting() || eyes_moving();
+}
+
+static void next(int phase)
+{
+    A.phase = phase;
+}
+
+static int coin(void)
+{
+    return (esp_random() & 1) ? 1 : -1;
+}
+
+/* Its face in this state, now and then coloured by how it feels. */
+static eyes_mood_t face(void)
+{
+    const float r = life_frange(0, 1);
+    if (A.style.face == EYES_MOOD_NEUTRAL) {
+        if (mood(EMO_HAPPY) > 0.45f && r < 0.35f) {
+            return EYES_MOOD_HAPPY;
+        }
+        if (mood(EMO_STIM) < -0.45f && r < 0.4f) {
+            return EYES_MOOD_BORED;
+        }
+        if (mood(EMO_ENERGY) < -0.5f) {
+            return EYES_MOOD_SLEEPY;
+        }
+    }
+    return A.style.face;
+}
+
+/* ---- On the ball ------------------------------------------------------------- */
+
+/* Float off to somewhere in the state's room, slower when tired. */
+static bool drift(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(face());
+        const float tired = mood(EMO_ENERGY) < -0.3f ? 1.4f : 1;
+        const act_style_t *s = &A.style;
+        const eyes_pos_t p = life_at(life_frange(-s->roam_x, s->roam_x), life_frange(-s->roam_y * 0.7f, s->roam_y),
+                                     life_frange(s->z_lo, s->z_hi));
+        eyes_move_to(p.x, p.y, p.z, (uint32_t) (life_frange(2600, 4600) * s->pace * tired), EYES_PATH_DRIFT);
+        next(1);
+        return false;
+    }
+    return !busy();
+}
+
+/* A look round: left, right, up, and back to its own gaze. */
+static bool look(void)
+{
+    static const float GAZE[][2] = {{-0.85f, 0.05f}, {0.85f, 0.05f}, {0.1f, -0.7f}};
+    if (busy()) {
+        return false;
+    }
+    if (A.phase < 3) {
+        // Left then right, or the other way round, then up.
+        const int i = A.phase == 2 ? 2 : A.side > 0 ? A.phase : 1 - A.phase;
+        eyes_look_at(GAZE[i][0], GAZE[i][1]);
+        wait_ms((uint32_t) life_frange(600, 1000));
+        next(A.phase + 1);
+        return false;
+    }
+    eyes_look_around();
+    return true;
+}
+
+static bool tilt(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_CURIOUS);
+        eyes_look_at(0, -0.1f);
+        life_sound(SOUND_HMM);
+        wait_ms(1500);
+        next(1);
+        return false;
+    }
+    if (waiting()) {
+        return false;
+    }
+    eyes_look_around();
+    return true;
+}
+
+static bool stretch(void)
+{
+    if (A.phase == 0) {
+        eyes_gesture(EYES_GESTURE_STRETCH);
+        if (mood(EMO_ENERGY) < 0) {
+            life_sound(SOUND_YAWN);
+        }
+        wait_ms(2000);
+        next(1);
+        return false;
+    }
+    return !waiting();
+}
+
+static bool sneeze(void)
+{
+    switch (A.phase) {
+    case 0:
+        eyes_set_mood(EYES_MOOD_SURPRISED);
+        wait_ms(700);
+        next(1);
+        return false;
+    case 1:
+        if (waiting()) {
+            return false;
+        }
+        life_sound(SOUND_SNEEZE);
+        eyes_poke();
+        wait_ms(900);
+        next(2);
+        return false;
+    case 2:
+        if (waiting()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        wait_ms(1200);
+        next(3);
+        return false;
+    default:
+        return !waiting();
+    }
+}
+
+/* Two hiccups, a jolt each, then a giggle at itself. */
+static bool hiccup(void)
+{
+    if (waiting()) {
+        return false;
+    }
+    if (A.phase < 2) {
+        eyes_set_mood(EYES_MOOD_SURPRISED);
+        life_sound(SOUND_HICCUP);
+        eyes_knock(0, -0.45f);
+        wait_ms((uint32_t) life_frange(1100, 1700));
+        next(A.phase + 1);
+        return false;
+    }
+    if (A.phase == 2) {
+        eyes_set_mood(EYES_MOOD_DELIGHTED);
+        life_sound(SOUND_GIGGLE);
+        wait_ms(1200);
+        next(3);
+        return false;
+    }
+    return true;
+}
+
+/* Off to the very edge, peering out of the glass; back with a look over
+ * its shoulder. */
+static bool peek(void)
+{
+    switch (A.phase) {
+    case 0:
+        A.side = coin();
+        eyes_set_mood(EYES_MOOD_CURIOUS);
+        eyes_move_to((float) A.side * 175, life_frange(-25, 30), 1.0f, 1400, EYES_PATH_GLIDE);
+        eyes_look_at((float) A.side, 0);
+        next(1);
+        return false;
+    case 1:
+        if (busy()) {
+            return false;
+        }
+        eyes_lean((float) A.side, 0);
+        wait_ms((uint32_t) life_frange(1500, 2800));
+        next(2);
+        return false;
+    case 2:
+        if (waiting()) {
+            return false;
+        }
+        eyes_lean(0, 0);
+        life_sound(SOUND_HMM);
+        eyes_look_at((float) A.side * 0.6f, 0);
+        eyes_move_to(0, 0, 1, 1700, EYES_PATH_DRIFT);
+        next(3);
+        return false;
+    default:
+        if (busy()) {
+            return false;
+        }
+        eyes_look_around();
+        return true;
+    }
+}
+
+/* Down to a corner to sniff at something there: little hops, a look. */
+static bool sniff(void)
+{
+    switch (A.phase) {
+    case 0:
+        A.side = coin();
+        eyes_set_mood(EYES_MOOD_CURIOUS);
+        eyes_move_to((float) A.side * 115 * 1.05f, 75 * 1.05f, 1.05f, 1600, EYES_PATH_GLIDE);
+        eyes_look_at((float) A.side * 0.8f, 0.8f);
+        next(1);
+        return false;
+    case 1: {
+        if (busy()) {
+            return false;
+        }
+        const eyes_pos_t me = eyes_where();
+        const eyes_pos_t hops[] = {{me.x - (float) A.side * 12, me.y, me.z}, {me.x, me.y, me.z},
+                                   {me.x - (float) A.side * 8, me.y, me.z}, me};
+        eyes_move(hops, 4, 1500, EYES_PATH_HOP);
+        life_sound(SOUND_SCAN);
+        next(2);
+        return false;
+    }
+    case 2:
+        if (busy()) {
+            return false;
+        }
+        eyes_set_mood(life_frange(0, 1) < 0.5f ? EYES_MOOD_HAPPY : EYES_MOOD_CURIOUS);
+        eyes_look_at(0, -0.1f);
+        wait_ms(1100);
+        next(3);
+        return false;
+    case 3:
+        if (waiting()) {
+            return false;
+        }
+        eyes_look_around();
+        eyes_move_to(0, 0, 1, 1800, EYES_PATH_DRIFT);
+        next(4);
+        return false;
+    default:
+        return !busy();
+    }
+}
+
+/* Where the firefly is, `ms` into its flight: a wandering knot of sines. */
+static void fly_at(uint32_t ms, float *x, float *y)
+{
+    const float t = (float) ms / 1000.0f;
+    *x = FLY_RX * (0.75f * sinf(t * 0.9f + A.a) + 0.25f * sinf(t * 2.6f + A.b));
+    *y = FLY_RY * (0.7f * sinf(t * 1.3f + A.b) + 0.3f * sinf(t * 3.1f + A.a)) - 20;
+}
+
+/* A firefly, the one thing it knows from home: it drifts in, Yoru follows
+ * it with its eyes and its whole body, and pounces. Sometimes it gets away. */
+static bool firefly(void)
+{
+    float fx, fy;
+    switch (A.phase) {
+    case 0:
+        A.a = life_frange(0, 6.3f);
+        A.b = life_frange(0, 6.3f);
+        A.t0 = LT.now;
+        A.n = (int) life_frange(FLY_MIN_MS, FLY_MAX_MS);
+        A.caught = life_frange(0, 1) < 0.65f;
+        eyes_set_mood(EYES_MOOD_CURIOUS);
+        life_sound(SOUND_FLUTTER);
+        next(1);
+        return false;
+    case 1: {
+        const uint32_t ms = LT.now - A.t0;
+        fly_at(ms, &fx, &fy);
+        eyes_firefly(true, fx, fy);
+        eyes_look_at(fx / 180, fy / 180);
+        // The body lags behind, a lazy spring, a little short of it.
+        eyes_follow(fx * 0.55f, fy * 0.5f, 1, 7);
+        if (ms > 1500) {
+            eyes_set_mood(EYES_MOOD_STARRY);
+        }
+        if ((int32_t) ms >= A.n) {
+            if (A.caught) {
+                eyes_move_to(fx, fy, 1, 380, EYES_PATH_DART);
+                next(2);
+            } else {
+                // Away, out of the screen.
+                next(4);
+                A.t0 = LT.now;
+            }
+        }
+        return false;
+    }
+    case 2:
+        if (busy()) {
+            return false;
+        }
+        eyes_firefly(false, 0, 0);
+        eyes_set_mood(EYES_MOOD_DELIGHTED);
+        eyes_gesture(EYES_GESTURE_CLAP);
+        life_sound(SOUND_GIGGLE);
+        mood_feel(LIFE_FEEL_FUN);
+        wait_ms(1500);
+        next(3);
+        return false;
+    case 3:
+        if (waiting()) {
+            return false;
+        }
+        eyes_move_to(0, 0, 1, 1500, EYES_PATH_DRIFT);
+        eyes_look_around();
+        next(6);
+        return false;
+    case 4: {
+        // It flies off upwards; Yoru stretches after it.
+        const float k = fminf(1, (float) (LT.now - A.t0) / 900.0f);
+        fly_at(LT.now - A.t0 + (uint32_t) A.n, &fx, &fy);
+        fy -= k * 300;
+        eyes_firefly(k < 1, fx, fy);
+        eyes_look_at(fx / 180, fmaxf(-1, fy / 180));
+        if (k >= 1) {
+            eyes_set_mood(EYES_MOOD_SAD);
+            life_sound(SOUND_AWW);
+            wait_ms(1600);
+            next(5);
+        }
+        return false;
+    }
+    case 5:
+        if (waiting()) {
+            return false;
+        }
+        eyes_move_to(0, 0, 1, 1500, EYES_PATH_DRIFT);
+        eyes_look_around();
+        next(6);
+        return false;
+    default:
+        return !busy();
+    }
+}
+
+static bool dance(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        const eyes_pos_t hops[] = {life_at(-28, 0, 1), life_at(28, 0, 1), life_at(-28, 0, 1), life_at(28, 0, 1),
+                                   life_at(0, 0, 1)};
+        eyes_move(hops, 5, 2600, EYES_PATH_HOP);
+        life_sound(SOUND_SING);
+        next(1);
+        return false;
+    }
+    if (A.phase == 1) {
+        if (busy()) {
+            return false;
+        }
+        eyes_gesture(EYES_GESTURE_CLAP);
+        mood_feel(LIFE_FEEL_FUN);
+        wait_ms(1300);
+        next(2);
+        return false;
+    }
+    return !waiting();
+}
+
+static bool loop_the_loop(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        const float r = 55;
+        eyes_pos_t pts[EYES_PATH_POINTS];
+        for (int i = 0; i < EYES_PATH_POINTS - 1; i++) {
+            const float a = (float) M_PI / 2 + 2 * (float) M_PI * (float) (i + 1) / (EYES_PATH_POINTS - 1);
+            pts[i] = life_at(r * cosf(a), r - r * sinf(a), 1);
+        }
+        pts[EYES_PATH_POINTS - 1] = life_at(0, 0, 1);
+        eyes_move(pts, EYES_PATH_POINTS, 1900, EYES_PATH_GLIDE);
+        life_sound(SOUND_WHISTLE);
+        next(1);
+        return false;
+    }
+    if (busy()) {
+        return false;
+    }
+    eyes_blink();
+    mood_feel(LIFE_FEEL_FUN);
+    return true;
+}
+
+/* Bouncing off the walls of the screen, squashing at each. */
+static bool bounce(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_DELIGHTED);
+        const float s = (float) coin();
+        const eyes_pos_t hops[] = {life_at(s * 120, 40, 1), life_at(-s * 110, 10, 1), life_at(s * 70, -40, 1),
+                                   life_at(-s * 40, 30, 1), life_at(0, 0, 1)};
+        eyes_move(hops, 5, 2800, EYES_PATH_HOP);
+        life_sound(SOUND_BOING);
+        next(1);
+        return false;
+    }
+    if (A.phase == 1) {
+        if (busy()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        mood_feel(LIFE_FEEL_FUN);
+        wait_ms(800);
+        next(2);
+        return false;
+    }
+    return !waiting();
+}
+
+/* Up high, as near the sky as the glass lets it: the sky it came from. */
+static bool stars(void)
+{
+    switch (A.phase) {
+    case 0:
+        eyes_set_mood(EYES_MOOD_DREAMY);
+        eyes_move_to(life_frange(-30, 30) * 1.2f, -80 * 1.2f, 1.2f, 3200, EYES_PATH_DRIFT);
+        eyes_look_at(0, -1);
+        next(1);
+        return false;
+    case 1:
+        if (busy()) {
+            return false;
+        }
+        eyes_blink();
+        wait_ms((uint32_t) life_frange(3500, 6000));
+        next(2);
+        return false;
+    case 2:
+        if (waiting()) {
+            return false;
+        }
+        life_sound(SOUND_SIGH);
+        eyes_look_around();
+        eyes_move_to(0, 0, 1, 2600, EYES_PATH_DRIFT);
+        next(3);
+        return false;
+    default:
+        return !busy();
+    }
+}
+
+/* Humming to itself, swaying slowly, eyes up. */
+static bool hum(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_DREAMY);
+        eyes_look_at(0.2f, -0.6f);
+        const eyes_pos_t sway[] = {life_at(-26, -12, 1.05f), life_at(26, -12, 1.05f), life_at(-26, -12, 1.05f),
+                                   life_at(0, -8, 1.05f)};
+        eyes_move(sway, 4, 5200, EYES_PATH_DRIFT);
+        life_sound(SOUND_SING);
+        next(1);
+        return false;
+    }
+    if (busy()) {
+        return false;
+    }
+    eyes_look_around();
+    return true;
+}
+
+/* Bored: a sigh, sinking a little, a look away. */
+static bool sigh(void)
+{
+    switch (A.phase) {
+    case 0: {
+        eyes_set_mood(EYES_MOOD_BORED);
+        life_sound(SOUND_SIGH);
+        const eyes_pos_t me = eyes_where();
+        eyes_move_to(me.x, me.y + 25 * me.z, me.z, 1300, EYES_PATH_DRIFT);
+        eyes_look_at((float) coin() * 0.8f, 0.3f);
+        wait_ms((uint32_t) life_frange(2400, 3600));
+        next(1);
+        return false;
+    }
+    case 1:
+        if (busy()) {
+            return false;
+        }
+        eyes_look_around();
+        return true;
+    default:
+        return true;
+    }
+}
+
+static bool yawn(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_SLEEPY);
+        eyes_gesture(EYES_GESTURE_STRETCH);
+        life_sound(SOUND_YAWN);
+        wait_ms(2300);
+        next(1);
+        return false;
+    }
+    return !waiting();
+}
+
+/* Nodding off: sinking, eyes closing, then a jolt awake. */
+static bool nod(void)
+{
+    switch (A.phase) {
+    case 0: {
+        eyes_set_mood(EYES_MOOD_SLEEPY);
+        const eyes_pos_t me = eyes_where();
+        eyes_move_to(me.x, me.y + 35 * me.z, me.z, 3200, EYES_PATH_DRIFT);
+        eyes_look_at(0, 0.7f);
+        next(1);
+        return false;
+    }
+    case 1:
+        if (busy()) {
+            return false;
+        }
+        eyes_knock(0, -0.6f);
+        eyes_set_mood(EYES_MOOD_SURPRISED);
+        life_sound(SOUND_EEP);
+        wait_ms(700);
+        next(2);
+        return false;
+    case 2: {
+        if (waiting()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_SLEEPY);
+        const eyes_pos_t me = eyes_where();
+        eyes_move_to(me.x, me.y - 35 * me.z, me.z, 1500, EYES_PATH_GLIDE);
+        eyes_look_around();
+        next(3);
+        return false;
+    }
+    default:
+        return !busy();
+    }
+}
+
+/* Sulking: off to one side, turned away; a glance back now and then. */
+static bool sulk(void)
+{
+    switch (A.phase) {
+    case 0:
+        A.side = coin();
+        eyes_set_mood(EYES_MOOD_GRUMPY);
+        eyes_move_to((float) A.side * 125 * 1.15f, 20 * 1.15f, 1.15f, 1800, EYES_PATH_GLIDE);
+        eyes_look_at((float) A.side, 0.2f);
+        life_sound(SOUND_GRUMBLE);
+        next(1);
+        return false;
+    case 1:
+        if (busy()) {
+            return false;
+        }
+        wait_ms((uint32_t) life_frange(4000, 7000));
+        next(2);
+        return false;
+    case 2:
+        if (waiting()) {
+            return false;
+        }
+        // Is anybody coming? A quick glance back.
+        eyes_look_at(-(float) A.side * 0.7f, 0);
+        wait_ms(900);
+        next(3);
+        return false;
+    case 3:
+        if (waiting()) {
+            return false;
+        }
+        life_sound(SOUND_PFFT);
+        eyes_look_at((float) A.side, 0.2f);
+        wait_ms(1500);
+        next(4);
+        return false;
+    default:
+        return !waiting();
+    }
+}
+
+/* ---- Up close ---------------------------------------------------------------- */
+
+/* The pair drifts a little, as if Yoru shifted behind the glass. */
+static bool c_drift(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(face());
+        eyes_move_to(life_frange(-22, 22), life_frange(-16, 18), 1, (uint32_t) life_frange(1800, 3000),
+                     EYES_PATH_DRIFT);
+        next(1);
+        return false;
+    }
+    return !busy();
+}
+
+/* Looking at you, close: a slow blink in the middle. */
+static bool c_gaze(void)
+{
+    switch (A.phase) {
+    case 0:
+        eyes_set_mood(mood(EMO_HAPPY) > 0.35f ? EYES_MOOD_HAPPY : face());
+        eyes_look_at(0, -0.05f);
+        wait_ms((uint32_t) life_frange(1800, 3000));
+        next(1);
+        return false;
+    case 1:
+        if (waiting()) {
+            return false;
+        }
+        eyes_blink();
+        wait_ms((uint32_t) life_frange(1500, 3000));
+        next(2);
+        return false;
+    default:
+        if (waiting()) {
+            return false;
+        }
+        eyes_look_around();
+        return true;
+    }
+}
+
+/* The cat's slow blink: I like you. */
+static bool c_blink(void)
+{
+    switch (A.phase) {
+    case 0:
+        eyes_look_at(0, -0.05f);
+        eyes_set_mood(EYES_MOOD_DREAMY);
+        wait_ms(1100);
+        next(1);
+        return false;
+    case 1:
+        if (waiting()) {
+            return false;
+        }
+        eyes_blink();
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        wait_ms(1400);
+        next(2);
+        return false;
+    default:
+        if (waiting()) {
+            return false;
+        }
+        eyes_look_around();
+        return true;
+    }
+}
+
+static bool c_wink(void)
+{
+    if (A.phase == 0) {
+        eyes_look_at(0, -0.05f);
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        eyes_wink((esp_random() & 1) ? 0 : 1, 450);
+        life_sound(SOUND_WINK);
+        wait_ms(1300);
+        next(1);
+        return false;
+    }
+    if (waiting()) {
+        return false;
+    }
+    eyes_look_around();
+    return true;
+}
+
+static bool c_tilt(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_CURIOUS);
+        eyes_look_at((float) coin() * 0.3f, -0.1f);
+        life_sound(SOUND_HMM);
+        wait_ms(1600);
+        next(1);
+        return false;
+    }
+    if (waiting()) {
+        return false;
+    }
+    eyes_look_around();
+    return true;
+}
+
+/* Hearts for eyes, beating. */
+static bool c_hearts(void)
+{
+    if (A.phase == 0) {
+        eyes_look_at(0, -0.05f);
+        eyes_set_mood(EYES_MOOD_SMITTEN);
+        life_sound(SOUND_HEARTBEAT);
+        eyes_move_to(0, -6, 0.85f, 900, EYES_PATH_GLIDE); // leaning in
+        wait_ms((uint32_t) life_frange(2600, 3600));
+        next(1);
+        return false;
+    }
+    if (A.phase == 1) {
+        if (waiting()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        eyes_move_to(0, 0, 1, 900, EYES_PATH_GLIDE);
+        next(2);
+        return false;
+    }
+    return !busy();
+}
+
+/* Stars for eyes: something wonderful. */
+static bool c_starry(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_STARRY);
+        eyes_look_at(0, -0.4f);
+        life_sound(SOUND_EXCITED);
+        eyes_poke();
+        wait_ms((uint32_t) life_frange(2400, 3200));
+        next(1);
+        return false;
+    }
+    if (waiting()) {
+        return false;
+    }
+    eyes_set_mood(EYES_MOOD_HAPPY);
+    eyes_look_around();
+    return true;
+}
+
+/* Silly faces: cross-eyed, the eyes rolled round, then squeezed with joy. */
+static bool c_tricks(void)
+{
+    switch (A.phase) {
+    case 0:
+        eyes_set_mood(EYES_MOOD_NEUTRAL);
+        eyes_look_at(0, 0);
+        eyes_cross(1);
+        life_sound(SOUND_BOING);
+        wait_ms(1300);
+        next(1);
+        A.n = 0;
+        return false;
+    case 1:
+        if (waiting()) {
+            return false;
+        }
+        eyes_cross(0);
+        // Round and round: eight steps of a circle.
+        if (A.n < 10) {
+            const float a = (float) A.n * (float) M_PI / 4;
+            eyes_look_at(0.8f * cosf(a), 0.7f * sinf(a));
+            A.n++;
+            wait_ms(130);
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_DELIGHTED);
+        eyes_look_at(0, 0);
+        life_sound(SOUND_GIGGLE);
+        eyes_poke();
+        wait_ms(1300);
+        next(2);
+        return false;
+    default:
+        if (waiting()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        eyes_look_around();
+        return true;
+    }
+}
+
+/* Inspecting the glass: eyes sweeping it, a tap on it. */
+static bool c_scan(void)
+{
+    static const float GAZE[][2] = {{-1, -0.2f}, {1, -0.2f}, {-0.6f, 0.7f}, {0.7f, -0.8f}};
+    if (busy()) {
+        return false;
+    }
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_CURIOUS);
+        life_sound(SOUND_SCAN);
+    }
+    if (A.phase < 4) {
+        eyes_look_at(GAZE[A.phase][0], GAZE[A.phase][1]);
+        wait_ms((uint32_t) life_frange(600, 900));
+        next(A.phase + 1);
+        return false;
+    }
+    if (A.phase == 4) {
+        A.side = coin();
+        eyes_look_at((float) A.side * 0.5f, 0);
+        eyes_move_to((float) A.side * 40, 0, 0.8f, 500, EYES_PATH_DART);
+        next(5);
+        return false;
+    }
+    if (A.phase == 5) {
+        eyes_poke(); // tap
+        life_sound(SOUND_BOOP);
+        eyes_move_to(0, 0, 1, 900, EYES_PATH_GLIDE);
+        next(6);
+        return false;
+    }
+    eyes_look_around();
+    return true;
+}
+
+/* Peekaboo: the eyes pop up from below the screen, look at you, and go. */
+static bool c_peekaboo(void)
+{
+    switch (A.phase) {
+    case 0:
+        eyes_move_to(0, OFF_SCREEN, 1, 0, EYES_PATH_GLIDE);
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        wait_ms((uint32_t) life_frange(500, 1200));
+        next(1);
+        return false;
+    case 1:
+        if (waiting()) {
+            return false;
+        }
+        eyes_look_at(0, -0.1f);
+        eyes_move_to(0, 0, 1, 650, EYES_PATH_DART);
+        eyes_set_mood(EYES_MOOD_DELIGHTED);
+        life_sound(SOUND_BOO);
+        next(2);
+        return false;
+    case 2:
+        if (busy()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        wait_ms(1600);
+        next(3);
+        return false;
+    case 3:
+        if (waiting()) {
+            return false;
+        }
+        eyes_move_to(0, OFF_SCREEN, 1, 700, EYES_PATH_GLIDE);
+        next(4);
+        return false;
+    case 4:
+        if (busy()) {
+            return false;
+        }
+        wait_ms(600);
+        next(5);
+        return false;
+    default:
+        return !waiting();
+    }
+}
+
+/* The eyes slide in from a side, look around the room and at you, and slip
+ * away the way they came. */
+static bool c_sneak(void)
+{
+    switch (A.phase) {
+    case 0:
+        A.side = coin();
+        eyes_move_to((float) A.side * OFF_SCREEN * 1.2f, 10, 1, 0, EYES_PATH_GLIDE);
+        eyes_set_mood(EYES_MOOD_CURIOUS);
+        wait_ms(400);
+        next(1);
+        return false;
+    case 1:
+        if (waiting()) {
+            return false;
+        }
+        eyes_look_at(-(float) A.side, 0);
+        eyes_move_to((float) A.side * 70, 10, 1, 1400, EYES_PATH_DRIFT);
+        next(2);
+        return false;
+    case 2:
+        if (busy()) {
+            return false;
+        }
+        eyes_look_at(-(float) A.side * 0.9f, 0.4f);
+        wait_ms(900);
+        next(3);
+        return false;
+    case 3:
+        if (waiting()) {
+            return false;
+        }
+        eyes_look_at(0, -0.05f);
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        wait_ms(1200);
+        next(4);
+        return false;
+    case 4:
+        if (waiting()) {
+            return false;
+        }
+        eyes_look_at((float) A.side, 0);
+        eyes_move_to((float) A.side * OFF_SCREEN * 1.2f, 10, 1, 1000, EYES_PATH_GLIDE);
+        next(5);
+        return false;
+    case 5:
+        if (busy()) {
+            return false;
+        }
+        wait_ms(500);
+        next(6);
+        return false;
+    default:
+        return !waiting();
+    }
+}
+
+/* The eyes bounce round the screen. */
+static bool c_bounce(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_DELIGHTED);
+        const float s = (float) coin();
+        const eyes_pos_t hops[] = {{s * 60, 30, 1}, {-s * 55, 20, 1}, {s * 30, -30, 1}, {-s * 20, 25, 1}, {0, 0, 1}};
+        eyes_move(hops, 5, 2600, EYES_PATH_HOP);
+        life_sound(SOUND_BEAT);
+        next(1);
+        return false;
+    }
+    if (A.phase == 1) {
+        if (busy()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_HAPPY);
+        mood_feel(LIFE_FEEL_FUN);
+        wait_ms(700);
+        next(2);
+        return false;
+    }
+    return !waiting();
+}
+
+/* Dozing at the glass: the eyes sink and close, then snap open. */
+static bool c_doze(void)
+{
+    switch (A.phase) {
+    case 0:
+        eyes_set_mood(EYES_MOOD_SLEEPY);
+        eyes_look_at(0, 0.5f);
+        eyes_move_to(0, 28, 1, 3000, EYES_PATH_DRIFT);
+        next(1);
+        return false;
+    case 1:
+        if (busy()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_DREAMY);
+        wait_ms(1500);
+        next(2);
+        return false;
+    case 2:
+        if (waiting()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_SURPRISED);
+        eyes_knock(0, -0.7f);
+        life_sound(SOUND_EEP);
+        eyes_move_to(0, 0, 1, 500, EYES_PATH_GLIDE);
+        wait_ms(800);
+        next(3);
+        return false;
+    default:
+        if (busy()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_SLEEPY);
+        eyes_look_around();
+        return true;
+    }
+}
+
+/* Looking for you, at the glass: left, right, and a small call. */
+static bool c_search(void)
+{
+    static const float GAZE[][2] = {{-1, 0}, {1, 0}, {-0.5f, -0.4f}, {0, 0}};
+    if (busy()) {
+        return false;
+    }
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_SAD);
+    }
+    if (A.phase < 4) {
+        eyes_look_at(GAZE[A.phase][0], GAZE[A.phase][1]);
+        wait_ms(A.phase == 3 ? 400 : 1100);
+        next(A.phase + 1);
+        return false;
+    }
+    if (A.phase == 4) {
+        life_sound(SOUND_WHIMPER);
+        wait_ms(2000);
+        next(5);
+        return false;
+    }
+    return true;
+}
+
+static bool c_sad(void)
+{
+    if (A.phase == 0) {
+        eyes_set_mood(EYES_MOOD_SAD);
+        eyes_look_at(0, 0.1f);
+        eyes_move_to(0, 14, 1, 1500, EYES_PATH_DRIFT);
+        wait_ms((uint32_t) life_frange(2500, 3500));
+        next(1);
+        return false;
+    }
+    return !busy();
+}
+
+/* ---- Running them ------------------------------------------------------------- */
+
+typedef bool (*act_fn)(void);
+
+static const act_fn FNS[ACT_COUNT] = {
+    [ACT_DRIFT] = drift,       [ACT_LOOK] = look,         [ACT_TILT] = tilt,
+    [ACT_STRETCH] = stretch,   [ACT_SNEEZE] = sneeze,     [ACT_HICCUP] = hiccup,
+    [ACT_PEEK] = peek,         [ACT_SNIFF] = sniff,       [ACT_FIREFLY] = firefly,
+    [ACT_DANCE] = dance,       [ACT_LOOP] = loop_the_loop, [ACT_BOUNCE] = bounce,
+    [ACT_STARS] = stars,       [ACT_HUM] = hum,           [ACT_SIGH] = sigh,
+    [ACT_YAWN] = yawn,         [ACT_NOD] = nod,           [ACT_SULK] = sulk,
+    [ACT_C_DRIFT] = c_drift,   [ACT_C_GAZE] = c_gaze,     [ACT_C_BLINK] = c_blink,
+    [ACT_C_WINK] = c_wink,     [ACT_C_TILT] = c_tilt,     [ACT_C_HEARTS] = c_hearts,
+    [ACT_C_STARRY] = c_starry, [ACT_C_TRICKS] = c_tricks, [ACT_C_SCAN] = c_scan,
+    [ACT_C_PEEKABOO] = c_peekaboo, [ACT_C_SNEAK] = c_sneak, [ACT_C_BOUNCE] = c_bounce,
+    [ACT_C_DOZE] = c_doze,     [ACT_C_SEARCH] = c_search, [ACT_C_SAD] = c_sad,
+};
+
+void acts_start(act_id_t id, const act_style_t *style)
+{
+    memset(&A, 0, sizeof(A));
+    A.id = id < ACT_COUNT ? id : ACT_DRIFT;
+    A.style = *style;
+    A.wait_until = LT.now;
+    A.side = coin();
+}
+
+bool acts_step(void)
+{
+    const bool done = FNS[A.id]();
+    if (done) {
+        eyes_firefly(false, 0, 0);
+        eyes_cross(0);
+    }
+    return done;
+}
+
+act_id_t acts_by_name(const char *name)
+{
+    for (int i = 0; i < ACT_COUNT; i++) {
+        if (strcmp(name, ACTS[i].name) == 0) {
+            return (act_id_t) i;
+        }
+    }
+    return ACT_COUNT;
+}

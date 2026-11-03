@@ -344,6 +344,7 @@ static void hold_finger(uint32_t now, lv_point_t p)
     s.hold_loved = false;
     s.hold_home = eyes_where();
     life_attend();
+    life_feel(LIFE_FEEL_HOLD);
     eyes_poke();
     playback_sound(SOUND_CHIRP);
     react(EYES_MOOD_HAPPY, 1000); // the tick keeps it going
@@ -396,6 +397,7 @@ static void watch_finger(lv_indev_t *indev)
         && lv_tick_elaps(s.press_ms) >= STROKE_MIN_MS && board_settings_on(SETTING_TOUCH_REACTIONS)) {
         s.stroked = true;
         life_attend();
+        life_feel(LIFE_FEEL_STROKE);
         playback_sound(SOUND_PURR);
         react(EYES_MOOD_HAPPY, 2500);
     }
@@ -413,6 +415,7 @@ static void poke(uint32_t now)
     s.pokes = (now - s.last_poke_ms < POKE_WINDOW_MS) ? s.pokes + 1 : 1;
     s.last_poke_ms = now;
     life_attend();
+    life_feel(LIFE_FEEL_POKE);
     eyes_poke();
     if (s.pokes >= 3) {
         play("annoyed");
@@ -429,6 +432,7 @@ static void slap(uint32_t now, int32_t dx, int32_t dy)
     s.slaps = (now - s.last_slap_ms < SLAP_WINDOW_MS) ? s.slaps + 1 : 1;
     s.last_slap_ms = now;
     life_attend();
+    life_feel(LIFE_FEEL_SLAP);
     const float len = sqrtf((float) (dx * dx + dy * dy));
     eyes_knock((float) dx / len * 0.9f, (float) dy / len * 0.5f);
     if (s.slaps >= 3) {
@@ -629,6 +633,7 @@ static void timers_tick(void)
         snprintf(text, sizeof(text), "%s", card_tr("Time's up! " LV_SYMBOL_BELL, "Tempo scaduto! " LV_SYMBOL_BELL));
     }
     toast_show(text, 6, TOAST_WAIT);
+    life_feel(LIFE_FEEL_TIMER);
     if (card_up() || s.menu || s.view || s.voice != VOICE_IDLE) {
         return;
     }
@@ -670,6 +675,7 @@ static void battery_tick(uint32_t now)
             s.asleep_ms = now; // dark again a minute from now
         }
         eyes_zap();
+        life_feel(LIFE_FEEL_PLUGGED);
         battery_toast("Charging", "In carica", 3, TOAST_INFO);
         if (free) {
             s.last_touch_ms = now;
@@ -945,6 +951,10 @@ static void on_motion(motion_event_t ev)
     }
     s.last_touch_ms = now;
     life_attend();
+    life_feel(ev == MOTION_SHAKEN || ev == MOTION_SPUN || ev == MOTION_SHAKEN_LONG ? LIFE_FEEL_SHAKE
+              : ev == MOTION_DROPPED                                            ? LIFE_FEEL_DROP
+              : ev == MOTION_LIFTED                                             ? LIFE_FEEL_LIFT
+                                                                                : LIFE_FEEL_POKE);
     switch (ev) {
     case MOTION_LIFTED:
         play("lifted");
@@ -1043,6 +1053,9 @@ void behaviour_voice(voice_state_t state)
     if (s.dark) {
         light_up(); // called by name: the screen comes back to listen
     }
+    if (was == VOICE_IDLE) {
+        life_feel(LIFE_FEEL_TALK);
+    }
     if (s.asleep) {
         // The wake word wakes it.
         s.asleep = false;
@@ -1108,6 +1121,7 @@ void behaviour_heard_from(float x)
         && board_settings_on(SETTING_PET_HEARING)) {
         // The gaze turns to the noise, and drifts back on its own.
         hold_gaze(x * 0.9f, 0, HEARD_LOOK_MS);
+        life_feel(LIFE_FEEL_SOUND);
     }
     lvgl_port_unlock();
 }

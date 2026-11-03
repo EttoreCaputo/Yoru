@@ -61,7 +61,7 @@ Settings are kept in NVS and survive a reboot.
 | `play_sound` | `name` | As on DualEye: the same sounds, plus Yoru's own: `unplug` and, an earcon played with pet sounds off too, `battery_low` (0.12.1) |
 | `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it), `power_saver` (on battery, the Saver profile instead of Balanced; 0.12.0, see Power), `hibernate` (on battery, minutes of dark screen before hibernating, 0 never; 0.12.0). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
 | `set_setting` | `name`, `value`: integer | Change one setting within its range (switches are 0 or 1); it applies at once |
-| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time) |
+| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0; since 0.15.0 also its state, `watch`, `explore`, `play`, `dream`, `bored`, `seek`, `sulk`, `drowsy`, and `greet`), `cheer` (0..1), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time); since 0.15.0 `life`: `activity`, `state`, `act`, `since_s`, `left_s`, `close` (up close, only its eyes on the screen) and `emotions` (`happy`, `energy`, `social`, `stim`, `trust`, -1..1), see `docs/life.md`. `eyes` may also be `delighted`, `smitten`, `starry` or `dreamy` since 0.15.0 |
 | `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `habits` · `games` (0.11.8 and later) · `settings` · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it. Since 0.11.0; before, the menu was a ring and `inbox` one of its pages |
 | `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Yoru asks before it acts for you, over the eyes, with Allow and Deny (see Confirmations). A second call replaces it |
 | `hide_approval` | `id`: string | Take that card away: it was answered in the app, or gave up. An `id` that isn't shown is fine |
@@ -294,6 +294,17 @@ The brain's answer may carry tags, which are taken out before it is said and act
 - **Failures** show in a line over the bottom rim (no internet, a key refused, too many requests) with the red ring; nothing is said.
 - **Not while a host is there:** with one, everything goes to it as before. Without the services or the WiFi, the offline phrases above.
 - `debug/cloud` `{"text": "..."}` answers a text as if it had been heard, for tests.
+
+## Debugging Yoru's life
+
+Since 0.15.0 (`docs/life.md`). `debug/life` takes any of:
+
+- `state`: one of `lounge`, `watch`, `explore`, `play`, `dream`, `bored`, `seek`, `sulk`, `drowsy`, entered now, its cooldown ignored;
+- `act`: an act's name (`firefly`, `dance`, `c_hearts`, `c_peekaboo`...), played next;
+- `feel`: an event's name (`stroke`, `drop`, `ignored`...), applied to the emotions;
+- `speed`: how much faster the life clock runs (1 to 300; dwell times, cooldowns and the emotions' fading; the animations stay at their pace). A restart sets it back to 1.
+
+It answers with `get_state`'s `life`, or `-32602` for an unknown name.
 
 ## Fetch
 

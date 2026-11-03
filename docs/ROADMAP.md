@@ -8,7 +8,7 @@ Firmware 0.13.0 (2026-11-02).
 
 **In**
 - The look: the matte sphere with its eyes and hands, depth in perspective, state tint and halo, sleep as drifting away, 24-bit colour as an option (M5).
-- Life on the desk, reduced since 0.8.0: Yoru floats near the middle, turns to sudden sounds, reacts to touch and to the case, gets sleepy and naps when nobody is around, and comes to the glass when something urgent waits for you. Since 0.14.0 (`life.c`): whims of its own (peek, stretch, dance, the sky, a loop, a sneeze, looking for you), greetings when you're back after 15 minutes and in the morning, and a cheer that attention raises and time alone wears down. The needs and the acts they chose (fireflies, play, exploring) are out for now (M5).
+- Life on the desk, reduced since 0.8.0: Yoru floats near the middle, turns to sudden sounds, reacts to touch and to the case, gets sleepy and naps when nobody is around, and comes to the glass when something urgent waits for you. Since 0.14.0 greetings when you're back after 15 minutes and in the morning. Since 0.15.0 a life of its own after Anki's Vector (`docs/life.md`): five emotions, nine states with weighted ways on (lounging, with you up at the glass, exploring, playing, dreaming, bored, looking for you, sulking, drowsy), about thirty acts including the firefly hunt, and a view up close where only its eyes show. The needs as such (food, rest...) are still out (M5).
 - Senses: touch, motion (`motion.c`: lifted, put down, shaken, knocked, rocked, face down, dropped, spun, tilt), the sound's direction (`ears_dir.c`), the PMU (M2).
 - The menu as a watch's: Notifications, Timers, Habits, Games, Do not disturb and Settings around Yoru; every setting on the board, in Italian and English (M2).
 - Voice and link: wake word (Alexa, Hi ESP, Jarvis, Computer), push-to-talk on PWR, listening on after an answer, the host judging the end of a sentence (Smart Turn), speech on the speaker, USB and WiFi (M3).
@@ -20,7 +20,7 @@ Firmware 0.13.0 (2026-11-02).
 
 **Left**
 - Voice: the custom wake word "Yoru" (M6); the mic gain (M3); the second mic, with a two-mic AFE (M3); check the offline phrases with a real voice (in the first test, with the Mac's synthetic voice, "what time is it" and "volume up" were heard, the timer phrases weren't).
-- The pet's return: needs and the acts they choose (fireflies, play, exploring), with the late-night notice and the sounds' language (M5); 0.14.0 brought back whims, greetings and a cheer.
+- The pet's return: needs, with the late-night notice and the sounds' language (M5); 0.14.0 brought back greetings, 0.15.0 emotions, states and acts (`docs/life.md`). Next there: the tables in a file Yoru Hub can update without a new firmware, and more acts up close.
 - Cloud voice: try it with a real voice in the room; the keys in NVS are in the clear (NVS encryption, or keys scoped to the board); the brain's tags as real tool calls; something said now and then on its own.
 - Power: measure what the profiles draw on the board; the touch controller asleep with the dark screen; waking from hibernation for a timer (M2).
 - The menu: the Look items (name, colour, eye shape: the host can set `eye_color` and `eye_style`, the menu can't yet) and pairing a computer from the board (M2).

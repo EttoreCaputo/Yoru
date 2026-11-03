@@ -8,6 +8,7 @@
 #include "card.h"
 #include "esp_random.h"
 #include "habits.h"
+#include "life.h"
 #include "playback.h"
 
 #define CX (BOARD_LCD_H_RES / 2)
@@ -236,6 +237,9 @@ static void row_cb(lv_event_t *e)
     if (done < 0) {
         pop(r->check, -8); // already full (or empty): a shrug of a pop
         return;
+    }
+    if (!undo) {
+        life_feel(LIFE_FEEL_HABIT);
     }
     paint_row(i);
     paint_summary();

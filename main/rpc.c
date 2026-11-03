@@ -11,7 +11,9 @@
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "life.h"
 #include "link.h"
+#include "lvgl_port.h"
 #include "net.h"
 #include "playback.h"
 #include "voice.h"
@@ -275,6 +277,18 @@ void rpc_handle(uint8_t *payload, size_t len)
             message = cloud_ready() ? "expected {\"text\": string}" : "no services or no WiFi";
         } else {
             result = cJSON_CreateObject();
+        }
+    } else if (strcmp(name, "debug/life") == 0) {
+        // Push Yoru's own life about (tests): a state, an act, a feeling,
+        // the life clock's speed.
+        static char why[64];
+        if (!cJSON_IsObject(params) || !life_debug(params, why, sizeof(why))) {
+            code = RPC_INVALID_PARAMS;
+            message = cJSON_IsObject(params) ? why : "expected {\"state\"|\"act\"|\"feel\"|\"speed\"}";
+        } else {
+            lvgl_port_lock();
+            result = life_status();
+            lvgl_port_unlock();
         }
     } else if (strcmp(name, "debug/audio") == 0) {
         const cJSON *cmd = cJSON_GetObjectItemCaseSensitive(params, "cmd");

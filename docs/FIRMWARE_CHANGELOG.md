@@ -1,5 +1,17 @@
 # Firmware changelog
 
+## 0.15.0
+
+Yoru has a life of his own, and comes up close.
+
+- **Moods of his own.** Yoru now goes through moods by himself, each with its own things to do: lounging near you, exploring the edges and corners, playing on his own, daydreaming about the sky he came from, getting bored, drowsy, looking for you when he's been alone too long, and sulking for a while if nobody came. He moves from one to the next by chance, but not blindly: how he feels decides which is likelier.
+- **How he feels.** He's happier, livelier, more or less in need of company, excited or bored, and he trusts you more as time goes by. What you do moves it: strokes, holding his hand, talking, games, ticking off a habit cheer him up; shaking or dropping him doesn't. He's sleepy at night and a little after lunch, and he remembers how much he trusts you after a restart.
+- **Up close.** Now and then he comes right up to the glass, so near you only see his eyes, big and light on the black. Up close he can do things he can't on the ball: hearts for eyes, stars for eyes, `> <` when he laughs, a wink, a slow blink to say he likes you, crossing his eyes and rolling them round, peekaboo from below the screen, sliding in from a side to look around, dozing off against the glass. When he wants to be with you he stays up there and looks at you.
+- **Fireflies.** The one thing he knows from home: a little light flickers about the screen, he follows it with his eyes and his whole body, and pounces. Sometimes it gets away.
+- New things to do on the ball too: bouncing off the walls, hiccups, sniffing a corner, humming to himself, sighing, nodding off and jolting awake.
+- Do not disturb keeps him calm and quiet: no playing, no sounds.
+- Fixed: the board could crash at start-up while Yoru greeted you, and his body sometimes moved in jerks: drawing him took memory the voice needed.
+
 ## 0.14.1
 
 Holding PWR talks to Yoru without the Mac, too.

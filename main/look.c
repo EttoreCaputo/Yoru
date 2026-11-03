@@ -27,9 +27,12 @@ static const stop_t PEARL[] = {
 static look_t s_look;
 /* The spheres of other sizes, rendered when first drawn: a few for the
  * sizes and squashes in use, within a budget of PSRAM (a sphere up at the
- * glass is about 450 KB). */
+ * glass is about 450 KB). The budget is small: PSRAM is shared with
+ * MultiNet, which loads while Yoru greets you at boot and crashes inside
+ * ESP-SR if it can't have its memory, and with the cloud's TLS. Up close
+ * (eyes_close_up()) there is no sphere at all. */
 #define BALL_SLOTS 14
-#define BALL_BUDGET (3200 * 1024)
+#define BALL_BUDGET (1024 * 1024)
 typedef struct {
     look_sprite_t sp;
     int rx, ry; // 0: empty
@@ -218,7 +221,9 @@ static esp_err_t render_ball_fast(look_sprite_t *sp, int rx, int ry)
     const uint32_t size = (uint32_t) (w * h * 3);
     // Only the alpha plane needs clearing: colour outside the disc is unseen.
     uint8_t *data = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    ESP_RETURN_ON_FALSE(data, ESP_ERR_NO_MEM, TAG, "ball %dx%d", rx, ry);
+    if (data == NULL) {
+        return ESP_ERR_NO_MEM; // look_ball() makes room and tries again
+    }
     memset(data + w * h * 2, 0, (size_t) (w * h));
     memset(&sp->img, 0, sizeof(sp->img));
     sp->img.header.magic = LV_IMAGE_HEADER_MAGIC;
@@ -337,8 +342,21 @@ const look_sprite_t *look_ball(int rx, int ry, uint32_t frame)
         return NULL;
     }
     const int64_t start = esp_timer_get_time();
-    if (render_ball_fast(&free_slot->sp, rx, ry) != ESP_OK) {
-        return NULL;
+    // PSRAM is shared with the voice, the WiFi's TLS and the cloud: when no
+    // block is big enough, older sizes go until one is (freed neighbours
+    // merge).
+    while (render_ball_fast(&free_slot->sp, rx, ry) != ESP_OK) {
+        oldest = NULL;
+        for (int i = 0; i < BALL_SLOTS; i++) {
+            ball_slot_t *b = &s_balls[i];
+            if (b->rx != 0 && b->used != frame && (oldest == NULL || frame - b->used > frame - oldest->used)) {
+                oldest = b;
+            }
+        }
+        if (oldest == NULL) {
+            return NULL;
+        }
+        ball_free(oldest);
     }
     free_slot->rx = rx;
     free_slot->ry = ry;

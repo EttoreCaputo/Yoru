@@ -23,7 +23,7 @@ idf_component_register(SRCS "approval.c" "toast.c" "inbox_ui.c" "inbox.c" "main.
                             "motion.c"
                             "power.c"
                             "ui_voice.c"
-                            "life.c"
+                            "life.c" "life_mood.c" "life_mind.c" "life_acts.c"
                             "ears_dir.c"
                             "metrics_model.c"
                             "metrics_parser.c"

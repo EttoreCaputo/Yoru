@@ -1,19 +1,22 @@
 #pragma once
-/* What Yoru does when nothing else has its attention: it floats about near
- * you, gets sleepy when nobody is around and drifts off to sleep; when
- * something important arrives for you it comes up to the glass and knocks.
- * Now and then it has a whim of its own (peeks out past the edge, stretches,
- * dances, gazes up at the sky it came from, loops, sneezes), greets you when
- * you come back after a while and in the morning, and has a cheer that your
- * attention raises and time alone wears down: cheerful it dances and loops
- * more, glum it looks bored and comes to look for you. The needs and the
- * fireflies come later (docs/ROADMAP.md).
+/* What Yoru does when nothing else has its attention (docs/life.md): a life
+ * of its own, after Anki's Vector. Five emotions (happy, energy, company,
+ * excitement, trust) that what happens pushes and time brings back; a state
+ * it is in (lounging, with you up at the glass, exploring, playing,
+ * dreaming, bored, looking for you, sulking, drowsy), each with its acts and
+ * weighted ways on; acts on the ball or up close, where only its eyes show.
+ * Over that, what interrupts it: something important for you (it comes up
+ * to the glass and knocks), a greeting when you're back, a nap when nobody
+ * is around, sleep.
  * It only moves the eyes (eyes.c) and plays its sounds; behaviour.c says when
- * it may, and puts it to sleep when it asks. All calls with the LVGL lock
- * held. */
+ * it may, tells it what happens, and puts it to sleep when it asks. All
+ * calls with the LVGL lock held, but life_debug(). */
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
+
+#include "cJSON.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,6 +41,28 @@ typedef struct {
     int32_t day;
 } life_ctx_t;
 
+/* What happens to it, for the emotions (life_mood.c has what each does). */
+typedef enum {
+    LIFE_FEEL_POKE,
+    LIFE_FEEL_STROKE,
+    LIFE_FEEL_HOLD,    // your finger in its hands
+    LIFE_FEEL_TALK,    // a conversation
+    LIFE_FEEL_SLAP,
+    LIFE_FEEL_SHAKE,
+    LIFE_FEEL_DROP,
+    LIFE_FEEL_LIFT,
+    LIFE_FEEL_PLAYED,  // a game with you
+    LIFE_FEEL_TIMER,   // a timer rang
+    LIFE_FEEL_HABIT,   // a habit ticked off
+    LIFE_FEEL_WOKE,
+    LIFE_FEEL_GREETED,
+    LIFE_FEEL_IGNORED, // it called and nobody came
+    LIFE_FEEL_FUN,     // it had fun on its own
+    LIFE_FEEL_SOUND,   // a sudden noise
+    LIFE_FEEL_PLUGGED,
+    LIFE_FEEL_COUNT,
+} life_feel_t;
+
 typedef enum {
     LIFE_NOTHING,
     LIFE_SLEEP, // it has settled down to sleep
@@ -57,11 +82,20 @@ void life_woke(void);
 bool life_call(void);
 /** It is at the glass for you right now: a touch means "I'm coming". */
 bool life_calling(void);
-/** What it is doing (lounge, call, nap, sleep, come, whim, greet), for
- * get_state. */
+/** Something happened to it: its emotions move. */
+void life_feel(life_feel_t feel);
+/** What it is doing: its state (lounge, watch, explore, play, dream, bored,
+ * seek, sulk, drowsy) or what interrupted it (call, nap, sleep, come,
+ * greet), for get_state. */
 const char *life_activity(void);
 /** Its cheer, 0 (glum) to 1 (delighted), for get_state. */
 float life_cheer(void);
+/** The state, the act, the emotions: get_state's `life`. */
+cJSON *life_status(void);
+/** debug/life: {"state"}, {"act"}, {"feel"}, {"speed"} (the life clock up to
+ * 300 times faster). Takes the LVGL lock. False, with why in `err`, for an
+ * unknown name. */
+bool life_debug(const cJSON *params, char *err, size_t len);
 
 #ifdef __cplusplus
 }
