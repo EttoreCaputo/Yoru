@@ -37,9 +37,10 @@ static const char *TAG = "cloud";
 /* The host's JSON, keys and character included. */
 #define CFG_MAX 3900
 #define RATE 16000
-/* The longest utterance kept: PWR may be held for a minute, the rest is cut. */
-#define REC_MAX_S 15
-#define REC_SAMPLES (REC_MAX_S * RATE)
+#define REC_SAMPLES (CLOUD_REC_MAX_MS / 1000 * RATE)
+/* Woken from hibernating, the WiFi takes a few seconds to join again: what
+ * is said meanwhile waits for it this long. */
+#define NET_WAIT_MS 10000
 #define REPLY_MAX (16 * 1024)
 #define TEXT_MAX 1024
 #define PROMPT_MAX 4096
@@ -245,7 +246,16 @@ bool cloud_ready(void)
     xSemaphoreTake(s_lock, portMAX_DELAY);
     const bool set = s_cfg != NULL;
     xSemaphoreGive(s_lock);
-    return set && s_rec != NULL && net_online();
+    return set && s_rec != NULL && (net_online() || net_joining());
+}
+
+/* The WiFi up, waited for if it's coming back. */
+static bool wait_online(void)
+{
+    for (int ms = 0; !net_online() && net_joining() && ms < NET_WAIT_MS; ms += 100) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+    return net_online();
 }
 
 bool cloud_begin(void)
@@ -1010,7 +1020,7 @@ static void answer(uint32_t job)
         voice_set_state(VOICE_IDLE);
         return;
     }
-    fail_t f = s_asked ? FAIL_NONE : transcribe(cJSON_GetObjectItemCaseSensitive(cfg, "stt"), s_heard, sizeof(s_heard));
+    fail_t f = !wait_online() ? FAIL_NET : s_asked ? FAIL_NONE : transcribe(cJSON_GetObjectItemCaseSensitive(cfg, "stt"), s_heard, sizeof(s_heard));
     s_asked = false;
     s_sending = false; // the recording is free again
     if (cancelled(job)) {
@@ -1072,6 +1082,7 @@ static void warm_all(void)
     cJSON *cfg = s_cfg != NULL ? cJSON_Duplicate(s_cfg, true) : NULL;
     xSemaphoreGive(s_lock);
     const char *parts[ROLE_COUNT] = {[ROLE_STT] = "stt", [ROLE_LLM] = "llm", [ROLE_TTS] = "tts"};
+    wait_online();
     for (int r = 0; r < ROLE_COUNT && cfg != NULL && !s_sending; r++) {
         warm((role_t) r, str(cJSON_GetObjectItemCaseSensitive(cfg, parts[r]), "url"));
     }

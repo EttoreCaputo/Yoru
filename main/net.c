@@ -592,6 +592,15 @@ bool net_online(void)
     return up;
 }
 
+bool net_joining(void)
+{
+    lock();
+    const bool coming = s_started && s_enabled && s_ssid[0] != '\0'
+                        && (s_hibernating || s_state == ST_CONNECTING || s_state == ST_DISCONNECTED);
+    unlock();
+    return coming;
+}
+
 cJSON *net_status(void)
 {
     cJSON *st = cJSON_CreateObject();

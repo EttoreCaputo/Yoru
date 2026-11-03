@@ -134,6 +134,7 @@ static const char *const END_NAMES[] = {
 typedef struct {
     bool active;
     bool button; /* push-to-talk: only letting go of PWR ends it */
+    int max_ms;  /* it's cut here */
     uint8_t id;
     uint16_t seq;
     int64_t start_us;
@@ -489,6 +490,9 @@ static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms, i
     st->level_us = 0;
     // Without a host, the board sends it to the services itself.
     st->cloud = !metrics_model_live() && cloud_begin();
+    // The board keeps only so much of it for the services: the ring shows it
+    // running out.
+    st->max_ms = st->cloud ? CLOUD_REC_MAX_MS : st->button ? MAX_TALK_MS : MAX_UTTERANCE_MS;
     // "Alexa" said again mid-sentence isn't a new wake, and WakeNet's CPU is
     // free meanwhile.
     s_afe->disable_wakenet(s_afe_data);
@@ -506,6 +510,10 @@ static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms, i
         playback_sound(SOUND_LISTEN);
         lvgl_port_lock();
         ui_voice_countdown((uint32_t) no_speech_ms);
+        lvgl_port_unlock();
+    } else if (st->cloud) {
+        lvgl_port_lock();
+        ui_voice_countdown((uint32_t) st->max_ms);
         lvgl_port_unlock();
     }
 }
@@ -598,9 +606,11 @@ static void stream_frame(const afe_fetch_result_t *res)
     st->samples += bytes / sizeof(int16_t);
     if (heard_speech(st, res, now, (int) (bytes / sizeof(int16_t) / 16))) {
         if (st->speech_us == 0 && st->follow_up) {
-            // Someone is talking: no more running out.
+            // Someone is talking: no more running out, but for the room
+            // left in the recording.
+            const int64_t left = st->max_ms - (now - st->start_us) / 1000;
             lvgl_port_lock();
-            ui_voice_countdown(0);
+            ui_voice_countdown(st->cloud && left > 0 ? (uint32_t) left : 0);
             lvgl_port_unlock();
         }
         st->speech_us = now;
@@ -625,14 +635,14 @@ static void stream_frame(const afe_fetch_result_t *res)
 
     int64_t elapsed_ms = (now - st->start_us) / 1000;
     if (st->button) {
-        if (elapsed_ms >= MAX_TALK_MS) {
+        if (elapsed_ms >= st->max_ms) {
             stream_end(END_MAX_LENGTH);
         }
     } else if (st->speech_us != 0 && (now - st->speech_us) / 1000 >= st->end_silence_ms) {
         stream_end(END_SPEECH);
     } else if (st->speech_us == 0 && elapsed_ms >= st->no_speech_ms) {
         stream_end(END_NO_SPEECH);
-    } else if (elapsed_ms >= MAX_UTTERANCE_MS) {
+    } else if (elapsed_ms >= st->max_ms) {
         stream_end(END_MAX_LENGTH);
     }
 }

@@ -1,5 +1,12 @@
 # Firmware changelog
 
+## 0.14.1
+
+Holding PWR talks to Yoru without the Mac, too.
+
+- **PWR works like "Alexa".** Holding PWR when Yoru had been asleep a long while went to the few English phrases ("Without the Mac I know only a few words"): the WiFi was still coming back. Now he listens at once and sends what you said as soon as the WiFi is back, in a few seconds.
+- **The time you have left.** Without the Mac he keeps at most 15 seconds of what you say: a ring along the rim runs down while he listens, and when it's gone he stops and answers. In a follow-up the ring first shows how long he waits for you, then, once you talk, the time left.
+
 ## 0.14.0
 
 Yoru talks with you without the Mac, and has a life of his own.

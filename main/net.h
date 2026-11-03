@@ -71,6 +71,10 @@ cJSON *net_status(void);
 /** Joined to the WiFi, with an address: the internet may be reachable. */
 bool net_online(void);
 
+/** Not joined yet, but on its way: starting, after a drop, or hibernating.
+ * Not when the network isn't there or the password is wrong. */
+bool net_joining(void);
+
 /** `wifi/...` requests (rpc.c). `usb`: the request came over USB, which may
  * change the WiFi and read the pairing key. Returns the result, or NULL with
  * `*code` and `*message` set. */

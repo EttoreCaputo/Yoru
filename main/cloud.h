@@ -19,6 +19,9 @@
 extern "C" {
 #endif
 
+/** The longest utterance kept for the services; the rest is cut. */
+#define CLOUD_REC_MAX_MS 15000
+
 /** Read the services from NVS and start the task. After voice_start() and
  * playback_start(). */
 void cloud_init(void);
