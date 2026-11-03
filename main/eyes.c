@@ -85,23 +85,6 @@
 /* The most pieces an overlay has (three z's, three dots). */
 #define MAX_OVERLAY_RECTS 3
 
-/* Up close (eyes_close_up()): Yoru against the glass, only its eyes on the
- * screen, light on the black (the sphere's pearl). They are this many times
- * the size of the eyes on the ball, this far apart, and look this far. */
-#define CLOSE_K 4.6f
-#define CLOSE_SPACING 112
-#define CLOSE_GAZE_X 90
-#define CLOSE_GAZE_Y 80
-/* How much more the pair moves than the ball would: up close a small step
- * is a big one. */
-#define CLOSE_MOVE 1.7f
-#define CLOSE_RGB 0xECE9F0
-/* What the lids and the redrawn box reach past the eye, for antialiasing. */
-#define CLOSE_MARGIN 3
-/* How shut a blink must be to swap the views behind it. */
-#define CLOSE_SWAP_LID 0.3f
-/* Back on the ball, it starts this near and floats back. */
-#define CLOSE_BACK_Z 0.72f
 /* The eye sprites: the largest eye (surprised, swelling, stretched) fits
  * in this. */
 #define EYE_BUF_W 40
@@ -120,15 +103,7 @@ typedef struct {
     float left, right;
     /* 1: drawn as a spiral (dizzy) instead of a pill. */
     float spiral;
-    /* Up close, another shape instead of the pill (GLYPH_*); on the ball the
-     * pill the rest of the shape says. Not eased: it swaps. */
-    float glyph;
 } eye_shape_t;
-
-#define GLYPH_PILL 0
-#define GLYPH_HEART 1
-#define GLYPH_STAR 2
-#define GLYPH_SQUEEZE 3 // > <
 
 static const eye_shape_t s_moods[EYES_MOOD_COUNT] = {
     [EYES_MOOD_NEUTRAL] = {26, 60, 0, 0, 0, 0, 1, 1},
@@ -149,9 +124,9 @@ static const eye_shape_t s_moods[EYES_MOOD_COUNT] = {
     [EYES_MOOD_SCARED] = {22, 70, 0.12f, -0.45f, 0, 0, 1, 1},
     [EYES_MOOD_PEEK] = {20, 44, 0, 0, 0, 0, 1, 1},
     [EYES_MOOD_WAITING] = {24, 54, 0, 0, 0, 7, 1.08f, 0.92f},
-    [EYES_MOOD_DELIGHTED] = {29, 55, 0, 0, 1, 0, 1, 1, 0, GLYPH_SQUEEZE},
-    [EYES_MOOD_SMITTEN] = {29, 57, 0, 0, 1, 0, 1, 1, 0, GLYPH_HEART},
-    [EYES_MOOD_STARRY] = {30, 66, 0, 0, 0, 0, 1.04f, 1.04f, 0, GLYPH_STAR},
+    [EYES_MOOD_DELIGHTED] = {29, 55, 0, 0, 1, 0, 1, 1},
+    [EYES_MOOD_SMITTEN] = {29, 57, 0, 0, 1, 0, 1, 1},
+    [EYES_MOOD_STARRY] = {30, 66, 0, 0, 0, 0, 1.04f, 1.04f},
     [EYES_MOOD_DREAMY] = {27, 57, 0.36f, -0.12f, 0.25f, 4, 1, 1},
 };
 
@@ -449,12 +424,6 @@ static struct {
     float wlid[2];
     /* Cross-eyed, 0..1, eased, and where it is going. */
     float cross, tcross;
-    /* Up close: shown, wanted (it swaps behind a blink), swapped this frame;
-     * the eyes then, and the box they were drawn in. */
-    bool close, close_want, close_swapped;
-    eye_box_t ceye[2];
-    lv_area_t close_drawn;   // both eyes, for eyes_hit()
-    lv_area_t ceye_drawn[2]; // each eye, for redrawing
     /* The firefly (eyes_firefly()): shown, where (screen pixels from the
      * middle), and where it was drawn. */
     bool fly, fly_shown;
@@ -1170,187 +1139,6 @@ static void draw_overlays(lv_layer_t *layer)
     }
 }
 
-/* ---- Up close ------------------------------------------------------------ */
-
-/* The two big eyes, in screen pixels: the same shape as on the ball, larger,
- * and moved by where the body would be (a hop hops the pair, nearer makes
- * them bigger). */
-static void close_layout(void)
-{
-    const float t = (float) s.t_ms / 1000.0f;
-    const float z = fmaxf(Z_NEAR, s.mv.pos.z);
-    const float near = clampf(1.0f / z, 0.6f, 1.6f);
-    const float sq = clampf(s.squash + s.vsq, -1, 1);
-    const float nx = 1 - 0.3f * s.gx * s.gx;
-    const float ny = 1 - 0.25f * s.gy * s.gy;
-    const float swell = (1 + 0.14f * s.level) * near;
-    const float w = s.cur.w * K * CLOSE_K * nx * swell * (1 + 2 * LOOK_SQUASH * sq);
-    const float h = s.cur.h * K * CLOSE_K * ny * swell * (1 - 2 * LOOK_SQUASH * sq) * s.lid;
-    const float lift = CLOSE_SPACING * sinf(s.cur.tilt * (float) M_PI / 180.0f);
-    const float gx = clampf(s.gx + 0.6f * s.lx, -1, 1), gy = clampf(s.gy + 0.6f * s.ly, -1, 1);
-    // A slow sway, so a still face still breathes.
-    const float bob = 4 * sinf(t * 1.7f);
-    const float cx = CX + s.mv.pos.x / z * CLOSE_MOVE + s.kx * 2.5f + s.lx * 18;
-    const float cy = CY + s.mv.pos.y / z * CLOSE_MOVE + bob + s.ky * 2.5f + s.ly * 14;
-    const float shiver = s.mood == EYES_MOOD_SCARED ? 3 * sinf(t * 70) : 0;
-    for (int i = 0; i < 2; i++) {
-        const int side = i == 0 ? -1 : 1;
-        const int inner = -side;
-        eye_box_t *e = &s.ceye[i];
-        e->w = w;
-        e->h = h * (i == 0 ? s.cur.left : s.cur.right) * s.wlid[i];
-        e->x = cx + shiver + (float) side * (CLOSE_SPACING * near * nx - 0.45f * CLOSE_GAZE_X * s.cross) + gx * CLOSE_GAZE_X;
-        e->y = cy + gy * CLOSE_GAZE_Y - (float) side * lift * near;
-        const float hh = fmaxf(e->h, 2);
-        const float cut = -hh / 2 + s.cur.top * hh;
-        e->top_l = cut - s.cur.slope * hh * 0.6f * (float) inner;
-        e->top_r = cut + s.cur.slope * hh * 0.6f * (float) inner;
-        e->bottom = s.cur.bottom;
-        e->spiral = s.cur.spiral;
-        e->phase = (float) side * t * 4.0f;
-    }
-}
-
-/* The box an eye up close covers: the pill and its glow, or the glyph's
- * square. Tight, since up close the eyes are big: the lids and the smile
- * are black on black outside it, so they needn't be redrawn there. */
-static lv_area_t close_eye_area(const eye_box_t *e)
-{
-    if (e->spiral > 0.5f || (int) s.cur.glyph != GLYPH_PILL) {
-        const float r = fmaxf(e->w * 1.35f, e->h * 0.66f) + 6;
-        return box(e->x, e->y, r, r, r, r);
-    }
-    const float hw = fmaxf(e->w / 2, 1.5f) + CLOSE_MARGIN + 2, hh = fmaxf(e->h / 2, 1.5f) + CLOSE_MARGIN + 2;
-    return box(e->x, e->y, hw, hh, hw, hh);
-}
-
-static lv_color_t close_color(void)
-{
-    const float base[3] = {(float) (CLOSE_RGB >> 16), (float) ((CLOSE_RGB >> 8) & 0xFF), (float) (CLOSE_RGB & 0xFF)};
-    float c[3];
-    for (int i = 0; i < 3; i++) {
-        c[i] = lerp(base[i], s.tint_rgb[i], 0.8f * s.tint);
-    }
-    return rgb_color(c);
-}
-
-static void draw_line(lv_layer_t *layer, float x1, float y1, float x2, float y2, float width, lv_color_t color)
-{
-    lv_draw_line_dsc_t dsc;
-    lv_draw_line_dsc_init(&dsc);
-    dsc.color = color;
-    dsc.width = (int32_t) fmaxf(2, width);
-    dsc.round_start = 1;
-    dsc.round_end = 1;
-    dsc.p1.x = x1;
-    dsc.p1.y = y1;
-    dsc.p2.x = x2;
-    dsc.p2.y = y2;
-    lv_draw_line(layer, &dsc);
-}
-
-/* A heart about `size` tall, beating. */
-static void close_heart(lv_layer_t *layer, const eye_box_t *e, lv_color_t c)
-{
-    const float beat = 1 + 0.08f * fmaxf(0, sinf((float) s.t_ms / 1000.0f * 7.5f));
-    const float sz = fminf(e->w * 1.9f, e->h * 0.95f) * beat;
-    const float r = sz * 0.29f;
-    draw_disc(layer, e->x - sz * 0.25f, e->y - sz * 0.12f, r, c, LV_OPA_COVER);
-    draw_disc(layer, e->x + sz * 0.25f, e->y - sz * 0.12f, r, c, LV_OPA_COVER);
-    fill_triangle(layer, e->x - sz * 0.52f, e->y - sz * 0.02f, e->x + sz * 0.52f, e->y - sz * 0.02f, e->x,
-                  e->y + sz * 0.5f, c, LV_OPA_COVER);
-}
-
-/* A five-pointed star, turning slowly and twinkling. */
-static void close_star(lv_layer_t *layer, const eye_box_t *e, lv_color_t c)
-{
-    const float t = (float) s.t_ms / 1000.0f;
-    const float ro = fminf(e->w * 1.05f, e->h * 0.5f) * (1 + 0.06f * sinf(t * 9));
-    const float ri = ro * 0.46f;
-    const float a0 = -(float) M_PI / 2 + 0.25f * sinf(t * 1.3f + e->phase);
-    for (int k = 0; k < 10; k++) {
-        const float a1 = a0 + (float) k * (float) M_PI / 5, a2 = a1 + (float) M_PI / 5;
-        const float r1 = (k & 1) ? ri : ro, r2 = (k & 1) ? ro : ri;
-        fill_triangle(layer, e->x, e->y, e->x + r1 * cosf(a1), e->y + r1 * sinf(a1), e->x + r2 * cosf(a2),
-                      e->y + r2 * sinf(a2), c, LV_OPA_COVER);
-    }
-}
-
-/* > for the left eye, < for the right: squeezed shut with joy. */
-static void close_squeeze(lv_layer_t *layer, const eye_box_t *e, int side, lv_color_t c)
-{
-    const float a = e->w * 0.55f, b = fminf(e->h, e->w * 2) * 0.32f;
-    const float th = e->w * 0.42f;
-    const float dir = side < 0 ? 1.0f : -1.0f; // the left one points in, to the right
-    draw_line(layer, e->x - dir * a, e->y - b, e->x + dir * a, e->y, th, c);
-    draw_line(layer, e->x + dir * a, e->y, e->x - dir * a, e->y + b, th, c);
-}
-
-/* Rings turning round: dizzy. */
-static void close_spiral(lv_layer_t *layer, const eye_box_t *e, lv_color_t c)
-{
-    const float rad = fminf(e->w, e->h) * 0.8f;
-    lv_draw_arc_dsc_t dsc;
-    lv_draw_arc_dsc_init(&dsc);
-    dsc.color = c;
-    dsc.width = (int32_t) fmaxf(3, rad * 0.16f);
-    dsc.rounded = 1;
-    dsc.center.x = (int32_t) e->x;
-    dsc.center.y = (int32_t) e->y;
-    for (int k = 1; k <= 3; k++) {
-        const int32_t start = ((int32_t) (e->phase * 57.3f) + k * 110) % 360;
-        dsc.radius = (uint16_t) (rad * (float) k / 3);
-        dsc.start_angle = (start + 360) % 360;
-        dsc.end_angle = (dsc.start_angle + 250) % 360;
-        lv_draw_arc(layer, &dsc);
-    }
-}
-
-/* The pill, lit, with the lids cut out of it in black: the screen is black
- * around it, so cutting is drawing black. */
-static void close_pill(lv_layer_t *layer, const eye_box_t *e, lv_color_t c)
-{
-    const float hw = fmaxf(e->w / 2, 1.5f), hh = fmaxf(e->h / 2, 1.5f);
-    const lv_color_t black = lv_color_black();
-    fill_rect(layer, e->x - hw, e->y - hh, e->x + hw, e->y + hh, c, LV_RADIUS_CIRCLE, LV_OPA_COVER);
-    if (hh < 4) {
-        return; // shut: a line
-    }
-    const float edge = hw + CLOSE_MARGIN;
-    if (fmaxf(e->top_l, e->top_r) > -hh + 1) {
-        const float top = e->y - hh - CLOSE_MARGIN;
-        const float yl = e->y + e->top_l, yr = e->y + e->top_r;
-        fill_triangle(layer, e->x - edge, yl, e->x + edge, yr, e->x - edge, top, black, LV_OPA_COVER);
-        fill_triangle(layer, e->x + edge, yr, e->x + edge, top, e->x - edge, top, black, LV_OPA_COVER);
-    }
-    if (e->bottom > 0.01f) {
-        const float rb = 1.8f * hw;
-        const float cy = e->y + hh + 2 - e->bottom * (0.6f * hh + 2) + rb;
-        draw_disc(layer, e->x, cy, rb, black, LV_OPA_COVER);
-    }
-}
-
-static void draw_close(lv_layer_t *layer)
-{
-    const lv_color_t c = close_color();
-    const int glyph = (int) s.cur.glyph;
-    for (int i = 0; i < 2; i++) {
-        const eye_box_t *e = &s.ceye[i];
-        const bool open = e->h > 0.4f * fminf(e->w, 20);
-        if (e->spiral > 0.5f) {
-            close_spiral(layer, e, c);
-        } else if (glyph == GLYPH_HEART && open) {
-            close_heart(layer, e, c);
-        } else if (glyph == GLYPH_STAR && open) {
-            close_star(layer, e, c);
-        } else if (glyph == GLYPH_SQUEEZE) {
-            close_squeeze(layer, e, i == 0 ? -1 : 1, c);
-        } else {
-            close_pill(layer, e, c);
-        }
-    }
-}
-
 #define FLY_RGB 0xD8FF6A
 #define FLY_GLOW 14
 
@@ -1377,11 +1165,6 @@ static void draw_firefly(lv_layer_t *layer)
 static void draw_cb(lv_event_t *e)
 {
     lv_layer_t *layer = lv_event_get_layer(e);
-    if (s.close) {
-        draw_close(layer);
-        draw_firefly(layer);
-        return;
-    }
     const look_t *lk = look_get();
     const body_vis_t *v = &s.body;
     const lv_color_t black = lv_color_black();
@@ -1721,7 +1504,6 @@ static bool step(void)
             c[i] = w[i]; // close enough: a still face stops redrawing
         }
     }
-    s.cur.glyph = want->glyph;
 
     // Saccades: a new place to look every 1.2-3.6 s, unless held.
     if (!s.held) {
@@ -1790,37 +1572,6 @@ static bool step(void)
     const float cross = lerp(s.cross, s.tcross, ease(0.2f));
     winked = winked || fabsf(cross - s.cross) > 0.002f;
     s.cross = fabsf(cross - s.tcross) < 0.002f ? s.tcross : cross;
-
-    // Up close it can't sleep, talk, think or point: back to the ball for
-    // those. The views swap behind a blink.
-    if (s.close_want
-        && (s.status != EYES_STATUS_IDLE || s.mood == EYES_MOOD_ASLEEP || s.mood == EYES_MOOD_PEEK
-            || s.mood == EYES_MOOD_WAITING || s.mood == EYES_MOOD_LISTENING || s.mood == EYES_MOOD_SPEAKING
-            || s.mood == EYES_MOOD_THINKING)) {
-        s.close_want = false;
-    }
-    if (s.close_want != s.close) {
-        if (s.lid < CLOSE_SWAP_LID) {
-            s.close = s.close_want;
-            s.close_swapped = true;
-            if (s.close) {
-                // The pair starts in the middle, as big as it comes.
-                s.mv.n = 0;
-                s.mv.follow = false;
-                s.mv.pos = (eyes_pos_t) {0, 0, 1};
-                s.mv.vel = (eyes_pos_t) {0};
-            } else {
-                // Back from the glass.
-                s.mv.n = 0;
-                s.mv.follow = false;
-                s.mv.pos = (eyes_pos_t) {0, 10 * CLOSE_BACK_Z, CLOSE_BACK_Z};
-                const eyes_pos_t home = {0, 0, 1};
-                mover_path(&s.mv, &home, 1, 900, EYES_PATH_GLIDE);
-            }
-        } else if (s.blink_ms <= 0) {
-            s.blink_ms = 160;
-        }
-    }
 
     float squash = s.squash * powf(0.85f, s.frames);
     // Quick to rise with a syllable, slower to fall: it reads as talking.
@@ -1896,31 +1647,6 @@ static bool step(void)
     return moved;
 }
 
-/* Up close only the eyes move: one box round both, where they were and
- * where they are. */
-static void close_frame(bool moved)
-{
-    const eye_box_t was[2] = {s.ceye[0], s.ceye[1]};
-    close_layout();
-    const bool turning = s.cur.spiral > 0.5f || s.cur.glyph == GLYPH_HEART || s.cur.glyph == GLYPH_STAR;
-    if (!moved && !turning && memcmp(was, s.ceye, sizeof(was)) == 0 && s.close_drawn.x2 >= s.close_drawn.x1) {
-        return;
-    }
-    // Each eye on its own: one box round both would be most of the screen.
-    const bool drawn = s.close_drawn.x2 >= s.close_drawn.x1;
-    for (int i = 0; i < 2; i++) {
-        const lv_area_t now = close_eye_area(&s.ceye[i]);
-        if (drawn) {
-            invalidate_move(&s.ceye_drawn[i], &now);
-        } else {
-            lv_obj_invalidate_area(s.obj, &now);
-        }
-        s.ceye_drawn[i] = now;
-    }
-    const lv_area_t *a = &s.ceye_drawn[0], *b = &s.ceye_drawn[1];
-    s.close_drawn = (lv_area_t) {LV_MIN(a->x1, b->x1), LV_MIN(a->y1, b->y1), LV_MAX(a->x2, b->x2), LV_MAX(a->y2, b->y2)};
-}
-
 static void frame_cb(lv_timer_t *timer)
 {
     const uint32_t elapsed = lv_tick_elaps(s.last_tick);
@@ -1934,15 +1660,6 @@ static void frame_cb(lv_timer_t *timer)
     body_layout(&s.body);
     eye_layout();
     s.frame++;
-    if (s.close_swapped) {
-        // One view goes, the other comes: the whole screen once, and every
-        // piece of the ball drawn afresh when it's back.
-        s.close_swapped = false;
-        lv_obj_invalidate(s.obj);
-        s.body_valid = false;
-        s.eye_sp[0].valid = s.eye_sp[1].valid = false;
-        s.close_drawn = (lv_area_t) {0, 0, -1, -1};
-    }
     // The firefly flickers and flies: its box, where it was and where it is.
     if (s.fly || s.fly_shown) {
         const lv_area_t now = fly_area();
@@ -1953,10 +1670,6 @@ static void frame_cb(lv_timer_t *timer)
         }
         s.fly_drawn = now;
         s.fly_shown = s.fly;
-    }
-    if (s.close) {
-        close_frame(eyes_moved);
-        return;
     }
     // Hidden under the menu or the dark it isn't drawn: no new sizes to
     // render (the menu draws its own Yoru meanwhile).
@@ -2089,7 +1802,6 @@ lv_obj_t *eyes_create(lv_obj_t *parent)
     s.lowbat_key = -1;
     s.wink = -1;
     s.wlid[0] = s.wlid[1] = 1;
-    s.close_drawn = (lv_area_t) {0, 0, -1, -1};
     s.last_tick = lv_tick_get();
     s.hand[0] = (hand_pose_t) TUCK_L;
     s.hand[1] = (hand_pose_t) TUCK_R;
@@ -2243,7 +1955,6 @@ void eyes_gesture(eyes_gesture_t gesture)
         return;
     }
     s.clutch = false; // a gesture needs the hands
-    s.close_want = false; // and the ball
     s.hand_from[0] = s.hand[0];
     s.hand_from[1] = s.hand[1];
     s.gesture = gesture;
@@ -2318,25 +2029,10 @@ eyes_pos_t eyes_unproject(int32_t x, int32_t y, float z)
 
 bool eyes_hit(int32_t x, int32_t y)
 {
-    if (s.close) {
-        // Up close it is all there is.
-        return x >= s.close_drawn.x1 - 40 && x <= s.close_drawn.x2 + 40 && y >= s.close_drawn.y1 - 40
-               && y <= s.close_drawn.y2 + 40;
-    }
     const float r = R * s.body.dist + 18;
     return hypotf((float) (x - s.body.bx), (float) (y - s.body.by)) <= r;
 }
 
-
-void eyes_close_up(bool on)
-{
-    s.close_want = on;
-}
-
-bool eyes_up_close(void)
-{
-    return s.close;
-}
 
 void eyes_wink(int eye, uint32_t ms)
 {

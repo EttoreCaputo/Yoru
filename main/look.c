@@ -29,8 +29,7 @@ static look_t s_look;
  * sizes and squashes in use, within a budget of PSRAM (a sphere up at the
  * glass is about 450 KB). The budget is small: PSRAM is shared with
  * MultiNet, which loads while Yoru greets you at boot and crashes inside
- * ESP-SR if it can't have its memory, and with the cloud's TLS. Up close
- * (eyes_close_up()) there is no sphere at all. */
+ * ESP-SR if it can't have its memory, and with the cloud's TLS. */
 #define BALL_SLOTS 14
 #define BALL_BUDGET (1024 * 1024)
 typedef struct {

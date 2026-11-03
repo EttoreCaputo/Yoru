@@ -60,9 +60,11 @@ void mood_status(cJSON *out);
 /* ---- What it does (life_acts.c) --------------------------------------------- */
 
 typedef enum {
-    // On the ball.
+    ACT_REST, // still: only the eyes wander and blink
     ACT_DRIFT,
     ACT_LOOK,
+    ACT_GAZE,
+    ACT_WINK,
     ACT_TILT,
     ACT_STRETCH,
     ACT_SNEEZE,
@@ -78,28 +80,13 @@ typedef enum {
     ACT_SIGH,
     ACT_YAWN,
     ACT_NOD,
+    ACT_SEARCH,
+    ACT_SAD,
     ACT_SULK,
-    // Up close: only the eyes.
-    ACT_C_DRIFT,
-    ACT_C_GAZE,
-    ACT_C_BLINK,
-    ACT_C_WINK,
-    ACT_C_TILT,
-    ACT_C_HEARTS,
-    ACT_C_STARRY,
-    ACT_C_TRICKS,
-    ACT_C_SCAN,
-    ACT_C_PEEKABOO,
-    ACT_C_SNEAK,
-    ACT_C_BOUNCE,
-    ACT_C_DOZE,
-    ACT_C_SEARCH,
-    ACT_C_SAD,
     ACT_COUNT,
 } act_id_t;
 
-#define ACTF_CLOSE 1 // up close
-#define ACTF_LOUD 2  // too lively for Do not disturb
+#define ACTF_LOUD 1 // too lively for Do not disturb
 
 typedef struct {
     const char *name;

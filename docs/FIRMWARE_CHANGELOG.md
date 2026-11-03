@@ -1,5 +1,12 @@
 # Firmware changelog
 
+## 0.15.1
+
+Yoru is calmer, and stays on his ball.
+
+- **Calmer.** He was doing something all the time. Now he's mostly still: he floats where he is, his eyes wander and blink, and only now and then, every half a minute or so, he does something you notice. Playing and exploring come less often and last less, and his little whims (sneezing, hiccups, the firefly) are rarer, so they stay a surprise.
+- **No more eyes up close.** The view with only his big eyes on the screen is gone. When he wants to be with you he comes a little nearer on his ball, looks at you with a slow blink, now and then a wink; when he's lonely he looks around for you on the ball.
+
 ## 0.15.0
 
 Yoru has a life of his own, and comes up close.
