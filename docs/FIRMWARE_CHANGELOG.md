@@ -1,5 +1,12 @@
 # Firmware changelog
 
+## 0.17.0
+
+Yoru looks things up on the web, even without the Mac.
+
+- **He searches the web himself.** With the Mac away and the WiFi up, ask him for something recent or that he can't know (the news, the weather, a score, a price, opening hours) and he looks it up on Tavily and answers out loud from what he found. It takes a couple of seconds more than a plain answer. If the search doesn't work (no internet, a key refused, too many searches) he says so kindly.
+- **How to turn it on.** Paste a Tavily key in Yoru Hub, under Settings (the free plan gives 1,000 searches a month); Yoru Hub hands it to the board with the other keys. Without a key he tells you he can't search the web from the desk, as before.
+
 ## 0.16.0
 
 Habits are gone; Tasks take their place.

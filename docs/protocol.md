@@ -273,7 +273,8 @@ Since 0.14.0, with the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/b
 {"name":"Yoru","character":"You are friendly and to the point...","memory":"# What Yoru knows about you ...",
  "stt":{"url":"https://api.groq.com/openai/v1/audio/transcriptions","key":"gsk_...","model":"whisper-large-v3-turbo","language":"it"},
  "llm":{"api":"openai","url":"https://api.openai.com/v1/chat/completions","key":"sk-...","model":"gpt-6-luna","params":{"reasoning_effort":"none"}},
- "tts":{"api":"elevenlabs","url":"https://api.elevenlabs.io","key":"...","model":"eleven_v4_turbo","voice":"<voice_id>"}}
+ "tts":{"api":"elevenlabs","url":"https://api.elevenlabs.io","key":"...","model":"eleven_v4_turbo","voice":"<voice_id>"},
+ "search":{"url":"https://api.tavily.com/search","key":"tvly-..."}}
 ```
 
 | Field | What it is |
@@ -281,14 +282,16 @@ Since 0.14.0, with the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/b
 | `stt` | An OpenAI-style `/audio/transcriptions` endpoint (Groq, OpenAI): the full `url`, `model`, `language` (optional) |
 | `llm` | `api`: `openai` (Chat Completions at `url`, with `params` merged into each request) or `anthropic` (Messages at `url`, `max_tokens` 400) |
 | `tts` | `api`: `elevenlabs` (`url` is the base; `voice` the voice id; PCM at 16 kHz) or `openai` (`url` the base, `/audio/speech`; `voice`; `format` `pcm` at `rate`, 24000 by default, or `wav`; `max_chars` per request, the text cut at sentences) |
+| `search` | Optional (0.17.0 and later): web search through Tavily's `/search` (`url`, `key`). With it the brain may ask for a search (see below); without it the board says it can't search the web |
 | `name`, `character`, `memory` | Optional: Yoru's name, a line on how it talks, what it knows of the user (a host sends 1,200 characters at most) |
 
 The whole object must fit in 3,900 bytes. Every URL must be `https`; the certificates are ESP-IDF's bundle plus GlobalSign Root CA (`main/certs/extra_roots.pem`), which Groq's, Anthropic's and ElevenLabs' chains end in.
 
-`cloud/get` (no params): `{"set":true,"stt":"whisper-large-v3-turbo","llm":"gpt-6-luna","tts":"eleven_v4_turbo","ready":true}`, the models and whether it would answer now (services, WiFi); never the keys.
+`cloud/get` (no params): `{"set":true,"stt":"whisper-large-v3-turbo","llm":"gpt-6-luna","tts":"eleven_v4_turbo","search":true,"ready":true}`, the models, whether a web search is set (0.17.0 and later) and whether it would answer now (services, WiFi); never the keys.
 
 The brain's answer may carry tags, which are taken out before it is said and act on the board (`commands_tag()`): `[timer SECONDS]`, `[pomodoro]`, `[stop]`, `[pause]`, `[resume]`, `[volume up]`, `[volume down]`, `[open games|timers|tasks|inbox]` (`[habit NUMBER]` and `habits` until 0.15.1), `[sleep]` and `[face NAME]` (happy, excited, love, curious, proud, wink, surprised, sad, shy, sleepy, dance, wave, thinking).
 
+- **Web search (0.17.0).** With `search` set, the prompt tells the brain it may reply with only `[search QUERY]` for anything recent or unknown. The board then calls Tavily (`include_answer`, three results), and asks the brain again with the results, as data, in the same turn; the brain's answer is said. The results are not kept in the history (only the question and the answer), a second search in the same turn is ignored, and the search connection is closed once it has answered, to spare internal RAM. A failed search is told to the brain, which says so kindly.
 - **Speed.** Each service keeps one connection open between requests, and its TLS session to resume a new one; all three are opened (a `HEAD`) while the user is still talking. A fresh connection takes the board 1 to 4 s; a kept one a few milliseconds.
 - **Failures** show in a line over the bottom rim (no internet, a key refused, too many requests) with the red ring; nothing is said.
 - **Not while a host is there:** with one, everything goes to it as before. Without the services or the WiFi, the offline phrases above.
