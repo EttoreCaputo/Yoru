@@ -13,12 +13,10 @@
 #include "board_settings.h"
 #include "card.h"
 #include "clock.h"
-#include "commands.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "errand.h"
 #include "eyes.h"
-#include "habits.h"
 #include "inbox.h"
 #include "inbox_ui.h"
 #include "life.h"
@@ -776,8 +774,6 @@ static void tick_cb(lv_timer_t *timer)
     apply_rotation();
     inbox_tick(now);
     timers_tick();
-    habits_poll();
-    commands_poll();
     battery_tick(now);
     if (card_up()) {
         wait_for_answer(now);

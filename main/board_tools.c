@@ -15,7 +15,7 @@
 #include "esp_timer.h"
 #include "errand.h"
 #include "eyes.h"
-#include "habits.h"
+#include "tasks.h"
 #include "inbox.h"
 #include "inbox_ui.h"
 #include "life.h"
@@ -391,9 +391,9 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
     cJSON_AddNumberToObject(st, "timers", timers_count());
     // The board's own clock: local minutes since midnight, -1 if not known.
     cJSON_AddNumberToObject(st, "minute", clock_minute());
-    cJSON *hb = cJSON_AddObjectToObject(st, "habits");
-    cJSON_AddNumberToObject(hb, "count", habits_count());
-    cJSON_AddNumberToObject(hb, "done", habits_done());
+    cJSON *tk = cJSON_AddObjectToObject(st, "tasks");
+    cJSON_AddNumberToObject(tk, "count", tasks_count());
+    cJSON_AddNumberToObject(tk, "failed", tasks_failed());
     cJSON_AddBoolToObject(st, "errand", errand_busy());
     lvgl_port_unlock();
     *structured = st;
@@ -609,14 +609,14 @@ static bool tool_set_timers(const cJSON *args, char *text, cJSON **structured)
     return ok;
 }
 
-static bool tool_set_habits(const cJSON *args, char *text, cJSON **structured)
+static bool tool_set_tasks(const cJSON *args, char *text, cJSON **structured)
 {
     lvgl_port_lock();
-    const bool ok = habits_set(args, text, TEXT_MAX);
-    const int n = habits_count(), done = habits_done();
+    const bool ok = tasks_set(args, text, TEXT_MAX);
+    const int n = tasks_count();
     lvgl_port_unlock();
     if (ok) {
-        snprintf(text, TEXT_MAX, "%d habits, %d done", n, done);
+        snprintf(text, TEXT_MAX, "%d tasks", n);
     }
     return ok;
 }
@@ -643,7 +643,7 @@ static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
         .description = "Open or close the menu on Yoru's screen: on its home (the apps around Yoru), on an app "
-                       "(inbox, timers, habits, games, settings) or straight on a page of Settings (display, sound, "
+                       "(inbox, timers, tasks, games, settings) or straight on a page of Settings (display, sound, "
                        "behaviour, voice, connection, battery, about).",
         .schema = "{\"type\":\"object\",\"properties\":{\"open\":{\"type\":\"boolean\"},"
                   "\"page\":{\"type\":\"string\"}}}",
@@ -721,17 +721,23 @@ static const tool_t TOOLS[] = {
         .fn = tool_set_timers,
     },
     {
-        .name = "set_habits",
-        .description = "Today's habits, for the Habits app on Yoru (at most 8): how many times each is done of its "
-                       "goal and its streak. A tap on the board ticks one and comes back with `habit_check`. The "
-                       "host sends it itself.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"habits\":{\"type\":\"array\",\"maxItems\":8,"
+        .name = "set_tasks",
+        .description = "The tasks the user gave the host's assistant, for the Tasks app on Yoru (at most 8): what "
+                       "each does, when it runs and next, and how it went last time. \"Do it now\" on the board "
+                       "comes back with `task_run`. The host sends it itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"tasks\":{\"type\":\"array\",\"maxItems\":8,"
                   "\"items\":{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},"
-                  "\"name\":{\"type\":\"string\"},\"done\":{\"type\":\"integer\"},"
-                  "\"goal\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":99},"
-                  "\"streak\":{\"type\":\"integer\"},\"color\":{\"type\":\"string\"}},"
-                  "\"required\":[\"id\",\"name\"]}}},\"required\":[\"habits\"]}",
-        .fn = tool_set_habits,
+                  "\"name\":{\"type\":\"string\"},\"what\":{\"type\":\"string\"},"
+                  "\"repeat\":{\"type\":\"string\",\"enum\":[\"once\",\"daily\",\"monthly\",\"hourly\"]},"
+                  "\"at\":{\"type\":\"string\"},\"date\":{\"type\":\"string\"},"
+                  "\"days\":{\"type\":\"array\",\"items\":{\"type\":\"integer\"}},"
+                  "\"day\":{\"type\":\"integer\"},\"every\":{\"type\":\"integer\"},"
+                  "\"acting\":{\"type\":\"string\",\"enum\":[\"never\",\"ask\",\"free\"]},"
+                  "\"enabled\":{\"type\":\"boolean\"},\"next\":{\"type\":\"integer\"},"
+                  "\"last\":{\"type\":\"integer\"},\"result\":{\"type\":\"string\"},"
+                  "\"failed\":{\"type\":\"boolean\"},\"running\":{\"type\":\"boolean\"}},"
+                  "\"required\":[\"id\",\"name\"]}}},\"required\":[\"tasks\"]}",
+        .fn = tool_set_tasks,
     },
     {
         .name = "show_fetch",

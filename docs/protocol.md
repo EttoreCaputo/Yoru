@@ -9,14 +9,14 @@ Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main
 `hello` and `ready` answer:
 
 ```json
-{"protocol":2,"firmware":"0.11.9","idf":"v6.1","board":"yoru-amoled-1.75c","id":"7c0c5f4233e4","transport":"usb","max_payload":4096,"channels":["ctrl","metrics","log","audio_up","audio_down"],"capabilities":["tools","gaze","wifi","voice","speaker","inbox","timers","habits","fetch"]}
+{"protocol":2,"firmware":"0.11.9","idf":"v6.1","board":"yoru-amoled-1.75c","id":"7c0c5f4233e4","transport":"usb","max_payload":4096,"channels":["ctrl","metrics","log","audio_up","audio_down"],"capabilities":["tools","gaze","wifi","voice","speaker","inbox","timers","tasks","fetch"]}
 ```
 
 - `board` is `yoru-amoled-1.75c`; a host tells Yoru from DualEye by it.
 - `agents` and `remote` (0.7.0 to 0.11.4): the coding agents' tools and notifications and the remote for them. 0.11.5 removed them, with the agents' questions, drafts, chats and `shortcut` (`show_approval` stays, for Yoru's own confirmations): a host must not send those tools to a board without the capabilities.
 - `inbox` (0.10.0 and later): the inbox (see Inbox): the `show_notification`, `hide_notification` and `clear_notifications` tools and the `notification_action` notification.
 - `timers` (0.11.0 and later): the menu's Timers app (see Timers): the `set_timers` tool and the `timer_action` notification.
-- `habits` (0.11.0 and later): the menu's Habits app (see Habits): the `set_habits` tool and the `habit_check` notification.
+- `tasks` (0.16.0 and later): the menu's Tasks app (see Tasks): the `set_tasks` tool and the `task_run` notification. `habits` (0.11.0 to 0.15.1) was the Habits app, with `set_habits` and `habit_check`.
 - `fetch` (0.11.0 and later): Yoru's errands (see Fetch): the `show_fetch` tool.
 - `cloud` (0.14.0 and later): talking without the host (see Cloud voice): the `cloud/set` and `cloud/get` methods.
 - There is no `media` or `music` capability: Yoru has no image or music face, so `media/...` and `music/...` answer `-32601`.
@@ -41,7 +41,7 @@ The TCP port is the same, 7340.
 
 The same snapshot. Since 0.10.0 a snapshot needs only `pet` (the host's time and idle time): `cpu` and `gpu` are optional, and one with none of the three is still ignored. Since 0.8.0 Yoru reads only the host's time and idle time (night brightness, and the sleep times count from your last input on the computer); it shows none of the rest. A timer's `screen` is ignored.
 
-**The board's clock (0.13.0).** The board keeps the time of day itself (`clock.c`): from the internet (SNTP, `pool.ntp.org`) once its WiFi is up, and from each snapshot: `ts` (UTC seconds) sets it when it is more than 2 s off, and `pet.tz`, the host's time zone as POSIX writes it (`"CET-1CEST,M3.5.0,M10.5.0/3"`, at most 47 characters), sets the zone, kept in NVS. A host without `tz` gives its offset from `pet.min` against `ts`, to a quarter of an hour. Until a host has said a zone, the board uses Central European Time. Night brightness, the habits' day and "what time is it" use this clock, with or without a host. A host whose snapshots stopped more than 3 s ago is taken as gone: its idle time no longer counts, the board rings its timers and hears spoken commands itself (Offline commands).
+**The board's clock (0.13.0).** The board keeps the time of day itself (`clock.c`): from the internet (SNTP, `pool.ntp.org`) once its WiFi is up, and from each snapshot: `ts` (UTC seconds) sets it when it is more than 2 s off, and `pet.tz`, the host's time zone as POSIX writes it (`"CET-1CEST,M3.5.0,M10.5.0/3"`, at most 47 characters), sets the zone, kept in NVS. A host without `tz` gives its offset from `pet.min` against `ts`, to a quarter of an hour. Until a host has said a zone, the board uses Central European Time. Night brightness, the tasks' times and "what time is it" use this clock, with or without a host. A host whose snapshots stopped more than 3 s ago is taken as gone: its idle time no longer counts, the board rings its timers and hears spoken commands itself (Offline commands).
 
 ```json
 {"v":2,"ts":1793574000,"pet":{"min":915,"idle":4,"tz":"CET-1CEST,M3.5.0,M10.5.0/3"}}
@@ -61,8 +61,8 @@ Settings are kept in NVS and survive a reboot.
 | `play_sound` | `name` | As on DualEye: the same sounds, plus Yoru's own: `unplug` and, an earcon played with pet sounds off too, `battery_low` (0.12.1) |
 | `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it), `power_saver` (on battery, the Saver profile instead of Balanced; 0.12.0, see Power), `hibernate` (on battery, minutes of dark screen before hibernating, 0 never; 0.12.0). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
 | `set_setting` | `name`, `value`: integer | Change one setting within its range (switches are 0 or 1); it applies at once |
-| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0; since 0.15.0 also its state, `watch`, `explore`, `play`, `dream`, `bored`, `seek`, `sulk`, `drowsy`, and `greet`), `cheer` (0..1), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time); since 0.15.0 `life`: `activity`, `state`, `act`, `since_s`, `left_s` and `emotions` (`happy`, `energy`, `social`, `stim`, `trust`, -1..1), see `docs/life.md`. `eyes` may also be `delighted`, `smitten`, `starry` or `dreamy` since 0.15.0 |
-| `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `habits` · `games` (0.11.8 and later) · `settings` · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it. Since 0.11.0; before, the menu was a ring and `inbox` one of its pages |
+| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0; since 0.15.0 also its state, `watch`, `explore`, `play`, `dream`, `bored`, `seek`, `sulk`, `drowsy`, and `greet`), `cheer` (0..1), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`; replaced in 0.16.0 by `tasks`: `count`, `failed`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time); since 0.15.0 `life`: `activity`, `state`, `act`, `since_s`, `left_s` and `emotions` (`happy`, `energy`, `social`, `stim`, `trust`, -1..1), see `docs/life.md`. `eyes` may also be `delighted`, `smitten`, `starry` or `dreamy` since 0.15.0 |
+| `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `tasks` (0.16.0 and later; `habits` before) · `games` (0.11.8 and later) · `settings` · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it. Since 0.11.0; before, the menu was a ring and `inbox` one of its pages |
 | `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Yoru asks before it acts for you, over the eyes, with Allow and Deny (see Confirmations). A second call replaces it |
 | `hide_approval` | `id`: string | Take that card away: it was answered in the app, or gave up. An `id` that isn't shown is fine |
 | `show_toast` | `text`: string, `seconds`: integer, `tone`?: `info` · `done` · `wait` · `error` | Since 0.7.0. One line above the bottom rim for a few seconds. A second call replaces it. Yoru Hub no longer sends it (since 2026-10-21) |
@@ -70,10 +70,10 @@ Settings are kept in NVS and survive a reboot.
 | `hide_notification` | `id`: string | Since 0.10.0. Take it out of the inbox. An `id` that isn't there is fine |
 | `clear_notifications` | none | Since 0.10.0. Empty the inbox |
 | `set_timers` | `timers`: array | Since 0.11.0. Every timer and reminder (see Timers) |
-| `set_habits` | `habits`: array | Since 0.11.0. Today's habits (see Habits) |
+| `set_tasks` | `tasks`: array | Since 0.16.0. The tasks the user gave the host (see Tasks); `set_habits` (0.11.0 to 0.15.1) is gone |
 | `show_fetch` | `state`, `source`?, `id`? | Since 0.11.0. A connector call starts or ends: Yoru's errand (see Fetch) |
 
-The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `set_habits`, `show_fetch`) are for the host only: Yoru Hub keeps them out of its MCP server.
+The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `show_fetch`, and since 0.16.0 `set_tasks`) are for the host only: Yoru Hub keeps them out of its MCP server.
 
 ## Confirmations
 
@@ -224,25 +224,25 @@ What the user does comes back as `timer_action`:
 
 `label` comes when it has one, `pomodoro` only for a `work` or `break` phase, `language` is the board's (`it` or `en`), for what the host says when it rings. A host that takes it over puts it in its list with `was` set to the board's id, and the board drops its own copy then; offered again, the host updates the one it has instead of adding another. A host that doesn't know `timer_new` ignores it, and the timer stays the board's. Yoru Hub: `Timers::adopt` in `core/src/timers.rs`. Hibernation waits while any timer is there; the board's own don't survive a restart.
 
-## Habits
+## Tasks
 
-Since 0.11.0, with the `habits` capability. Yoru Hub keeps them in `core/src/assistant/habits.rs` (set by voice or on its Routines page). The host keeps the user's habits, how many times each is done today and the streaks, starts each day afresh at midnight, and sends today's list whenever it changes and on connect.
+Since 0.16.0, with the `tasks` capability; it replaced the Habits app (0.11.0 to 0.15.1: `set_habits`, `habit_check`, the `habits` capability, gone). Yoru Hub keeps them in `core/src/assistant/tasks.rs`: jobs the user gave its assistant, in words, once or on a schedule, which the host does on its own when their time comes. The host sends the whole list whenever one changes (a run starting or ending included), every ten minutes, and on connect; the board only shows them.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
-| `set_habits` | `habits`: array of at most 8 `{id, name, done?, goal?, streak?, color?}` | Replace the list. `id`: at most 23 bytes; `name`: at most 24 characters shown; `done`: today's count (0 by default, kept within 0..`goal`); `goal`: times a day, 1 to 99 (1 by default); `streak`: days in a row it was done, today counting once it is; `color`: `"#RRGGBB"`, otherwise one of the board's in turn |
+| `set_tasks` | `tasks`: array of at most 8 `{id, name, what?, repeat?, at?, date?, days?, day?, every?, acting?, enabled?, next?, last?, result?, failed?, running?}` | Replace the list. `id`: at most 39 bytes; `name`: at most 32 characters shown; `what`: the job and `result`: what was done last time, 100 characters each; `repeat`: `once` (`date` `YYYY-MM-DD` and `at` `HH:MM`), `daily` (`at`, `days` 1 Monday to 7 Sunday, none for every day), `monthly` (`day` and `at`) or `hourly` (`every` hours); `acting`: `never` (reads and tells), `ask` (asks before acting, the default) or `free` (acts on its own); `next` and `last`: Unix seconds, 0 for none; `failed`: the last run went wrong; `running`: it is being done now |
 
 ```json
-{"habits":[{"id":"water","name":"Water","done":3,"goal":8,"streak":12,"color":"#40C8E0"},{"id":"walk","name":"Walk","done":0,"goal":1,"streak":4}]}
+{"tasks":[{"id":"weekly-issues","name":"Weekly issues","what":"Sum up my open GitHub issues","repeat":"daily","at":"09:00","days":[1],"acting":"never","enabled":true,"next":1794300000,"last":1793700000,"result":"6 open, 2 stuck.","failed":false,"running":false}]}
 ```
 
-The menu's Habits app shows the first three as rings around how many are done today, and a row for each. A tap adds one (up to `goal`), a long press takes one back; finishing one adds today to its streak on the board, undoing it takes it away. Each change comes back as `habit_check`, with the new count:
+The menu's Tasks app has a row for each, with a dot (green: went well, red: failed, amber: running, grey: off) and when it runs next; its bubble's badge counts the ones that failed. A tap opens one: when it runs, what to do, how far it may go, what was done last time, and "Do it now", which asks the host with `task_run` (only while a host is there):
 
 ```json
-{"jsonrpc":"2.0","method":"habit_check","params":{"id":"water","done":4}}
+{"jsonrpc":"2.0","method":"task_run","params":{"id":"weekly-issues"}}
 ```
 
-**Without the host (0.13.0).** The board keeps the last list in NVS, so it is there after a restart and goes on without a host: a tap still ticks one off, at midnight on the board's clock the counts start afresh and a habit not done the day before (or a day missed) loses its streak. The next `set_habits` from a host is the host's list, except for the counts ticked on the board since the last list, on the same day: those stay, and the board sends a `habit_check` for each, so the host catches up. Ticks from an earlier day are dropped.
+The row shows it as running until the host's next list. A run that ends well since the last list cheers Yoru up (`task` in `docs/life.md`). The board keeps the last list in NVS, so it shows after a restart and without a host; the Cloud voice's prompt lists them, to be done once the computer is back.
 
 ## Offline commands
 
@@ -257,16 +257,15 @@ Since 0.13.0. When no host has sent a snapshot for 3 s, what is said after the w
 | "how much time is left", "how long is left" | Shows what is left on the first timer |
 | "what time is it", "what is the time" | Shows the time on the board's clock |
 | "go to sleep", "good night" | To sleep, as a tap of PWR |
-| "lets play", "play a game"; "show my timers", "open timers"; "show my habits", "open habits"; "show my notifications", "open notifications" | Opens Games, Timers, Habits or Notifications |
+| "lets play", "play a game"; "show my timers", "open timers"; "show my tasks", "open tasks"; "show my notifications", "open notifications" | Opens Games, Timers, Tasks or Notifications |
 | "volume up", "louder"; "volume down", "quieter" | The volume by 15 |
 | "hello there", "how are you" | Yoru waves |
-| "check water", "water done" | Ticks off that habit, by its name in letters (three at least) |
 
-Since 0.14.0 these phrases are only the fallback: with the services of the Cloud voice set and the WiFi up, what is said goes to them instead. Anything else gets a puzzled "hm?" and a line saying that without the Mac it knows only a few words. The phrases are rebuilt when the habits' names change, in a task of its own (it takes a second or two). MultiNet takes about 13 KB of internal RAM and stays unloaded if less than 64 KB would be left. With a host there, everything goes to it as before.
+Since 0.14.0 these phrases are only the fallback: with the services of the Cloud voice set and the WiFi up, what is said goes to them instead. Anything else gets a puzzled "hm?" and a line saying that without the Mac it knows only a few words. MultiNet takes about 13 KB of internal RAM and stays unloaded if less than 64 KB would be left. With a host there, everything goes to it as before.
 
 ## Cloud voice
 
-Since 0.14.0, with the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/bridge/cloud.rs`). When no host has sent a snapshot for 3 s and the WiFi is up, the board talks to online services itself, with the keys a host handed over: what is said after the wake word (or with PWR held) is recorded in PSRAM, 15 s at most (the ring along the rim runs it down while it listens; past it the utterance ends with `max_length`, whatever started it), and sent to a speech-to-text service; the text goes with Yoru's character, what it knows of the user and what the board knows now (date and time, timers, habits, battery) to the brain; the answer is said by a voice, streamed to the speaker as it arrives. Then it listens for a follow-up without the wake word, as with a host. Since 0.14.1 a WiFi on its way back counts as up: woken from hibernating, what is said is recorded at once and sent when the WiFi has joined, waiting up to 10 s (then the error line says there's no internet). Only a network that isn't there or a wrong password leave it to the offline phrases. The last eight messages are kept for the next question, for ten minutes.
+Since 0.14.0, with the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/bridge/cloud.rs`). When no host has sent a snapshot for 3 s and the WiFi is up, the board talks to online services itself, with the keys a host handed over: what is said after the wake word (or with PWR held) is recorded in PSRAM, 15 s at most (the ring along the rim runs it down while it listens; past it the utterance ends with `max_length`, whatever started it), and sent to a speech-to-text service; the text goes with Yoru's character, what it knows of the user and what the board knows now (date and time, timers, tasks, battery) to the brain; the answer is said by a voice, streamed to the speaker as it arrives. Then it listens for a follow-up without the wake word, as with a host. Since 0.14.1 a WiFi on its way back counts as up: woken from hibernating, what is said is recorded at once and sent when the WiFi has joined, waiting up to 10 s (then the error line says there's no internet). Only a network that isn't there or a wrong password leave it to the offline phrases. The last eight messages are kept for the next question, for ten minutes.
 
 `cloud/set` is a method of its own, not a tool, so a model calling the board's tools never sees it. A host sends it on every handshake and whenever the services change; the board keeps them in NVS (namespace `cloud`) and writes the flash only when they differ. `{"clear": true}` forgets them. The answer is `cloud/get`'s.
 
@@ -288,7 +287,7 @@ The whole object must fit in 3,900 bytes. Every URL must be `https`; the certifi
 
 `cloud/get` (no params): `{"set":true,"stt":"whisper-large-v3-turbo","llm":"gpt-6-luna","tts":"eleven_v4_turbo","ready":true}`, the models and whether it would answer now (services, WiFi); never the keys.
 
-The brain's answer may carry tags, which are taken out before it is said and act on the board (`commands_tag()`): `[timer SECONDS]`, `[pomodoro]`, `[stop]`, `[pause]`, `[resume]`, `[habit NUMBER]` (of the habits listed in the prompt), `[volume up]`, `[volume down]`, `[open games|timers|habits|inbox]`, `[sleep]` and `[face NAME]` (happy, excited, love, curious, proud, wink, surprised, sad, shy, sleepy, dance, wave, thinking).
+The brain's answer may carry tags, which are taken out before it is said and act on the board (`commands_tag()`): `[timer SECONDS]`, `[pomodoro]`, `[stop]`, `[pause]`, `[resume]`, `[volume up]`, `[volume down]`, `[open games|timers|tasks|inbox]` (`[habit NUMBER]` and `habits` until 0.15.1), `[sleep]` and `[face NAME]` (happy, excited, love, curious, proud, wink, surprised, sad, shy, sleepy, dance, wave, thinking).
 
 - **Speed.** Each service keeps one connection open between requests, and its TLS session to resume a new one; all three are opened (a `HEAD`) while the user is still talking. A fresh connection takes the board 1 to 4 s; a kept one a few milliseconds.
 - **Failures** show in a line over the bottom rim (no internet, a key refused, too many requests) with the red ring; nothing is said.

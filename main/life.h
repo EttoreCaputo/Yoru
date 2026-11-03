@@ -53,7 +53,7 @@ typedef enum {
     LIFE_FEEL_LIFT,
     LIFE_FEEL_PLAYED,  // a game with you
     LIFE_FEEL_TIMER,   // a timer rang
-    LIFE_FEEL_HABIT,   // a habit ticked off
+    LIFE_FEEL_TASK,    // a task of his done
     LIFE_FEEL_WOKE,
     LIFE_FEEL_GREETED,
     LIFE_FEEL_IGNORED, // it called and nobody came

@@ -67,7 +67,7 @@ static const struct {
     [LIFE_FEEL_LIFT] = {"lift", {0.10f, 0, 0.30f, 0.30f, 0}},
     [LIFE_FEEL_PLAYED] = {"played", {0.50f, -0.10f, 0.40f, 0.60f, 0.005f}},
     [LIFE_FEEL_TIMER] = {"timer", {0, 0, 0, 0.20f, 0}},
-    [LIFE_FEEL_HABIT] = {"habit", {0.30f, 0, 0.20f, 0.10f, 0}},
+    [LIFE_FEEL_TASK] = {"task", {0.30f, 0, 0.20f, 0.10f, 0}},
     [LIFE_FEEL_WOKE] = {"woke", {0.10f, 0.50f, 0, -0.20f, 0}},
     [LIFE_FEEL_GREETED] = {"greeted", {0.40f, 0.10f, 0.60f, 0.30f, 0.005f}},
     [LIFE_FEEL_IGNORED] = {"ignored", {-0.30f, 0, -0.40f, -0.10f, -0.005f}},

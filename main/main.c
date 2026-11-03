@@ -15,7 +15,7 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "eyes.h"
-#include "habits.h"
+#include "tasks.h"
 #include "life.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
@@ -178,7 +178,7 @@ void app_main(void)
     board_settings_init();
     board_settings_on_change(on_setting);
     clock_init();
-    habits_init();
+    tasks_init();
     // Before anything takes the power locks it sets up.
     power_init();
     metrics_model_init();

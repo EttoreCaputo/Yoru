@@ -15,8 +15,8 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_system.h"
-#include "habits.h"
-#include "habits_ui.h"
+#include "tasks.h"
+#include "tasks_ui.h"
 #include "inbox.h"
 #include "inbox_ui.h"
 #include "freertos/FreeRTOS.h"
@@ -235,7 +235,7 @@ typedef enum {
     APP_INBOX,
     APP_YORU,
     APP_TIMERS,
-    APP_HABITS,
+    APP_TASKS,
     APP_SETTINGS,
     APP_FOCUS,
     APP_GAMES,
@@ -253,7 +253,7 @@ static const app_def_t APPS[APP_COUNT] = {
     [APP_INBOX] = {"Notifications", "Notifiche", 0xFF6B6B, 0xE0262F, LV_SYMBOL_ENVELOPE},
     [APP_YORU] = {"Yoru", "Yoru", 0, 0, NULL},
     [APP_TIMERS] = {"Timers", "Timer", 0xFFB340, 0xF07800, NULL},
-    [APP_HABITS] = {"Habits", "Abitudini", 0x2A2D36, 0x101114, NULL},
+    [APP_TASKS] = {"Tasks", "Compiti", 0x7FA7FF, 0x3B5BD9, LV_SYMBOL_LIST},
     [APP_SETTINGS] = {"Settings", "Impostazioni", 0x9A9AA2, 0x55555D, LV_SYMBOL_SETTINGS},
     [APP_FOCUS] = {"Do not disturb", "Non disturbare", 0x8E8CF8, 0x4B48D6, NULL},
     [APP_GAMES] = {"Games", "Giochi", 0x5BE07A, 0x1E9E46, LV_SYMBOL_PLAY},
@@ -283,14 +283,11 @@ typedef struct {
     float x, y, r;
 } bubble_t;
 
-/* What the bubbles show live: badges, the timer's ring, the habits' rings,
- * the moon. */
+/* What the bubbles show live: badges, the timer's ring, the moon. */
 typedef struct {
     int badge[APP_COUNT];
     uint32_t badge_rgb[APP_COUNT];
     float timer;
-    float habit[3];
-    uint32_t habit_rgb[3];
     bool focus;
 } live_t;
 
@@ -1325,14 +1322,6 @@ static void draw_app(lv_layer_t *layer, int i, const bubble_t *b)
         }
         break;
     }
-    case APP_HABITS:
-        // The day's first three habits as rings, as a watch's Activity.
-        for (int k = 0; k < 3; k++) {
-            const lv_color_t c = lv_color_hex(h.live.habit_rgb[k]);
-            ring(layer, x, y, (0.86f - 0.235f * (float) k) * r, 0.19f * r, h.live.habit[k], c,
-                 lv_color_mix(c, lv_color_black(), 60));
-        }
-        break;
     case APP_FOCUS: {
         // The moon: a pale disc with a bite out of it in the bubble's colour.
         disc(layer, x - 0.07f * r, y + 0.04f * r, 0.41f * r, focus_on ? COL_TEXT : lv_color_hex(0x8E8E93));
@@ -1626,12 +1615,9 @@ static void refresh_home(void)
     v.timer = timers_at(0, &tv) && tv.total_s > 0 ? tv.left_s / tv.total_s : 0;
     v.badge[APP_TIMERS] = nt > 1 ? nt : 0;
     v.badge_rgb[APP_TIMERS] = 0xFF3B30;
-    static const uint32_t RGB[] = {0xFF375F, 0x30D158, 0x40C8E0};
-    for (int k = 0; k < 3; k++) {
-        const habit_t *hb = habits_at(k);
-        v.habit[k] = hb != NULL && hb->goal > 0 ? (float) hb->done / (float) hb->goal : 0;
-        v.habit_rgb[k] = hb != NULL ? hb->rgb : RGB[k];
-    }
+    // A task that went wrong last time.
+    v.badge[APP_TASKS] = tasks_failed();
+    v.badge_rgb[APP_TASKS] = 0xFF3B30;
     v.focus = board_settings_on(SETTING_FOCUS);
 
     for (int i = 0; i < APP_COUNT; i++) {
@@ -1641,9 +1627,6 @@ static void refresh_home(void)
     }
     if (fabsf(v.timer - h.live.timer) > 0.002f) {
         h.dirty |= 1u << APP_TIMERS;
-    }
-    if (memcmp(v.habit, h.live.habit, sizeof(v.habit)) != 0 || memcmp(v.habit_rgb, h.live.habit_rgb, sizeof(v.habit_rgb)) != 0) {
-        h.dirty |= 1u << APP_HABITS;
     }
     if (v.focus != h.live.focus) {
         h.dirty |= 1u << APP_FOCUS;
@@ -2056,8 +2039,8 @@ static void open_target(app_t app)
     case APP_TIMERS:
         open_app(timers_ui_build);
         break;
-    case APP_HABITS:
-        open_app(habits_ui_build);
+    case APP_TASKS:
+        open_app(tasks_ui_build);
         break;
     case APP_GAMES:
         open_app(games_ui_build);
@@ -2089,7 +2072,7 @@ static void idle_cb(lv_timer_t *t)
     }
     if (s.app != NULL) {
         timers_ui_refresh();
-        habits_ui_refresh();
+        tasks_ui_refresh();
         games_ui_refresh();
     }
 }
@@ -2143,7 +2126,7 @@ void menu_close(void)
 bool menu_open_page(const char *name)
 {
     static const char *const APP_NAMES[APP_COUNT] = {
-        [APP_INBOX] = "inbox", [APP_TIMERS] = "timers", [APP_HABITS] = "habits", [APP_SETTINGS] = "settings",
+        [APP_INBOX] = "inbox", [APP_TIMERS] = "timers", [APP_TASKS] = "tasks", [APP_SETTINGS] = "settings",
         [APP_GAMES] = "games"};
     if (strcasecmp(name, "home") == 0) {
         menu_open();

@@ -11,8 +11,6 @@
 #include "clock.h"
 #include "esp_attr.h"
 #include "esp_log.h"
-#include "habits.h"
-#include "life.h"
 #include "lvgl_port.h"
 #include "menu.h"
 #include "playback.h"
@@ -32,15 +30,13 @@ enum {
     CMD_SLEEP,
     CMD_PLAY,
     CMD_TIMERS,
-    CMD_HABITS,
+    CMD_TASKS,
     CMD_INBOX,
     CMD_LOUDER,
     CMD_QUIETER,
     CMD_HELLO,
     /* + minutes */
     CMD_TIMER = 100,
-    /* + the habit's index */
-    CMD_HABIT = 400,
 };
 
 static const struct {
@@ -67,8 +63,8 @@ static const struct {
     {CMD_PLAY, "play a game"},
     {CMD_TIMERS, "show my timers"},
     {CMD_TIMERS, "open timers"},
-    {CMD_HABITS, "show my habits"},
-    {CMD_HABITS, "open habits"},
+    {CMD_TASKS, "show my tasks"},
+    {CMD_TASKS, "open tasks"},
     {CMD_INBOX, "show my notifications"},
     {CMD_INBOX, "open notifications"},
     {CMD_LOUDER, "volume up"},
@@ -109,25 +105,9 @@ static const struct {
 
 #define FIXED_N (sizeof(FIXED) / sizeof(FIXED[0]))
 #define SPANS_N (sizeof(SPANS) / sizeof(SPANS[0]))
-#define PHRASES_MAX (FIXED_N + 3 * SPANS_N + 2 * HABITS_MAX)
+#define PHRASES_MAX (FIXED_N + 3 * SPANS_N)
 
 EXT_RAM_BSS_ATTR static voice_phrase_t s_list[PHRASES_MAX];
-/* The habits' names the phrases were made from. */
-static uint32_t s_names = UINT32_MAX;
-
-/* FNV-1a of the habits' names, to notice when they change. */
-static uint32_t names_hash(void)
-{
-    uint32_t h = 2166136261u;
-    for (int i = 0; i < habits_count(); i++) {
-        for (const char *p = habits_at(i)->name; *p != '\0'; p++) {
-            h = (h ^ (uint8_t) *p) * 16777619u;
-        }
-        h = (h ^ '|') * 16777619u;
-    }
-    return h;
-}
-
 static int add(int n, int id, const char *text)
 {
     if (n < (int) PHRASES_MAX && text[0] != '\0') {
@@ -136,27 +116,6 @@ static int add(int n, int id, const char *text)
         n++;
     }
     return n;
-}
-
-/* A habit's name as MultiNet can take it: lower case letters and single
- * spaces; empty if too short to tell apart. */
-static void spoken_name(const char *name, char *out, size_t len)
-{
-    size_t n = 0;
-    for (const char *p = name; *p != '\0' && n + 1 < len; p++) {
-        if (isalpha((unsigned char) *p)) {
-            out[n++] = (char) tolower((unsigned char) *p);
-        } else if (n > 0 && out[n - 1] != ' ') {
-            out[n++] = ' ';
-        }
-    }
-    while (n > 0 && out[n - 1] == ' ') {
-        n--;
-    }
-    out[n] = '\0';
-    if (n < 3) {
-        out[0] = '\0';
-    }
 }
 
 static void handle(int id);
@@ -178,17 +137,6 @@ static void send_phrases(void)
             n = add(n, CMD_TIMER + SPANS[i].min, text);
         }
     }
-    for (int i = 0; i < habits_count(); i++) {
-        char name[HABITS_NAME_CHARS + 1];
-        spoken_name(habits_at(i)->name, name, sizeof(name));
-        if (name[0] != '\0') {
-            snprintf(text, sizeof(text), "check %s", name);
-            n = add(n, CMD_HABIT + i, text);
-            snprintf(text, sizeof(text), "%s done", name);
-            n = add(n, CMD_HABIT + i, text);
-        }
-    }
-    s_names = names_hash();
     voice_set_commands(s_list, n, handle);
 }
 
@@ -200,19 +148,6 @@ void commands_start(void)
     lvgl_port_lock();
     send_phrases();
     lvgl_port_unlock();
-}
-
-void commands_poll(void)
-{
-    // MultiNet takes a moment over a new list: only when the names change.
-    static uint32_t version = UINT32_MAX;
-    if (!voice_commands_available() || habits_version() == version) {
-        return;
-    }
-    version = habits_version();
-    if (names_hash() != s_names) {
-        send_phrases();
-    }
 }
 
 /* ---- What each one does ---------------------------------------------------------- */
@@ -317,25 +252,6 @@ static void volume(int by)
     say(text, TOAST_INFO);
 }
 
-static void tick_habit(int i)
-{
-    const habit_t *h = habits_at(i);
-    if (h == NULL) {
-        return;
-    }
-    char text[48];
-    const int done = habits_tick(i, 1);
-    if (done < 0) {
-        snprintf(text, sizeof(text), card_tr("%s: done already", "%s: gia' fatto"), h->name);
-        say(text, TOAST_INFO);
-        return;
-    }
-    snprintf(text, sizeof(text), "%s %d/%d", h->name, done, h->goal);
-    say(text, TOAST_DONE);
-    life_feel(LIFE_FEEL_HABIT);
-    behaviour_play(done >= h->goal ? "proud" : "happy");
-}
-
 static void open_page(const char *name)
 {
     if (!menu_open_page(name)) {
@@ -347,9 +263,7 @@ static void handle(int id)
 {
     lvgl_port_lock();
     ESP_LOGI(TAG, "command %d", id);
-    if (id >= CMD_HABIT) {
-        tick_habit(id - CMD_HABIT);
-    } else if (id >= CMD_TIMER) {
+    if (id >= CMD_TIMER) {
         new_timer((id - CMD_TIMER) * 60);
     } else {
         switch (id) {
@@ -383,8 +297,8 @@ static void handle(int id)
         case CMD_TIMERS:
             open_page("timers");
             break;
-        case CMD_HABITS:
-            open_page("habits");
+        case CMD_TASKS:
+            open_page("tasks");
             break;
         case CMD_INBOX:
             open_page("inbox");
@@ -434,12 +348,6 @@ bool commands_tag(const char *tag)
         new_timer(secs);
         lvgl_port_unlock();
         return true;
-    } else if (strcmp(word, "habit") == 0) {
-        const int i = atoi(arg) - 1;
-        if (i < 0 || i >= HABITS_MAX) {
-            return false;
-        }
-        id = CMD_HABIT + i;
     } else if (strcmp(word, "face") == 0) {
         for (size_t i = 0; i < sizeof(FACES) / sizeof(FACES[0]); i++) {
             if (strcmp(arg, FACES[i]) == 0) {
@@ -453,7 +361,7 @@ bool commands_tag(const char *tag)
     } else if (strcmp(word, "open") == 0) {
         id = strcmp(arg, "games") == 0    ? CMD_PLAY
              : strcmp(arg, "timers") == 0 ? CMD_TIMERS
-             : strcmp(arg, "habits") == 0 ? CMD_HABITS
+             : strcmp(arg, "tasks") == 0  ? CMD_TASKS
              : strcmp(arg, "inbox") == 0  ? CMD_INBOX
                                           : 0;
     } else if (strcmp(word, "volume") == 0) {

@@ -4,8 +4,8 @@
  * a watch's: a honeycomb of small round bubbles, Yoru one of them, that you
  * can drag around, shrinking towards the rim. Yoru shrinks into its bubble
  * as the menu opens and the others bloom out; badges and rings on them say
- * what is new: Notifications (the inbox), Timers, Habits (today's, as
- * rings), Settings (every setting, in categories with round icons), Do not
+ * what is new: Notifications (the inbox), Timers, Tasks (the jobs you
+ * gave Yoru), Settings (every setting, in categories with round icons), Do not
  * disturb (a moon to tap) and Agents. A tapped bubble grows over the screen
  * into its app. Changes apply at once and are saved by board_settings.c.
  * Tap Yoru or swipe up from the bottom edge to close, tap a title or swipe
@@ -28,7 +28,7 @@ void menu_init(lv_obj_t *face, menu_cb_t cb);
 
 void menu_open(void);
 /** Open straight on a page by its English name, lower case: an app
- * ("inbox", "timers", "habits", "settings"), a category of Settings
+ * ("inbox", "timers", "tasks", "settings"), a category of Settings
  * ("display", "sound", ...) or "home", for the host; false for an unknown
  * one. */
 bool menu_open_page(const char *name);

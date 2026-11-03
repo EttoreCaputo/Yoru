@@ -122,7 +122,7 @@ It reacts *towards* things, never at random:
 - **Shaking:** it gets dizzy (spiral eyes) and then grumpy.
 - **Touch:** stroking the screen makes it happy and the sphere leans towards the finger. A tap is a poke: the ball squashes and wobbles; once is fine, three in a row annoy it. A long press on it: it takes your finger in both hands and leans towards it, and held a while longer it melts (hearts, a purr); lifting the finger, it lets go and waves.
 - **Music:** it bobs to the beat and the hands sway with it.
-- **Menu:** a swipe down from the top edge opens a menu like a watch's: Yoru shrinks into a bubble of a honeycomb of small round apps (notifications, timers, habits, games, settings, do not disturb), one of them rather than their centre, blinking and looking at the one under your finger; the honeycomb can be dragged, and shrinks towards the rim so more apps fit (see the roadmap, M2).
+- **Menu:** a swipe down from the top edge opens a menu like a watch's: Yoru shrinks into a bubble of a honeycomb of small round apps (notifications, timers, tasks, games, settings, do not disturb), one of them rather than their centre, blinking and looking at the one under your finger; the honeycomb can be dragged, and shrinks towards the rim so more apps fit (see the roadmap, M2).
 
 ### Moods from your day
 Yoru feels your day, not the machine's: it isn't part of the computer, so its temperature or load mean nothing to it.

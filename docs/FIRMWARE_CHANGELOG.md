@@ -1,5 +1,13 @@
 # Firmware changelog
 
+## 0.16.0
+
+Habits are gone; Tasks take their place.
+
+- **Tasks.** A new app in the menu, where Habits was, shows the jobs you gave Yoru in Yoru Hub: what each does, when it runs and when next, and how it went last time (a green dot when it went well, red when it didn't, amber while he's on it). The bubble shows a red badge when one went wrong. Tap one to read it whole, with what he did last time, and "Do it now" to have it done at once (it needs the computer). When one goes well, Yoru is pleased.
+- **No more Habits.** The Habits app, its rings and the phrases to tick one off ("water done") are gone, and so is what the board kept of them.
+- Without the Mac you can say "show my tasks" or "open tasks", and talking to Yoru over WiFi he knows your tasks too.
+
 ## 0.15.1
 
 Yoru is calmer, and stays on his ball.

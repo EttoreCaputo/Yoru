@@ -113,10 +113,10 @@ static cJSON *identity(void)
     cJSON_AddItemToArray(caps, cJSON_CreateString("wifi"));
     // The inbox: show_notification and notification_action (docs/protocol.md, Inbox).
     cJSON_AddItemToArray(caps, cJSON_CreateString("inbox"));
-    // The menu's Timers and Habits apps, and the errands (docs/protocol.md,
-    // Timers, Habits, Fetch).
+    // The menu's Timers and Tasks apps, and the errands (docs/protocol.md,
+    // Timers, Tasks, Fetch).
     cJSON_AddItemToArray(caps, cJSON_CreateString("timers"));
-    cJSON_AddItemToArray(caps, cJSON_CreateString("habits"));
+    cJSON_AddItemToArray(caps, cJSON_CreateString("tasks"));
     cJSON_AddItemToArray(caps, cJSON_CreateString("fetch"));
     if (voice_available()) {
         cJSON_AddItemToArray(channels, cJSON_CreateString("audio_up"));

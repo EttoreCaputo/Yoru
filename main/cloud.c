@@ -20,7 +20,7 @@
 #include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#include "habits.h"
+#include "tasks.h"
 #include "lvgl_port.h"
 #include "metrics_model.h"
 #include "net.h"
@@ -616,11 +616,14 @@ static int context(char *out, size_t len)
                           t.label, state, left / 60, left % 60);
         }
     }
-    if (habits_count() > 0) {
-        n += snprintf(out + n, len - (size_t) n, " The user's habits today (number, name, done of goal):");
-        for (int i = 0; i < habits_count() && n < (int) len - 60; i++) {
-            const habit_t *h = habits_at(i);
-            n += snprintf(out + n, len - (size_t) n, "%s %d %s %d/%d", i ? ";" : "", i + 1, h->name, h->done, h->goal);
+    if (tasks_count() > 0) {
+        // Done on the computer: while it's away they wait.
+        n += snprintf(out + n, len - (size_t) n, " The tasks the user gave you, done on the computer once it's back:");
+        for (int i = 0; i < tasks_count() && n < (int) len - 80; i++) {
+            const task_t *t = tasks_at(i);
+            char when[48];
+            tasks_when(t, when, sizeof(when));
+            n += snprintf(out + n, len - (size_t) n, "%s %s (%s%s)", i ? ";" : "", t->name, when, t->enabled ? "" : ", off");
         }
         n += snprintf(out + n, len - (size_t) n, ".");
     }
@@ -642,9 +645,8 @@ static const char RULES[] =
     "[pomodoro] starts a pomodoro (25 minutes of focus, then 5 of break)\n"
     "[stop] stops the timer, or the alarm that is ringing\n"
     "[pause] and [resume] pause or resume the running timer\n"
-    "[habit NUMBER] ticks off a habit of the list below\n"
     "[volume up] and [volume down]\n"
-    "[open games], [open timers], [open habits], [open inbox] open an app on your screen\n"
+    "[open games], [open timers], [open tasks], [open inbox] open an app on your screen\n"
     "[sleep] you go to sleep, when the user says good night or asks you to rest\n"
     "[face NAME] shows a feeling: happy, excited, love, curious, proud, wink, surprised, sad, shy, sleepy, dance, "
     "wave or thinking\n"
