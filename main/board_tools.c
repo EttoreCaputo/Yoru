@@ -383,11 +383,6 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
         cJSON_AddNumberToObject(mo, "lean_x", round2(lx));
         cJSON_AddNumberToObject(mo, "lean_y", round2(ly));
         cJSON_AddNumberToObject(mo, "upright", motion_upright());
-        float peak;
-        int jolts;
-        motion_jolt_stats(&peak, &jolts);
-        cJSON_AddNumberToObject(mo, "jolt_peak", round2(peak));
-        cJSON_AddNumberToObject(mo, "jolts", jolts);
     }
     lvgl_port_lock();
     cJSON_AddBoolToObject(st, "approval", approval_is_open());

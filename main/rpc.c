@@ -309,6 +309,10 @@ void rpc_handle(uint8_t *payload, size_t len)
             if (on != NULL) {
                 friends_enable(cJSON_IsTrue(on));
             }
+            const cJSON *every = cJSON_GetObjectItemCaseSensitive(params, "hello_ms");
+            if (cJSON_IsNumber(every)) {
+                friends_hello_every(every->valueint);
+            }
             result = cJSON_CreateObject();
             cJSON_AddBoolToObject(result, "on", friends_enabled());
             friends_bump_stats(result);

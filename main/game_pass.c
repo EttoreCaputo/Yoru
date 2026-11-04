@@ -13,7 +13,7 @@
  * the case, and bounces off the rim; but the stretch of rim facing the
  * other Yoru (docs/FRIENDS.md) is open when it has the game open too, and
  * the ball rolls out there and into its screen, where it comes in from the
- * side facing this one. Which side that is, a bump of the two cases told.
+ * side facing this one. Which side that is, a tap told when they met.
  * The passes are counted, together. */
 
 #define CX ((float) KIT_CX)
@@ -130,7 +130,7 @@ static void check_gate(void)
     if (friends_count() == 0) {
         set_note("No other Yoru nearby", "Nessun'altra Yoru vicina");
     } else if (!sided) {
-        set_note("Bump the two Yorus together", "Fai toccare le due Yoru");
+        set_note("Bring the two Yorus together", "Avvicina le due Yoru");
     } else if (!open) {
         set_note("Open the game on the other one", "Apri il gioco sull'altra");
     } else if (!s.here) {

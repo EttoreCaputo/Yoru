@@ -7,8 +7,9 @@
  * after a long while, is a friend to greet (behaviour.c).
  *
  * Besides the hello they tell each other what they do (a yawn, falling
- * asleep, being stroked...), so the other can join in; a bump of the two
- * cases tells each which side the other is on; a ball crosses between their
+ * asleep, being stroked...), so the other can join in; bringing the two
+ * together (the signal jumps) is a meeting, and a tap shows which side the
+ * other is on; a ball crosses between their
  * screens in a game; and when both hear the wake word, only one answers. */
 
 #include <stdbool.h>
@@ -30,10 +31,11 @@ void friends_enable(bool on);
 bool friends_enabled(void);
 
 /** Every tick (behaviour.c, LVGL lock held): `awake` goes into our hello.
+ * `moving`: the case is being moved (hellos come faster).
  * Returns true once for a friend just met, or back after a long while,
  * that Yoru should greet now; only while `free` (nothing else has the
  * eyes): until then the friend waits. */
-bool friends_tick(bool awake, bool free);
+bool friends_tick(bool awake, bool free, bool moving);
 
 /** How many friends are in range now; how many of them are awake. */
 int friends_count(void);
@@ -55,7 +57,9 @@ typedef enum {
     FRIEND_TALK,    // a conversation started
     FRIEND_CHAT,    // a turn of their chatter: a = turn, b = turns in all
     FRIEND_FIREFLY, // its firefly flew off towards us: a = height, -1000..1000
-    FRIEND_BUMP,    // (from friends.c) our cases bumped: the side is known now
+    // Only from friends.c, never sent as events:
+    FRIEND_BUMP,    // we were brought together, up close
+    FRIEND_SIDED,   // the friend found where we are: so we know where it is
     FRIEND_EV_COUNT,
 } friend_ev_kind_t;
 
@@ -74,19 +78,21 @@ void friends_send(friend_ev_kind_t kind, int16_t a, int16_t b);
 bool friends_next(friend_ev_t *ev);
 
 /** Where the nearest friend in range is, as friend_ev_t's side: false until
- * a bump told it. */
+ * someone showed it (friends_found_at, here or on the friend). */
 bool friends_side(float *x, float *y);
 
-/** The case felt a sharp jolt along the glass, pushed towards (dx, dy) in
- * the panel's axes (motion.c): if a friend felt one at the same moment,
- * they bumped. From any task. */
-void friends_jolt(float dx, float dy);
+/** You showed where the nearest friend is: that way, (x, y) in the
+ * picture's axes (a tap on the edge facing it). The friend is told, and
+ * takes the opposite way. Kept across restarts. */
+void friends_found_at(float x, float y);
 
 /** For tests (`debug/friends`): an event by its name (`yawn`, `chat`...),
  * as if this board had done it; false for an unknown one. */
 bool friends_tell(const char *name);
-/** For tuning (`debug/friends`): jolts told, heard, and bumps matched. */
+/** For tuning (`debug/friends`): how many times they were brought together. */
 void friends_bump_stats(cJSON *out);
+/** For tests: say hello this often (ms) until the next restart. */
+void friends_hello_every(int ms);
 /** For tests: the nearest friend is that way, in degrees in the panel's
  * axes (0 right, 90 down), as a bump would have said. */
 bool friends_set_side(int deg);

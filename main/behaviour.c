@@ -81,6 +81,10 @@
 #define FRIEND_LOOK_MS 2500
 /* Woken by the friend's waking, a moment after it. */
 #define FRIEND_WAKE_MS 1200
+/* After meeting up close, a tap this far from the middle, for this long,
+ * shows where the friend is. */
+#define SIDE_ASK_MS 9000
+#define SIDE_EDGE_PX 140
 
 /* Waiting on an answer, the eyes go between the request and the buttons. */
 #define GLANCE_MIN_MS 1800
@@ -216,6 +220,10 @@ static struct {
     const char *join;
     uint32_t join_ms;
     uint32_t friend_wake_ms;
+    /* Asking for a tap on the edge facing the friend, until then (0: not);
+     * this press was that tap. */
+    uint32_t side_ask_until;
+    bool press_used;
 } s;
 
 static void show_voice(voice_state_t state);
@@ -517,8 +525,24 @@ static void touch_cb(lv_event_t *e)
     switch (code) {
     case LV_EVENT_PRESSED:
         s.pressed = true;
+        s.press_used = false;
         lv_indev_get_point(indev, &s.last_point);
         s.press_point = s.last_point;
+        if (s.side_ask_until != 0 && (int32_t) (now - s.side_ask_until) < 0) {
+            // The tap on the edge facing the friend.
+            const float dx = (float) (s.last_point.x - BOARD_LCD_H_RES / 2);
+            const float dy = (float) (s.last_point.y - BOARD_LCD_V_RES / 2);
+            const float r = sqrtf(dx * dx + dy * dy);
+            if (r >= SIDE_EDGE_PX) {
+                s.side_ask_until = 0;
+                s.press_used = true;
+                friends_found_at(dx / r, dy / r);
+                toast_show(card_tr("Got it!", "Ok, eccola!"), 2, TOAST_DONE);
+                play("happy");
+                look_at_friend(FRIEND_LOOK_MS);
+                break;
+            }
+        }
         s.press_ms = now;
         s.from_top = s.press_point.y < MENU_EDGE_PX;
         s.stroke = 0;
@@ -564,6 +588,9 @@ static void touch_cb(lv_event_t *e)
         break;
     }
     case LV_EVENT_SHORT_CLICKED:
+        if (s.press_used) {
+            break; // it showed where the friend is
+        }
         // Waking and sleeping work with reactions off too: they're the controls.
         if (s.asleep) {
             wake_up();
@@ -577,6 +604,9 @@ static void touch_cb(lv_event_t *e)
         }
         break;
     case LV_EVENT_LONG_PRESSED:
+        if (s.press_used) {
+            break;
+        }
         // Held on Yoru (not a stroke, not mid-conversation): it holds the finger.
         if (!s.asleep && !s.from_top && s.voice == VOICE_IDLE && !s.stroked && s.stroke <= STROKE_PX
             && board_settings_on(SETTING_TOUCH_REACTIONS) && eyes_hit(s.last_point.x, s.last_point.y)) {
@@ -842,7 +872,8 @@ static void friend_said(const friend_ev_t *ev, uint32_t now, bool free)
 {
     switch (ev->kind) {
     case FRIEND_BUMP:
-        // The two cases bumped: a high five, looking at each other.
+        // Brought together: a high five, looking at each other; then a tap
+        // on the edge facing the other shows where it is.
         if (s.menu || s.view || card_up() || s.voice != VOICE_IDLE) {
             return;
         }
@@ -857,6 +888,20 @@ static void friend_said(const friend_ev_t *ev, uint32_t now, bool free)
         life_feel(LIFE_FEEL_FRIEND);
         play("highfive");
         look_at_friend(FRIEND_LOOK_MS);
+        // They may lie elsewhere now: asked every time, a tap on either.
+        s.side_ask_until = now + SIDE_ASK_MS;
+        toast_show(card_tr("Tap the edge facing your friend", "Tocca il bordo verso l'amica"), SIDE_ASK_MS / 1000,
+                   TOAST_INFO);
+        return;
+    case FRIEND_SIDED:
+        // The other one was shown where we are: no need to ask here.
+        if (s.side_ask_until != 0) {
+            s.side_ask_until = 0;
+            toast_show(card_tr("Got it!", "Ok, eccola!"), 2, TOAST_DONE);
+        }
+        if (!s.asleep && !s.menu && !s.view) {
+            look_at_friend(FRIEND_LOOK_MS);
+        }
         return;
     case FRIEND_WOKE:
         // The other was woken: this one too, a moment later (not at night,
@@ -1001,7 +1046,7 @@ static void tick_cb(lv_timer_t *timer)
     const bool can_greet = !s.asleep && !s.menu && !s.view && !card_up() && s.voice == VOICE_IDLE && !s.holding
                            && !(s.until_ms != 0 && (int32_t) (now - s.until_ms) < 0)
                            && !board_settings_on(SETTING_FOCUS);
-    const bool met_friend = friends_tick(!s.asleep, can_greet);
+    const bool met_friend = friends_tick(!s.asleep, can_greet, motion_moving());
     friends_step(now, can_greet);
 
     if (s.status_until_ms != 0 && (int32_t) (now - s.status_until_ms) >= 0) {
@@ -1140,13 +1185,6 @@ static void set_face_down(bool down)
 
 static void on_motion(motion_event_t ev)
 {
-    if (ev == MOTION_JOLT) {
-        // Maybe another Yoru bumped into it: friends.c finds out.
-        float dx, dy;
-        motion_jolt(&dx, &dy);
-        friends_jolt(dx, dy);
-        return;
-    }
     const uint32_t now = lv_tick_get();
     const bool reactions = board_settings_on(SETTING_MOTION_REACTIONS) && !board_settings_on(SETTING_FOCUS);
     // Face down and back are a control, like a long press: always on, even

@@ -27,8 +27,19 @@ static const char *TAG = "friends";
 /* Met again after this long apart, it's greeted again. */
 #define GREET_AGAIN_MS (30 * 60 * 1000)
 #define MAX_FRIENDS 6
-/* Two jolts this close are one bump: the radio takes a few ms, the IMU 4. */
-#define BUMP_WINDOW_US (250 * 1000)
+/* Brought together: the signal was this weak (apart) and, within
+ * CLOSE_WITHIN_US, this strong (a few cm). Measured on two boards: -64 to
+ * -86 dBm apart, -50 to -55 lying near each other, -37 to -45 brought
+ * against each other. */
+#define FAR_DBM (-58)
+#define CLOSE_DBM (-46)
+#define CLOSE_WITHIN_US (1500 * 1000)
+/* One meeting, not several, while they stay close. */
+#define CLOSE_AGAIN_US (5000 * 1000)
+/* While either is being moved, hellos this often: the signal is followed
+ * closely enough to see them come together. */
+#define FAST_HELLO_MS 250
+#define FAST_FOR_US (2000 * 1000)
 /* Both heard the same wake word: their detections are this close. */
 #define HEARD_WINDOW_US (700 * 1000)
 /* How long after our wake word a louder friend's still counts. */
@@ -40,7 +51,8 @@ static const char *TAG = "friends";
 #define VERSION 1
 #define MSG_HELLO 1
 #define MSG_EVENT 2 // a, b: as friend_ev_kind_t says
-#define MSG_JOLT 3
+#define MSG_CLOSE 3 // we were brought together
+#define MSG_SIDE 6  // a: where we found the receiver, degrees in our panel's axes
 #define MSG_BALL 4  // a: where along the edge x1000, b: speed
 #define MSG_HEARD 5 // a: the wake word's volume in dB x10
 
@@ -67,6 +79,7 @@ typedef struct __attribute__((packed)) {
 
 #define FLAG_AWAKE 0x01
 #define FLAG_PLAYING 0x02
+#define FLAG_MOVING 0x04
 
 typedef struct {
     uint8_t mac[6];
@@ -81,7 +94,11 @@ typedef struct {
      * once (side_looked), saved when a bump changes it (side_dirty). */
     bool sided, side_looked, side_dirty;
     float side_x, side_y;
-    int64_t jolt_us, heard_us;
+    int64_t heard_us;
+    /* Coming together: when its signal was last weak, when they last met
+     * up close, when it was last being moved. */
+    int64_t far_us, close_us, moving_us;
+    int close_n; // hellos in a row at CLOSE_DBM or more
     float heard_db;
 } friend_t;
 
@@ -101,12 +118,14 @@ static bool s_on;
 static volatile bool s_awake = true;
 static volatile bool s_playing;
 static esp_timer_handle_t s_timer;
+static uint32_t s_hello_ms = HELLO_MS;
 static uint8_t s_mac[6];
-/* Jolts told and heard, for tuning the bump. */
-static int s_jolts_sent, s_jolts_heard, s_bumps;
-/* Our last jolt and wake word, under s_mux. */
-static int64_t s_jolt_us;
-static float s_jolt_x, s_jolt_y;
+/* Meetings up close, for get_state; when we last said a fast hello. */
+static int s_meetings;
+static int64_t s_fast_hello_us;
+static volatile bool s_moving;
+static volatile int64_t s_moved_us; // when we were last being moved
+/* Our last wake word, under s_mux. */
 static int64_t s_heard_us;
 static float s_heard_db;
 static bool s_heard_done;
@@ -118,7 +137,7 @@ static void send_hello(void *arg)
 {
     hello_t h = {.version = VERSION,
                  .type = MSG_HELLO,
-                 .flags = (s_awake ? FLAG_AWAKE : 0) | (s_playing ? FLAG_PLAYING : 0)};
+                 .flags = (s_awake ? FLAG_AWAKE : 0) | (s_playing ? FLAG_PLAYING : 0) | (s_moving ? FLAG_MOVING : 0)};
     memcpy(h.magic, MAGIC, sizeof(h.magic));
     strlcpy(h.firmware, esp_app_get_description()->version, sizeof(h.firmware));
     // Lost hellos don't matter: the next one is a few seconds away.
@@ -147,18 +166,17 @@ static void push(friend_ev_kind_t kind, int16_t a, int16_t b, int who)
     s_ev_count++;
 }
 
-/* With s_mux held: a friend and we felt a jolt at once. It is on the side
- * we were pushed away from. */
-static void bumped(int who)
+/* With s_mux held: brought together with friend `who` (seen here, or told
+ * by it): once, until they've been apart a while. */
+static void met_close(int who, int64_t now, bool tell)
 {
     friend_t *f = &s_friends[who];
-    f->side_x = -s_jolt_x;
-    f->side_y = -s_jolt_y;
-    f->sided = f->side_looked = f->side_dirty = true;
-    f->jolt_us = 0;
-    s_jolt_us = 0;
-    s_bumps++;
-    push(FRIEND_BUMP, 0, 0, who);
+    if (f->close_us != 0 && now - f->close_us < CLOSE_AGAIN_US) {
+        return;
+    }
+    f->close_us = now;
+    s_meetings++;
+    push(FRIEND_BUMP, tell ? 1 : 0, 0, who);
 }
 
 /* With s_mux held: the friend `mac` is, created on its hello only. */
@@ -208,8 +226,23 @@ static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int le
         friend_t *f = &s_friends[find(info->src_addr, true, now)];
         f->awake = (h.flags & FLAG_AWAKE) != 0;
         f->playing = (h.flags & FLAG_PLAYING) != 0;
+        if (h.flags & FLAG_MOVING) {
+            f->moving_us = now;
+        }
         f->rssi = info->rx_ctrl != NULL ? info->rx_ctrl->rssi : 0;
         f->seen_us = now;
+        // Apart a moment ago, against each other now, twice in a row, and
+        // one of the two being moved: brought together. Lying still, the
+        // signal jumps now and then on its own.
+        const bool moved = (s_moved_us != 0 && now - s_moved_us < CLOSE_WITHIN_US)
+                           || (f->moving_us != 0 && now - f->moving_us < CLOSE_WITHIN_US);
+        f->close_n = f->rssi >= CLOSE_DBM ? f->close_n + 1 : 0;
+        if (f->rssi <= FAR_DBM) {
+            f->far_us = now;
+        } else if (f->close_n >= 2 && moved && f->far_us != 0 && now - f->far_us < CLOSE_WITHIN_US) {
+            f->far_us = 0;
+            met_close((int) (f - s_friends), now, true);
+        }
         memcpy(f->firmware, h.firmware, sizeof(f->firmware));
         portEXIT_CRITICAL(&s_mux);
         return;
@@ -224,16 +257,20 @@ static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int le
         f->seen_us = now;
         switch (type) {
         case MSG_EVENT:
-            if (m.kind < FRIEND_EV_COUNT && m.kind != FRIEND_BUMP) {
+            if (m.kind < FRIEND_BUMP) {
                 push((friend_ev_kind_t) m.kind, m.a, m.b, who);
             }
             break;
-        case MSG_JOLT:
-            s_jolts_heard++;
-            f->jolt_us = now;
-            if (s_jolt_us != 0 && now - s_jolt_us < BUMP_WINDOW_US) {
-                bumped(who);
-            }
+        case MSG_CLOSE:
+            met_close(who, now, false);
+            break;
+        case MSG_SIDE:
+            // It found us that way: it is the other way from us (both
+            // lying the same way up).
+            f->side_x = -cosf((float) m.a * (float) M_PI / 180.0f);
+            f->side_y = -sinf((float) m.a * (float) M_PI / 180.0f);
+            f->sided = f->side_looked = f->side_dirty = true;
+            push(FRIEND_SIDED, 0, 0, who);
             break;
         case MSG_BALL:
             if (s_playing) {
@@ -283,7 +320,7 @@ static void radio(bool on)
             const esp_timer_create_args_t args = {.callback = send_hello, .name = "friends"};
             esp_timer_create(&args, &s_timer);
         }
-        esp_timer_start_periodic(s_timer, (uint64_t) HELLO_MS * 1000);
+        esp_timer_start_periodic(s_timer, (uint64_t) s_hello_ms * 1000);
         s_on = true;
         send_hello(NULL);
         ESP_LOGI(TAG, "looking for friends");
@@ -396,13 +433,29 @@ static void to_picture(float x, float y, float *px, float *py)
 
 /* ---- Every tick -------------------------------------------------------------- */
 
-bool friends_tick(bool awake, bool free)
+bool friends_tick(bool awake, bool free, bool moving)
 {
+    const int64_t now0 = esp_timer_get_time();
+    s_moving = moving;
+    if (moving) {
+        s_moved_us = now0;
+    }
     if (s_awake != awake) {
         s_awake = awake;
         if (s_on) {
             send_hello(NULL); // the others know at once
         }
+    }
+    // While either is moved, hellos come fast, so coming together shows.
+    bool fast = moving;
+    portENTER_CRITICAL(&s_mux);
+    for (int i = 0; i < MAX_FRIENDS && !fast; i++) {
+        fast = s_friends[i].used && s_friends[i].moving_us != 0 && now0 - s_friends[i].moving_us < FAST_FOR_US;
+    }
+    portEXIT_CRITICAL(&s_mux);
+    if (s_on && fast && now0 - s_fast_hello_us >= FAST_HELLO_MS * 1000) {
+        s_fast_hello_us = now0;
+        send_hello(NULL);
     }
     keep_sides();
     const int64_t now = esp_timer_get_time();
@@ -508,7 +561,7 @@ cJSON *friends_status(void)
 
 void friends_send(friend_ev_kind_t kind, int16_t a, int16_t b)
 {
-    if (kind < FRIEND_EV_COUNT && kind != FRIEND_BUMP) {
+    if (kind < FRIEND_BUMP) {
         send_msg(MSG_EVENT, (uint8_t) kind, a, b);
     }
 }
@@ -525,6 +578,9 @@ bool friends_next(friend_ev_t *ev)
     s_ev_count--;
     const friend_t f = s_friends[q.who];
     portEXIT_CRITICAL(&s_mux);
+    if (q.kind == FRIEND_BUMP && q.a == 1) {
+        send_msg(MSG_CLOSE, 0, 0, 0); // it may not have seen it yet
+    }
     *ev = (friend_ev_t) {.kind = q.kind, .a = q.a, .b = q.b, .sided = f.sided};
     if (f.sided) {
         to_picture(f.side_x, f.side_y, &ev->side_x, &ev->side_y);
@@ -545,36 +601,59 @@ bool friends_side(float *x, float *y)
     return sided;
 }
 
-void friends_jolt(float dx, float dy)
+/* From the picture's axes back to the panel's. */
+static void from_picture(float px, float py, float *x, float *y)
 {
-    const float len = hypotf(dx, dy);
+    switch (lvgl_port_rotation()) {
+    case 1:
+        *x = py;
+        *y = -px;
+        break;
+    case 2:
+        *x = -px;
+        *y = -py;
+        break;
+    case 3:
+        *x = -py;
+        *y = px;
+        break;
+    default:
+        *x = px;
+        *y = py;
+        break;
+    }
+}
+
+void friends_found_at(float x, float y)
+{
+    float px, py;
+    from_picture(x, y, &px, &py);
+    const float len = hypotf(px, py);
     if (len <= 0) {
         return;
     }
-    const int64_t now = esp_timer_get_time();
-    send_msg(MSG_JOLT, 0, 0, 0);
     portENTER_CRITICAL(&s_mux);
-    s_jolts_sent++;
-    s_jolt_us = now;
-    s_jolt_x = dx / len;
-    s_jolt_y = dy / len;
-    for (int i = 0; i < MAX_FRIENDS; i++) {
-        if (s_friends[i].used && s_friends[i].jolt_us != 0 && now - s_friends[i].jolt_us < BUMP_WINDOW_US) {
-            bumped(i);
-            break;
-        }
+    const int i = nearest(esp_timer_get_time());
+    if (i >= 0) {
+        friend_t *f = &s_friends[i];
+        f->side_x = px / len;
+        f->side_y = py / len;
+        f->sided = f->side_looked = f->side_dirty = true;
     }
     portEXIT_CRITICAL(&s_mux);
+    if (i >= 0) {
+        send_msg(MSG_SIDE, 0, (int16_t) lroundf(atan2f(py, px) * 180.0f / (float) M_PI), 0);
+    }
 }
 
 static const char *const EV_NAMES[FRIEND_EV_COUNT] = {
-    "yawn", "sneeze", "hiccup", "dance", "asleep", "woke", "stroked", "talk", "chat", "firefly", "bump",
+    "yawn", "sneeze", "hiccup", "dance", "asleep", "woke", "stroked", "talk", "chat", "firefly", "bump", "sided",
 };
 
 bool friends_tell(const char *name)
 {
     for (int i = 0; i < FRIEND_EV_COUNT; i++) {
-        if (strcmp(name, EV_NAMES[i]) == 0 && i != FRIEND_BUMP) {
+        if (strcmp(name, EV_NAMES[i]) == 0 && i < FRIEND_BUMP) {
             // A chat as its last turn (the other giggles), a firefly mid-edge.
             friends_send((friend_ev_kind_t) i, i == FRIEND_CHAT ? 3 : 0, i == FRIEND_CHAT ? 3 : 0);
             return true;
@@ -585,12 +664,16 @@ bool friends_tell(const char *name)
 
 void friends_bump_stats(cJSON *out)
 {
-    portENTER_CRITICAL(&s_mux);
-    const int sent = s_jolts_sent, heard = s_jolts_heard, bumps = s_bumps;
-    portEXIT_CRITICAL(&s_mux);
-    cJSON_AddNumberToObject(out, "jolts_sent", sent);
-    cJSON_AddNumberToObject(out, "jolts_heard", heard);
-    cJSON_AddNumberToObject(out, "bumps", bumps);
+    cJSON_AddNumberToObject(out, "meetings", s_meetings);
+}
+
+void friends_hello_every(int ms)
+{
+    s_hello_ms = (uint32_t) (ms < 100 ? 100 : ms > 60000 ? 60000 : ms);
+    if (s_on && s_timer != NULL) {
+        esp_timer_stop(s_timer);
+        esp_timer_start_periodic(s_timer, (uint64_t) s_hello_ms * 1000);
+    }
 }
 
 bool friends_set_side(int deg)

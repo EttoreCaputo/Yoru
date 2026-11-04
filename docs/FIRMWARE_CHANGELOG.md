@@ -1,8 +1,13 @@
 # Firmware changelog
 
+## 0.20.2
+
+- **No more knocking: bring them together.** Hold the two Yorus apart, then bring them quickly up against each other: they high-five and look at each other. Simply lying next to each other doesn't count, and neither does moving them about.
+- **Show where the other is.** After they meet, Yoru asks you to tap the edge of his screen facing the other one: one tap on either is enough, the other knows too. He remembers it.
+
 ## 0.20.1
 
-- **The bump works.** Touching the two Yorus together did nothing: the board was waiting for too hard a knock. A gentle bump is enough now.
+- **The bump, gentler.** Touching the two Yorus together did nothing: the board was waiting for too hard a knock.
 
 ## 0.20.0
 
