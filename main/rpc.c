@@ -11,6 +11,7 @@
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "friends.h"
 #include "life.h"
 #include "link.h"
 #include "lvgl_port.h"
@@ -287,6 +288,21 @@ void rpc_handle(uint8_t *payload, size_t len)
             message = cloud_ready() ? "expected {\"text\": string}" : "no services or no WiFi";
         } else {
             result = cJSON_CreateObject();
+        }
+    } else if (strcmp(name, "debug/friends") == 0) {
+        // The hello to other Yorus, off at boot (docs/FRIENDS.md): on until
+        // the next restart, to see whether it upsets the router.
+        const cJSON *on = cJSON_GetObjectItemCaseSensitive(params, "on");
+        if (on != NULL && !cJSON_IsBool(on)) {
+            code = RPC_INVALID_PARAMS;
+            message = "expected {\"on\"?: bool}";
+        } else {
+            if (on != NULL) {
+                friends_enable(cJSON_IsTrue(on));
+            }
+            result = cJSON_CreateObject();
+            cJSON_AddBoolToObject(result, "on", friends_enabled());
+            cJSON_AddItemToObject(result, "friends", friends_status());
         }
     } else if (strcmp(name, "debug/life") == 0) {
         // Push Yoru's own life about (tests): a state, an act, a feeling,

@@ -18,6 +18,11 @@ extern "C" {
  * event loop): ESP-NOW starts and stops with it. */
 void friends_radio(bool on);
 
+/** Say hello and listen, while the WiFi has an address: off at boot, on
+ * only through `debug/friends` for now (docs/FRIENDS.md). */
+void friends_enable(bool on);
+bool friends_enabled(void);
+
 /** Every tick (behaviour.c, LVGL lock held): `awake` goes into our hello.
  * Returns true once for a friend just met, or back after a long while,
  * that Yoru should greet now; only while `free` (nothing else has the

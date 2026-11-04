@@ -327,6 +327,10 @@ Since 0.15.0 (`docs/life.md`). `debug/life` takes any of:
 
 It answers with `get_state`'s `life`, or `-32602` for an unknown name.
 
+## Friends' hello
+
+Since 0.19.1 the ESP-NOW hello to other Yorus (`docs/FRIENDS.md`) is off at every boot. `debug/friends` `{"on"?: bool}` turns it on or off until the next restart, and answers `{"on", "friends"}` (`friends` as in `get_state`). It only takes effect while the WiFi has an address.
+
 ## Fetch
 
 Since 0.11.0, with the `fetch` capability (Yoru Hub: `core/src/bridge/errands.rs`). While the host's assistant calls one of its connectors (an MCP tool: Gmail, Calendar, GitHub...), Yoru runs an errand: a portal in the connector's colour opens on the rim, Yoru dives in, and comes back with a parcel when the call is done.

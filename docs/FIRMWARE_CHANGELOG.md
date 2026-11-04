@@ -1,5 +1,9 @@
 # Firmware changelog
 
+## 0.19.1
+
+- **Friends, for testing only.** Yoru still doesn't look for other Yorus by himself; from the Mac the hello can be turned on until he restarts, to find out whether it's what upsets the router.
+
 ## 0.19.0
 
 Updates over WiFi.

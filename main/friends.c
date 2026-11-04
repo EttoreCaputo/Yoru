@@ -9,14 +9,11 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "link_crypto.h"
 
 static const char *TAG = "friends";
 
-/* Off since 0.19.0: with two boards saying hello, a home router's 2.4 GHz
- * network went down and came back once they stopped (docs/FRIENDS.md). Back
- * on once the hello is shown to be harmless. */
-#define FRIENDS_RADIO 0
 
 /* Often enough that a friend shows up within seconds, rarely enough that the
  * radio doesn't notice. */
@@ -115,11 +112,17 @@ static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int le
     portEXIT_CRITICAL(&s_mux);
 }
 
-void friends_radio(bool on)
+/* Off at every boot since 0.19.0: with two boards saying hello, a home
+ * router's 2.4 GHz network went down and came back once they stopped
+ * (docs/FRIENDS.md). `debug/friends` turns it on until the next restart, to
+ * find out. */
+static bool s_enabled;
+static bool s_wifi_up;
+static StaticSemaphore_t s_lock_buf;
+static SemaphoreHandle_t s_lock;
+
+static void radio(bool on)
 {
-    if (!FRIENDS_RADIO) {
-        return;
-    }
     if (on == s_on) {
         return;
     }
@@ -148,6 +151,37 @@ void friends_radio(bool on)
         esp_now_deinit();
         s_on = false;
     }
+}
+
+/* The WiFi's event task and the link's task both get here. */
+static void apply(bool *what, bool on)
+{
+    static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+    portENTER_CRITICAL(&mux);
+    if (s_lock == NULL) {
+        s_lock = xSemaphoreCreateMutexStatic(&s_lock_buf);
+    }
+    portEXIT_CRITICAL(&mux);
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    *what = on;
+    radio(s_enabled && s_wifi_up);
+    xSemaphoreGive(s_lock);
+}
+
+void friends_radio(bool on)
+{
+    apply(&s_wifi_up, on);
+}
+
+void friends_enable(bool on)
+{
+    ESP_LOGI(TAG, "hello %s", on ? "on" : "off");
+    apply(&s_enabled, on);
+}
+
+bool friends_enabled(void)
+{
+    return s_enabled;
 }
 
 bool friends_tick(bool awake, bool free)
