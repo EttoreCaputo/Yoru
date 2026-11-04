@@ -13,7 +13,7 @@ What it doesn't do: reach a board with no WiFi set up (ESP-NOW starts when the W
 
 ## Steps
 
-### 1. Hello (0.17.0, done)
+### 1. Hello (0.18.0, done)
 
 `main/friends.c`. Every 4 s each board broadcasts a hello: magic `YORU`, version 1, type `hello`, whether it is awake, its firmware. Whoever hears it keeps it in a table of six (MAC, RSSI, last heard, awake, firmware). A friend not heard for 30 s is gone.
 
