@@ -21,6 +21,7 @@ What it doesn't do: reach a board with no WiFi set up (ESP-NOW starts when the W
 - **`get_state`** has `friends`: `[{id, rssi, seen_s, awake, firmware}]`.
 - **Radio.** ESP-NOW starts on `IP_EVENT_STA_GOT_IP` (the channel is the access point's from then) and stops on `WIFI_EVENT_STA_STOP` (WiFi off, hibernating).
 - **Paused since 0.19.0**: off at every boot; since 0.19.1 `debug/friends` `{"on": true}` turns it on until the next restart, for the test below. On 2026-11-04, with two boards on 0.18.0 saying hello on the home router's 2.4 GHz network (channel 11), that network went down twice: the boards lost the access point (reason 201, not found) while still hearing each other, and the Mac no longer saw it. With the hello off on the one board within reach, the network came back. To find out before turning it back on: whether broadcast action frames every 4 s really upset that router (one board at a time, a longer interval, unicast once met), or whether it was something else.
+- **Test on a phone hotspot, 2026-11-04.** Both boards on 0.19.1, on an iPhone's hotspot (2.4 GHz), the hello on through `debug/friends`: they met within seconds (RSSI about -65 dBm, each heard every 4 s) and over four minutes the hotspot lost no ping, neither board left the WiFi and both links stayed up. So the hello itself is harmless to an access point; the home router, unstable that day anyway, is still to be tried before the hello is on by default.
 
 ### 2. The bump (to do)
 
