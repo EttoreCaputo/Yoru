@@ -47,6 +47,8 @@ idf.py build merge-bin
 tools/flash.sh
 ```
 
+Since 0.19.0 Yoru Hub updates a board over WiFi too (`docs/protocol.md`, OTA); a board flashed before needs this USB flash once.
+
 `tools/flash.sh` flashes only a board that already runs Yoru, so a DualEye plugged into the same Mac is left alone. `--list` says what each board runs; a blank board takes `--port /dev/cu.usbmodemN`. Quit Yoru Hub first: it holds the port.
 
 If the board doesn't show up as a serial port, hold BOOT while plugging it in.

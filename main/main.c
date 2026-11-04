@@ -28,6 +28,7 @@
 #include "metrics_model.h"
 #include "motion.h"
 #include "net.h"
+#include "ota.h"
 #include "nvs.h"
 #include "playback.h"
 #include "power.h"
@@ -215,6 +216,8 @@ void app_main(void)
     xTaskCreatePinnedToCoreWithCaps(stats_task, "stats", 3072, NULL, 2, NULL, 0, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
     rpc_init();
+    // A firmware just updated starts its probation (ota.c).
+    ota_init();
     link_on_receive(LINK_CHAN_CTRL, rpc_handle);
     link_on_receive(LINK_CHAN_METRICS, metrics_io_handle);
     link_on_receive(LINK_CHAN_AUDIO_DOWN, playback_receive);

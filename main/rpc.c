@@ -15,6 +15,7 @@
 #include "link.h"
 #include "lvgl_port.h"
 #include "net.h"
+#include "ota.h"
 #include "playback.h"
 #include "voice.h"
 
@@ -118,6 +119,10 @@ static cJSON *identity(void)
     cJSON_AddItemToArray(caps, cJSON_CreateString("timers"));
     cJSON_AddItemToArray(caps, cJSON_CreateString("tasks"));
     cJSON_AddItemToArray(caps, cJSON_CreateString("fetch"));
+    if (ota_available()) {
+        // Updates over the link: ota/begin, ota/write, ota/end.
+        cJSON_AddItemToArray(caps, cJSON_CreateString("ota"));
+    }
     if (voice_available()) {
         cJSON_AddItemToArray(channels, cJSON_CreateString("audio_up"));
         cJSON_AddItemToArray(caps, cJSON_CreateString("voice"));
@@ -180,6 +185,11 @@ void rpc_handle(uint8_t *payload, size_t len)
 
     if (strcmp(name, "hello") == 0) {
         result = identity();
+        // A host reached the board: a firmware just updated works (ota.c).
+        ota_confirm();
+    } else if (strncmp(name, "ota/", 4) == 0) {
+        // Updates over the link (ota.c).
+        result = ota_rpc(name, params, &code, &message);
     } else if (strcmp(name, "tools/list") == 0) {
         // Room for the envelope and nextCursor around the tools.
         result = board_tools_list(params, LINK_MAX_PAYLOAD - 128);

@@ -26,6 +26,7 @@ idf_component_register(SRCS "approval.c" "toast.c" "inbox_ui.c" "inbox.c" "main.
                             "life.c" "life_mood.c" "life_mind.c" "life_acts.c"
                             "ears_dir.c"
                             "friends.c"
+                            "ota.c"
                             "metrics_model.c"
                             "metrics_parser.c"
                             "metrics_io.c"
@@ -50,4 +51,4 @@ idf_component_register(SRCS "approval.c" "toast.c" "inbox_ui.c" "inbox.c" "main.
                        LDFRAGMENTS "linker.lf"
                        REQUIRES esp_app_format esp_codec_dev esp-sr esp_driver_gpio esp_driver_i2c esp_driver_i2s
                                 esp_driver_spi esp_driver_usb_serial_jtag esp_event esp_http_client esp_lcd esp_lcd_co5300
-                                esp_lcd_touch_cst9217 esp_netif esp_timer esp_wifi lvgl lwip mbedtls nvs_flash spi_flash)
+                                esp_lcd_touch_cst9217 esp_netif app_update esp_timer esp_wifi lvgl lwip mbedtls nvs_flash spi_flash)

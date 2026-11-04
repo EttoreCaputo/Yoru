@@ -19,6 +19,7 @@ Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main
 - `tasks` (0.16.0 and later): the menu's Tasks app (see Tasks): the `set_tasks` tool and the `task_run` notification. `habits` (0.11.0 to 0.15.1) was the Habits app, with `set_habits` and `habit_check`.
 - `fetch` (0.11.0 and later): Yoru's errands (see Fetch): the `show_fetch` tool.
 - `cloud` (0.14.0 and later): talking without the host (see Cloud voice): the `cloud/set` and `cloud/get` methods.
+- `ota` (0.19.0 and later, once flashed over USB with the two-slot partition table): updates over the link (see OTA).
 - There is no `media` or `music` capability: Yoru has no image or music face, so `media/...` and `music/...` answer `-32601`.
 - `eyes/gaze` turns Yoru's eyes towards the host's pointer for 6 s after the last one, unless a finger is on the screen, a conversation is on or it is asleep.
 - `voice/state` drives the eyes: `listening` (wide, looking at you), `thinking` (dots), `speaking` (warm, swelling with the speaker's level), `error` (sad). The wake word wakes Yoru up if it was asleep.
@@ -36,6 +37,24 @@ The same pairing and sealing, with Yoru's own names, so a DualEye host can't tal
 | NVS namespace | `dualeye_net` | `yoru_net` |
 
 The TCP port is the same, 7340.
+
+## OTA
+
+Since 0.19.0 the flash has two app slots, `ota_0` (where `factory` was, at 0x10000) and `ota_1` (0x820000), with `otadata` at 0x810000; `nvs` and `model` stay where they were, so the one flash over USB that brings the new table keeps the WiFi, the pairing and the models. From then on a host updates the board over its link, USB or WiFi (sealed with the pairing key, so only a paired host can):
+
+| Method | Params | Result |
+|---|---|---|
+| `ota/begin` | `size` (bytes), `sha256` (hex), `version` (for the log) | `{"slot","chunk"}`: the slot it writes, the most raw bytes per write (2048) |
+| `ota/write` | `offset` (where the board stands), `data` (base64) | `{"written"}` |
+| `ota/end` | none | `{"restarting":true}`: checked and set to boot; it restarts 0.8 s later |
+| `ota/abort` | none | `{}` |
+| `ota/status` | none | `running` (slot), `available`, `probation`, `active` (an update under way), `written` |
+
+- The image is the app's alone (`build/yoru.bin`, or the app partition's part of the merged image), not the merged one.
+- The board refuses, with `-32602`: an image that isn't Yoru's (the app descriptor's `project_name`, checked before anything is written), a write at another offset than the one reached (after a lost reply, `ota/status` says where it stands), a SHA-256 that doesn't match at the end. `ota/end` also has ESP-IDF check the image itself. A new `ota/begin` drops one left half done. A board flashed before 0.19.0 answers `-32601`: it needs the USB flash once.
+- **Probation.** The new firmware boots on probation (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`). It's kept once it gets an address on the WiFi or a host says `hello`: then it can be updated again. If neither comes within 5 minutes it restarts into the firmware before; so does a restart before then (a crash, or a host opening the USB port, which resets the chip).
+- On the board a toast says "Updating…", then "Updated: restarting" or "Update failed". Yoru carries on meanwhile.
+- About a minute for 3 MB, over USB or WiFi.
 
 ## Metrics
 

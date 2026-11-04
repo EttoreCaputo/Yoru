@@ -13,6 +13,11 @@
 
 static const char *TAG = "friends";
 
+/* Off since 0.19.0: with two boards saying hello, a home router's 2.4 GHz
+ * network went down and came back once they stopped (docs/FRIENDS.md). Back
+ * on once the hello is shown to be harmless. */
+#define FRIENDS_RADIO 0
+
 /* Often enough that a friend shows up within seconds, rarely enough that the
  * radio doesn't notice. */
 #define HELLO_MS 4000
@@ -112,6 +117,9 @@ static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int le
 
 void friends_radio(bool on)
 {
+    if (!FRIENDS_RADIO) {
+        return;
+    }
     if (on == s_on) {
         return;
     }

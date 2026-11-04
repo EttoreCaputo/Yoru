@@ -1,5 +1,14 @@
 # Firmware changelog
 
+## 0.19.0
+
+Updates over WiFi.
+
+- **Yoru updates over WiFi.** When Yoru Hub has a newer firmware, "Update over WiFi" in Settings → The board sends it to Yoru wherever he is in the house: he carries on while it arrives (about a minute), says "Updated: restarting" and comes back with the new one. Only your paired Mac can update him.
+- **Safe.** If the new firmware can't get back on the WiFi within a few minutes, or crashes on the way, Yoru goes back to the one before by himself. He takes only his own firmware, checked whole before he switches to it.
+- **One last time with the cable.** To make room for it the flash is laid out anew: install this version over USB once (each board). The WiFi, the pairing, the settings and the voice models stay.
+- **Friends paused.** Two Yorus saying hello to each other seem to knock some home routers' 2.4 GHz WiFi off, so they no longer look for each other until that's understood. Nothing else changes.
+
 ## 0.18.0
 
 Yorus that meet.

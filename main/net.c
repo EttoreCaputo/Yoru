@@ -14,6 +14,7 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "friends.h"
+#include "ota.h"
 #include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -390,6 +391,8 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
                  NET_TCP_PORT);
         // Other Yorus answer on the access point's channel, known now.
         friends_radio(true);
+        // On the network, it can be updated again: a new firmware is kept.
+        ota_confirm();
     }
 }
 

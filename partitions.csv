@@ -1,11 +1,17 @@
 # Yoru flash layout (16 MB; the 1.75C may have 32 MB, the rest stays unused).
 # `model` holds ESP-SR's models (M3): the wake words, VADNet and, since
-# 0.13.0, MultiNet 7 in English (2.6 MB); `assets` the eye styles and sounds
-# that can be loaded from the app (M6). The app grew to 4 MB in 0.14.0, with
-# the HTTPS client and its certificates for talking without the host.
+# 0.13.0, MultiNet 7 in English (2.6 MB). The app grew to 4 MB in 0.14.0,
+# with the HTTPS client and its certificates for talking without the host.
+# Since 0.19.0 two app slots, for updates over WiFi (docs/protocol.md, OTA):
+# ota_0 sits where `factory` was and `model` stays put, so a board flashed
+# before keeps its NVS (WiFi, pairing, trust) and its models. otadata and
+# ota_1 come out of `assets` (eye styles and sounds from the app, M6), which
+# nothing uses yet.
 # Name,   Type, SubType,   Offset,   Size
 nvs,      data, nvs,       0x9000,   0x6000
 phy_init, data, phy,       0xf000,   0x1000
-factory,  app,  factory,   0x10000,  4M
+ota_0,    app,  ota_0,     0x10000,  4M
 model,    data, spiffs,    0x410000, 4M
-assets,   data, undefined, 0x810000, 0x7F0000
+otadata,  data, ota,       0x810000, 0x2000
+ota_1,    app,  ota_1,     0x820000, 4M
+assets,   data, undefined, 0xC20000, 0x3E0000
