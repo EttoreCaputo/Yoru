@@ -13,11 +13,12 @@ Status: early development, firmware 0.13.0. What is in and what is left: [the ro
 - [Roadmap and hardware](ROADMAP.md)
 - [Protocol](protocol.md): what differs from DualEye's
 - [Firmware changelog](FIRMWARE_CHANGELOG.md)
+- [Friends](FRIENDS.md): Yorus that meet over ESP-NOW
 - [Mascot states](mascot/STATES.md): the Rive file's inputs
 
 ## What is on the board
 
-- **Yoru itself:** the sphere with its eyes and hands, moving through a space in perspective. It floats near you, gets sleepy and naps when nobody is around, and comes to the glass when something urgent waits for you. It has a life of its own (`docs/life.md`): emotions that what you do moves and time brings back, and moods it goes through (lounging, exploring, playing, dreaming, bored, drowsy, looking for you, sulking), each with its own things to do, from hunting a firefly to dancing. Mostly it rests, and does something now and then. It greets you when you're back after a while and in the morning. Its needs come later.
+- **Yoru itself:** the sphere with its eyes and hands, moving through a space in perspective. It floats near you, gets sleepy and naps when nobody is around, and comes to the glass when something urgent waits for you. It has a life of its own (`docs/life.md`): emotions that what you do moves and time brings back, and moods it goes through (lounging, exploring, playing, dreaming, bored, drowsy, looking for you, sulking), each with its own things to do, from hunting a firefly to dancing. Mostly it rests, and does something now and then. It greets you when you're back after a while and in the morning, and waves at another Yoru in the house (`docs/FRIENDS.md`). Its needs come later.
 - **Senses:** touch (pokes, strokes, flicks, and a long press he answers by holding your finger), motion (lifted, shaken, knocked, rocked, face down, dropped, spun, tilted) and where a sudden sound comes from.
 - **Voice:** a wake word (Alexa, Hi ESP, Jarvis or Computer, until "Yoru" exists), push-to-talk on PWR, listening on after an answer, and the host's voice on the speaker.
 - **The menu,** a watch's honeycomb of round apps around Yoru (swipe down from the top): Notifications, Timers, Tasks, Games, Do not disturb and Settings.

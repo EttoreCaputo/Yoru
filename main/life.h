@@ -60,6 +60,7 @@ typedef enum {
     LIFE_FEEL_FUN,     // it had fun on its own
     LIFE_FEEL_SOUND,   // a sudden noise
     LIFE_FEEL_PLUGGED,
+    LIFE_FEEL_FRIEND,  // another Yoru came by
     LIFE_FEEL_COUNT,
 } life_feel_t;
 

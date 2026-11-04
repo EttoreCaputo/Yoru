@@ -59,4 +59,5 @@ if [[ -z "$port" ]]; then
 fi
 
 cd "$root"
-idf.py -p "$port" flash
+# idf.py is an alias of the activated shell, which a script doesn't inherit.
+python "${IDF_PATH:?activate ESP-IDF first}/tools/idf.py" -p "$port" flash

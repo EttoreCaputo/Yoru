@@ -17,6 +17,7 @@
 #include "esp_random.h"
 #include "errand.h"
 #include "eyes.h"
+#include "friends.h"
 #include "inbox.h"
 #include "inbox_ui.h"
 #include "life.h"
@@ -766,6 +767,10 @@ static void tick_cb(lv_timer_t *timer)
     const uint32_t now = lv_tick_get();
 
     power_step();
+    const bool can_greet = !s.asleep && !s.menu && !s.view && !card_up() && s.voice == VOICE_IDLE && !s.holding
+                           && !(s.until_ms != 0 && (int32_t) (now - s.until_ms) < 0)
+                           && !board_settings_on(SETTING_FOCUS);
+    const bool met_friend = friends_tick(!s.asleep, can_greet);
 
     if (s.status_until_ms != 0 && (int32_t) (now - s.status_until_ms) >= 0) {
         s.status_until_ms = 0;
@@ -817,6 +822,12 @@ static void tick_cb(lv_timer_t *timer)
     if (s.holding) {
         hold_step(now);
         return;
+    }
+    if (met_friend) {
+        // Another Yoru came by: it stops what it was doing to wave.
+        life_attend();
+        life_feel(LIFE_FEEL_FRIEND);
+        play("wave");
     }
     const bool playing = s.until_ms != 0 && (int32_t) (now - s.until_ms) < 0;
     if (!playing) {

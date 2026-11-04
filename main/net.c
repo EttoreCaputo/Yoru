@@ -13,6 +13,7 @@
 #include "esp_random.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "friends.h"
 #include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -376,6 +377,8 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         if (retry) {
             ESP_LOGW(TAG, "WiFi: not connected (reason %d), retrying", ev->reason);
         }
+    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_STOP) {
+        friends_radio(false);
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         const ip_event_got_ip_t *ev = data;
         lock();
@@ -385,6 +388,8 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
         unlock();
         ESP_LOGI(TAG, "WiFi: connected to \"%s\" as " IPSTR ", %s.local:%d", s_ssid, IP2STR(&ev->ip_info.ip), s_host,
                  NET_TCP_PORT);
+        // Other Yorus answer on the access point's channel, known now.
+        friends_radio(true);
     }
 }
 

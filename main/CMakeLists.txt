@@ -25,6 +25,7 @@ idf_component_register(SRCS "approval.c" "toast.c" "inbox_ui.c" "inbox.c" "main.
                             "ui_voice.c"
                             "life.c" "life_mood.c" "life_mind.c" "life_acts.c"
                             "ears_dir.c"
+                            "friends.c"
                             "metrics_model.c"
                             "metrics_parser.c"
                             "metrics_io.c"

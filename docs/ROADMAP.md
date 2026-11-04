@@ -168,6 +168,7 @@ Yoru is the physical side of the coding agents on the computer, the way the couc
 - 24-bit colour (0.11.2, setting `color_24bit`): smoother gradients and shadows than 16-bit.
 - Games (0.11.9): Tilt ball, Slingshot and Constellations, in the menu's Games app (`games_ui.c`, `game_*.c`); each keeps the level reached.
 - Music: bob to the beat (to do).
+- Friends (`docs/FRIENDS.md`): Yorus that find each other over ESP-NOW and greet (0.17.0); the bump, where the other is, playing together and one answer to "Alexa" are to do.
 
 ### M6: hackability and integrations
 - Moods and looks as data (JSON) that can be loaded and shared from the app.
