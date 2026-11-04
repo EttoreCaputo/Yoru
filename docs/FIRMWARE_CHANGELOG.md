@@ -1,5 +1,9 @@
 # Firmware changelog
 
+## 0.19.2
+
+- **Friends are back.** Two Yorus on the same WiFi find each other and wave again, by themselves. Tested on a phone's hotspot: the WiFi doesn't mind them. Should your router act up with two of them around, the hello can be turned off from the Mac until he restarts.
+
 ## 0.19.1
 
 - **Friends, for testing only.** Yoru still doesn't look for other Yorus by himself; from the Mac the hello can be turned on until he restarts, to find out whether it's what upsets the router.

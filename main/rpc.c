@@ -290,8 +290,8 @@ void rpc_handle(uint8_t *payload, size_t len)
             result = cJSON_CreateObject();
         }
     } else if (strcmp(name, "debug/friends") == 0) {
-        // The hello to other Yorus, off at boot (docs/FRIENDS.md): on until
-        // the next restart, to see whether it upsets the router.
+        // The hello to other Yorus, on at boot (docs/FRIENDS.md): switched
+        // until the next restart, to test it or should a router mind it.
         const cJSON *on = cJSON_GetObjectItemCaseSensitive(params, "on");
         if (on != NULL && !cJSON_IsBool(on)) {
             code = RPC_INVALID_PARAMS;

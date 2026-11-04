@@ -18,8 +18,8 @@ extern "C" {
  * event loop): ESP-NOW starts and stops with it. */
 void friends_radio(bool on);
 
-/** Say hello and listen, while the WiFi has an address: off at boot, on
- * only through `debug/friends` for now (docs/FRIENDS.md). */
+/** Say hello and listen, while the WiFi has an address: on at boot,
+ * `debug/friends` switches it until the next restart (docs/FRIENDS.md). */
 void friends_enable(bool on);
 bool friends_enabled(void);
 

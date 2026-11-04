@@ -329,7 +329,7 @@ It answers with `get_state`'s `life`, or `-32602` for an unknown name.
 
 ## Friends' hello
 
-Since 0.19.1 the ESP-NOW hello to other Yorus (`docs/FRIENDS.md`) is off at every boot. `debug/friends` `{"on"?: bool}` turns it on or off until the next restart, and answers `{"on", "friends"}` (`friends` as in `get_state`). It only takes effect while the WiFi has an address.
+The ESP-NOW hello to other Yorus (`docs/FRIENDS.md`) is on at boot (off at boot in 0.19.0 and 0.19.1). Since 0.19.1 `debug/friends` `{"on"?: bool}` turns it on or off until the next restart, and answers `{"on", "friends"}` (`friends` as in `get_state`). It only takes effect while the WiFi has an address.
 
 ## Fetch
 

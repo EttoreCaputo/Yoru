@@ -112,11 +112,10 @@ static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int le
     portEXIT_CRITICAL(&s_mux);
 }
 
-/* Off at every boot since 0.19.0: with two boards saying hello, a home
- * router's 2.4 GHz network went down and came back once they stopped
- * (docs/FRIENDS.md). `debug/friends` turns it on until the next restart, to
- * find out. */
-static bool s_enabled;
+/* On at boot again since 0.19.2, after a test on a phone hotspot showed the
+ * hello harmless (docs/FRIENDS.md); `debug/friends` turns it off until the
+ * next restart, should a router mind it. */
+static bool s_enabled = true;
 static bool s_wifi_up;
 static StaticSemaphore_t s_lock_buf;
 static SemaphoreHandle_t s_lock;
