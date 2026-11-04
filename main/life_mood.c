@@ -76,6 +76,8 @@ static const struct {
     [LIFE_FEEL_PLUGGED] = {"plugged", {0.10f, 0.20f, 0, 0.30f, 0}},
     // Company, but not you: no trust.
     [LIFE_FEEL_FRIEND] = {"friend", {0.30f, 0.05f, 0.40f, 0.40f, 0}},
+    [LIFE_FEEL_FRIEND_ASLEEP] = {"friend_asleep", {0, -0.30f, -0.10f, -0.20f, 0}},
+    [LIFE_FEEL_JEALOUS] = {"jealous", {-0.20f, 0, -0.20f, 0.20f, 0}},
 };
 
 /* Energy through the day, hour by hour: sleepy at night, a dip after

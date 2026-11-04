@@ -29,6 +29,7 @@
 #include "power.h"
 #include "timers.h"
 #include "toast.h"
+#include "voice.h"
 
 /* Often enough for life.c's moves. */
 #define TICK_MS 100
@@ -65,6 +66,22 @@
 /* How long "done" (green) and "error" (red) stay on the sphere. */
 #define STATUS_DONE_MS 2500
 #define STATUS_ERROR_MS 3500
+/* With another Yoru (docs/FRIENDS.md). Jealous at most this often, and
+ * won back by a stroke this soon after. */
+#define JEALOUS_EVERY_MS 20000
+#define JEALOUS_WON_MS 30000
+/* Stroked: the friends hear it at most this often. */
+#define STROKED_TELL_MS 8000
+/* Their chatter: a few turns, now and then while both are free. */
+#define CHAT_MIN_MS (3 * 60 * 1000)
+#define CHAT_MAX_MS (8 * 60 * 1000)
+#define CHAT_TURN_MIN_MS 900
+#define CHAT_TURN_MAX_MS 1600
+/* Looking at the friend, when it's known where it is. */
+#define FRIEND_LOOK_MS 2500
+/* Woken by the friend's waking, a moment after it. */
+#define FRIEND_WAKE_MS 1200
+
 /* Waiting on an answer, the eyes go between the request and the buttons. */
 #define GLANCE_MIN_MS 1800
 #define GLANCE_SPAN_MS 1600
@@ -128,6 +145,12 @@ static const scene_t SCENES[] = {
     {"falling", EYES_MOOD_SCARED, 1500, FX_NONE, G(FLAIL), SOUND_EEP},
     {"drowsy", EYES_MOOD_SLEEPY, 4000, FX_NONE, G(NONE), SOUND_YAWN},
     {"lifted", EYES_MOOD_CURIOUS, 1800, FX_BLINK, G(NONE), SOUND_CHIRP},
+    // With another Yoru (docs/FRIENDS.md).
+    {"highfive", EYES_MOOD_LOVING, 3000, FX_POKE, G(CLAP), SOUND_TADA},
+    {"jealous", EYES_MOOD_GRUMPY, 2200, FX_NONE, G(NONE), SOUND_GRUMBLE},
+    {"chat", EYES_MOOD_CURIOUS, 1300, FX_BLINK, G(NONE), SOUND_CHIRP},
+    {"chat_reply", EYES_MOOD_HAPPY, 1300, FX_NONE, G(NONE), SOUND_HMM},
+    {"giggle", EYES_MOOD_DELIGHTED, 1600, FX_POKE, G(NONE), SOUND_GIGGLE},
 };
 
 static struct {
@@ -183,6 +206,16 @@ static struct {
     uint32_t hold_ms;
     bool hold_loved;
     eyes_pos_t hold_home;
+    /* With another Yoru: when it got jealous, when the friends last heard
+     * it's stroked, the next chatter, a chatter turn to say and when, an
+     * act to join in and when, a wake-up because the friend woke. */
+    uint32_t jealous_ms, stroked_told_ms;
+    uint32_t next_chat_ms;
+    int chat_turn, chat_turns;
+    uint32_t chat_at_ms;
+    const char *join;
+    uint32_t join_ms;
+    uint32_t friend_wake_ms;
 } s;
 
 static void show_voice(voice_state_t state);
@@ -281,12 +314,33 @@ static bool play(const char *name)
     return false;
 }
 
+/* At the other Yoru, if it's known where it is (a bump told). */
+static bool look_at_friend(uint32_t ms)
+{
+    float x, y;
+    if (!friends_side(&x, &y)) {
+        return false;
+    }
+    hold_gaze(x * 0.95f, y * 0.7f, ms);
+    return true;
+}
+
+/* Stroked or held: the friends hear it, not every time. */
+static void tell_stroked(uint32_t now)
+{
+    if (s.stroked_told_ms == 0 || now - s.stroked_told_ms >= STROKED_TELL_MS) {
+        s.stroked_told_ms = now;
+        friends_send(FRIEND_STROKED, 0, 0);
+    }
+}
+
 static void fall_asleep(void)
 {
     let_go(false);
     if (!s.asleep) {
         ESP_LOGI(TAG, "asleep");
         s.asleep_ms = lv_tick_get();
+        friends_send(FRIEND_ASLEEP, 0, 0);
     }
     s.asleep = true;
     s.until_ms = 0;
@@ -299,6 +353,7 @@ static void fall_asleep(void)
 static void wake_up(void)
 {
     ESP_LOGI(TAG, "awake");
+    friends_send(FRIEND_WOKE, 0, 0);
     s.asleep = false;
     s.woke_ms = lv_tick_get();
     set_brightness(awake_brightness());
@@ -344,6 +399,7 @@ static void hold_finger(uint32_t now, lv_point_t p)
     s.hold_home = eyes_where();
     life_attend();
     life_feel(LIFE_FEEL_HOLD);
+    tell_stroked(now);
     eyes_poke();
     playback_sound(SOUND_CHIRP);
     react(EYES_MOOD_HAPPY, 1000); // the tick keeps it going
@@ -395,8 +451,16 @@ static void watch_finger(lv_indev_t *indev)
     if (!s.stroked && !s.asleep && s.voice == VOICE_IDLE && s.stroke > STROKE_PX && !s.from_top
         && lv_tick_elaps(s.press_ms) >= STROKE_MIN_MS && board_settings_on(SETTING_TOUCH_REACTIONS)) {
         s.stroked = true;
+        const uint32_t now = lv_tick_get();
         life_attend();
         life_feel(LIFE_FEEL_STROKE);
+        tell_stroked(now);
+        if (s.jealous_ms != 0 && now - s.jealous_ms < JEALOUS_WON_MS) {
+            // Jealous a moment ago, and now it's its turn: won back.
+            s.jealous_ms = 0;
+            play("love");
+            return;
+        }
         playback_sound(SOUND_PURR);
         react(EYES_MOOD_HAPPY, 2500);
     }
@@ -762,6 +826,173 @@ static void power_step(void)
     }
 }
 
+static uint32_t chat_gap(void)
+{
+    return CHAT_MIN_MS + esp_random() % (CHAT_MAX_MS - CHAT_MIN_MS);
+}
+
+static uint32_t turn_gap(void)
+{
+    return CHAT_TURN_MIN_MS + esp_random() % (CHAT_TURN_MAX_MS - CHAT_TURN_MIN_MS);
+}
+
+/* What the other Yoru told: joining in, looking over, waking with it. Most
+ * only while `free` (nothing else has the eyes); the rest is dropped. */
+static void friend_said(const friend_ev_t *ev, uint32_t now, bool free)
+{
+    switch (ev->kind) {
+    case FRIEND_BUMP:
+        // The two cases bumped: a high five, looking at each other.
+        if (s.menu || s.view || card_up() || s.voice != VOICE_IDLE) {
+            return;
+        }
+        s.last_touch_ms = now;
+        if (s.dark) {
+            light_up();
+        }
+        if (s.asleep) {
+            wake_up();
+        }
+        life_attend();
+        life_feel(LIFE_FEEL_FRIEND);
+        play("highfive");
+        look_at_friend(FRIEND_LOOK_MS);
+        return;
+    case FRIEND_WOKE:
+        // The other was woken: this one too, a moment later (not at night,
+        // nor face down, nor in Do not disturb).
+        if (s.asleep && !s.face_down && !night() && !board_settings_on(SETTING_FOCUS)) {
+            s.friend_wake_ms = now + FRIEND_WAKE_MS;
+        }
+        return;
+    default:
+        break;
+    }
+    if (!free) {
+        return;
+    }
+    switch (ev->kind) {
+    case FRIEND_YAWN:
+        // Yawns are catching.
+        if (esp_random() % 10 < 7) {
+            s.join = "yawn";
+            s.join_ms = now + 1200 + esp_random() % 1800;
+        }
+        break;
+    case FRIEND_DANCE:
+        s.join = "dance";
+        s.join_ms = now + 400;
+        break;
+    case FRIEND_SNEEZE:
+    case FRIEND_HICCUP:
+        // It looks over, and laughs.
+        look_at_friend(FRIEND_LOOK_MS);
+        later("giggle", 1300);
+        break;
+    case FRIEND_ASLEEP:
+        // The other dozed off: this one slows down.
+        look_at_friend(FRIEND_LOOK_MS);
+        life_feel(LIFE_FEEL_FRIEND_ASLEEP);
+        if (esp_random() % 2 == 0) {
+            s.join = "yawn";
+            s.join_ms = now + 2000;
+        }
+        break;
+    case FRIEND_STROKED:
+        // You stroke the other one.
+        if (s.jealous_ms == 0 || now - s.jealous_ms >= JEALOUS_EVERY_MS) {
+            s.jealous_ms = now;
+            life_attend();
+            life_feel(LIFE_FEEL_JEALOUS);
+            play("jealous");
+            look_at_friend(FRIEND_LOOK_MS);
+        }
+        break;
+    case FRIEND_TALK:
+        look_at_friend(FRIEND_LOOK_MS);
+        break;
+    case FRIEND_CHAT:
+        // A turn of their chatter: the answer comes in a moment.
+        if (ev->a >= 1 && ev->a <= ev->b && ev->b <= 8) {
+            s.chat_turn = ev->a + 1;
+            s.chat_turns = ev->b;
+            s.chat_at_ms = now + turn_gap();
+            s.next_chat_ms = now + chat_gap(); // not both starting one
+        }
+        break;
+    case FRIEND_FIREFLY:
+        if (ev->sided) {
+            // Its edge faces ours the other way round: along is mirrored.
+            life_firefly_from(ev->side_x, ev->side_y, -(float) ev->a / 1000.0f);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+/* One turn of the chatter: chirps going back and forth, a giggle at the end. */
+static void chat_turn(uint32_t now)
+{
+    const int turn = s.chat_turn;
+    s.chat_turn = 0;
+    look_at_friend(FRIEND_LOOK_MS);
+    if (turn > s.chat_turns) {
+        play("giggle"); // the other said the last word
+        return;
+    }
+    play(turn == s.chat_turns ? "giggle" : turn % 2 == 1 ? "chat" : "chat_reply");
+    friends_send(FRIEND_CHAT, (int16_t) turn, (int16_t) s.chat_turns);
+}
+
+/* With another Yoru around, each tick. */
+static void friends_step(uint32_t now, bool free)
+{
+    friend_ev_t ev;
+    while (friends_next(&ev)) {
+        friend_said(&ev, now, free);
+    }
+    if (s.friend_wake_ms != 0 && (int32_t) (now - s.friend_wake_ms) >= 0) {
+        s.friend_wake_ms = 0;
+        if (s.asleep && !s.menu && !s.view) {
+            s.last_touch_ms = now;
+            if (s.dark) {
+                light_up();
+            }
+            wake_up();
+            look_at_friend(FRIEND_LOOK_MS);
+        }
+    }
+    // Both heard the wake word and the other heard it louder: it answers.
+    if (s.voice == VOICE_LISTENING && friends_outheard()) {
+        ESP_LOGI(TAG, "the other Yoru answers");
+        voice_yield();
+    }
+    if (!free || friends_awake() == 0) {
+        s.join = NULL;
+        s.chat_turn = 0;
+        return;
+    }
+    if (s.join != NULL && (int32_t) (now - s.join_ms) >= 0) {
+        const char *act = s.join;
+        s.join = NULL;
+        life_join(act);
+        look_at_friend(1200);
+    }
+    if (s.chat_turn != 0 && (int32_t) (now - s.chat_at_ms) >= 0) {
+        chat_turn(now);
+    }
+    if (s.next_chat_ms == 0) {
+        s.next_chat_ms = now + chat_gap();
+    } else if ((int32_t) (now - s.next_chat_ms) >= 0 && !board_settings_on(SETTING_FOCUS)) {
+        // Time for a chat: this one starts it.
+        s.next_chat_ms = now + chat_gap();
+        s.chat_turns = 3 + (int) (esp_random() % 3);
+        s.chat_turn = 1;
+        s.chat_at_ms = now;
+    }
+}
+
 static void tick_cb(lv_timer_t *timer)
 {
     const uint32_t now = lv_tick_get();
@@ -771,6 +1002,7 @@ static void tick_cb(lv_timer_t *timer)
                            && !(s.until_ms != 0 && (int32_t) (now - s.until_ms) < 0)
                            && !board_settings_on(SETTING_FOCUS);
     const bool met_friend = friends_tick(!s.asleep, can_greet);
+    friends_step(now, can_greet);
 
     if (s.status_until_ms != 0 && (int32_t) (now - s.status_until_ms) >= 0) {
         s.status_until_ms = 0;
@@ -908,6 +1140,13 @@ static void set_face_down(bool down)
 
 static void on_motion(motion_event_t ev)
 {
+    if (ev == MOTION_JOLT) {
+        // Maybe another Yoru bumped into it: friends.c finds out.
+        float dx, dy;
+        motion_jolt(&dx, &dy);
+        friends_jolt(dx, dy);
+        return;
+    }
     const uint32_t now = lv_tick_get();
     const bool reactions = board_settings_on(SETTING_MOTION_REACTIONS) && !board_settings_on(SETTING_FOCUS);
     // Face down and back are a control, like a long press: always on, even
@@ -1062,6 +1301,7 @@ void behaviour_voice(voice_state_t state)
     }
     if (was == VOICE_IDLE) {
         life_feel(LIFE_FEEL_TALK);
+        friends_send(FRIEND_TALK, 0, 0);
     }
     if (s.asleep) {
         // The wake word wakes it.

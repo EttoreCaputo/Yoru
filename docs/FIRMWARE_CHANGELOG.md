@@ -1,5 +1,18 @@
 # Firmware changelog
 
+## 0.20.0
+
+Two Yorus live together.
+
+- **Bump them.** Touch the two boards together: they high-five with hearts and look at each other, and from then on each knows which side the other is on (also after a restart). Move one, bump again.
+- **Catching yawns.** When one yawns, the other often yawns too a moment later; when one dances, the other joins in; a sneeze or a hiccup makes the other laugh. When one falls asleep, the other gets sleepy.
+- **Waking together.** Wake one, and the other wakes too and looks at it (not at night, face down or in do not disturb).
+- **Jealous.** Stroke one, and the other looks over and sulks; stroke it too, soon after, and it melts.
+- **Chatter.** Every few minutes, while both are free, they chirp at each other for a few turns, and end up giggling.
+- **The firefly flies over.** Sometimes Yoru's firefly gets away towards the other Yoru, who waves it goodbye; it comes in on the other screen from the right side.
+- **Pass the ball.** A new game: tilt the board to roll a ball; with the game open on both, the edge facing the other Yoru opens and the ball rolls into the other screen. The passes are counted.
+- **Only one answers.** When both hear the wake word, the one that heard it louder answers; the other lets it.
+
 ## 0.19.2
 
 - **Friends are back.** Two Yorus on the same WiFi find each other and wave again, by themselves. Tested on a phone's hotspot: the WiFi doesn't mind them. Should your router act up with two of them around, the hello can be turned off from the Mac until he restarts.

@@ -1,5 +1,7 @@
 #include "friends.h"
 
+#include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "esp_app_desc.h"
@@ -11,9 +13,10 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "link_crypto.h"
+#include "lvgl_port.h"
+#include "nvs.h"
 
 static const char *TAG = "friends";
-
 
 /* Often enough that a friend shows up within seconds, rarely enough that the
  * radio doesn't notice. */
@@ -24,13 +27,26 @@ static const char *TAG = "friends";
 /* Met again after this long apart, it's greeted again. */
 #define GREET_AGAIN_MS (30 * 60 * 1000)
 #define MAX_FRIENDS 6
+/* Two jolts this close are one bump: the radio takes a few ms, the IMU 4. */
+#define BUMP_WINDOW_US (250 * 1000)
+/* Both heard the same wake word: their detections are this close. */
+#define HEARD_WINDOW_US (700 * 1000)
+/* How long after our wake word a louder friend's still counts. */
+#define HEARD_LATE_US (2000 * 1000)
+#define EVENTS 8
+#define NVS_NAMESPACE "friends"
 
 #define MAGIC "YORU"
 #define VERSION 1
 #define MSG_HELLO 1
+#define MSG_EVENT 2 // a, b: as friend_ev_kind_t says
+#define MSG_JOLT 3
+#define MSG_BALL 4  // a: where along the edge x1000, b: speed
+#define MSG_HEARD 5 // a: the wake word's volume in dB x10
 
 /* On the air: small, fixed, and versioned, so a later firmware can add
- * messages without confusing this one. */
+ * messages without confusing this one. Boards before 0.20.0 only know the
+ * hello, and drop the rest for its size. */
 typedef struct __attribute__((packed)) {
     char magic[4];
     uint8_t version;
@@ -40,75 +56,196 @@ typedef struct __attribute__((packed)) {
     char firmware[16];
 } hello_t;
 
+typedef struct __attribute__((packed)) {
+    char magic[4];
+    uint8_t version;
+    uint8_t type;
+    uint8_t kind;
+    uint8_t reserved;
+    int16_t a, b;
+} msg_t;
+
 #define FLAG_AWAKE 0x01
+#define FLAG_PLAYING 0x02
 
 typedef struct {
     uint8_t mac[6];
     bool used;
-    bool awake;
+    bool awake, playing;
     bool present; // heard within GONE_MS
     int8_t rssi;
     int64_t seen_us;
     int64_t met_us; // when it was last greeted, 0 never
     char firmware[16];
+    /* Which way it is, in the panel's axes, from a bump; looked up in NVS
+     * once (side_looked), saved when a bump changes it (side_dirty). */
+    bool sided, side_looked, side_dirty;
+    float side_x, side_y;
+    int64_t jolt_us, heard_us;
+    float heard_db;
 } friend_t;
+
+typedef struct {
+    friend_ev_kind_t kind;
+    int16_t a, b;
+    int who; // index in s_friends
+} queued_t;
 
 static const uint8_t BROADCAST[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 static friend_t s_friends[MAX_FRIENDS];
+static queued_t s_events[EVENTS];
+static int s_ev_head, s_ev_count;
 static bool s_on;
 static volatile bool s_awake = true;
+static volatile bool s_playing;
 static esp_timer_handle_t s_timer;
+static uint8_t s_mac[6];
+/* Our last jolt and wake word, under s_mux. */
+static int64_t s_jolt_us;
+static float s_jolt_x, s_jolt_y;
+static int64_t s_heard_us;
+static float s_heard_db;
+static bool s_heard_done;
+/* A ball thrown to us, under s_mux. */
+static bool s_ball;
+static float s_ball_along, s_ball_speed;
 
 static void send_hello(void *arg)
 {
-    hello_t h = {.version = VERSION, .type = MSG_HELLO, .flags = s_awake ? FLAG_AWAKE : 0};
+    hello_t h = {.version = VERSION,
+                 .type = MSG_HELLO,
+                 .flags = (s_awake ? FLAG_AWAKE : 0) | (s_playing ? FLAG_PLAYING : 0)};
     memcpy(h.magic, MAGIC, sizeof(h.magic));
     strlcpy(h.firmware, esp_app_get_description()->version, sizeof(h.firmware));
     // Lost hellos don't matter: the next one is a few seconds away.
     esp_now_send(BROADCAST, (const uint8_t *) &h, sizeof(h));
 }
 
+static void send_msg(uint8_t type, uint8_t kind, int16_t a, int16_t b)
+{
+    if (!s_on) {
+        return;
+    }
+    msg_t m = {.version = VERSION, .type = type, .kind = kind, .a = a, .b = b};
+    memcpy(m.magic, MAGIC, sizeof(m.magic));
+    esp_now_send(BROADCAST, (const uint8_t *) &m, sizeof(m));
+}
+
+/* With s_mux held. */
+static void push(friend_ev_kind_t kind, int16_t a, int16_t b, int who)
+{
+    if (s_ev_count == EVENTS) {
+        // Full: the oldest goes, it's stale by now.
+        s_ev_head = (s_ev_head + 1) % EVENTS;
+        s_ev_count--;
+    }
+    s_events[(s_ev_head + s_ev_count) % EVENTS] = (queued_t) {kind, a, b, who};
+    s_ev_count++;
+}
+
+/* With s_mux held: a friend and we felt a jolt at once. It is on the side
+ * we were pushed away from. */
+static void bumped(int who)
+{
+    friend_t *f = &s_friends[who];
+    f->side_x = -s_jolt_x;
+    f->side_y = -s_jolt_y;
+    f->sided = f->side_looked = f->side_dirty = true;
+    f->jolt_us = 0;
+    s_jolt_us = 0;
+    push(FRIEND_BUMP, 0, 0, who);
+}
+
+/* With s_mux held: the friend `mac` is, created on its hello only. */
+static int find(const uint8_t *mac, bool create, int64_t now)
+{
+    int free_slot = -1, oldest = -1;
+    for (int i = 0; i < MAX_FRIENDS; i++) {
+        const friend_t *c = &s_friends[i];
+        if (c->used && memcmp(c->mac, mac, 6) == 0) {
+            return i;
+        }
+        if (!c->used && free_slot < 0) {
+            free_slot = i;
+        }
+        if (c->used && (oldest < 0 || c->seen_us < s_friends[oldest].seen_us)) {
+            oldest = i;
+        }
+    }
+    if (!create) {
+        return -1;
+    }
+    // A full table forgets the friend not heard from the longest.
+    const int i = free_slot >= 0 ? free_slot : oldest;
+    memset(&s_friends[i], 0, sizeof(s_friends[i]));
+    memcpy(s_friends[i].mac, mac, 6);
+    s_friends[i].used = true;
+    s_friends[i].seen_us = now;
+    return i;
+}
+
 /* The WiFi task: short, and only the table. */
 static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int len)
 {
-    if (len < (int) sizeof(hello_t) || memcmp(data, MAGIC, 4) != 0) {
+    if (len < (int) sizeof(msg_t) || memcmp(data, MAGIC, 4) != 0 || data[4] != VERSION) {
         return;
     }
-    hello_t h;
-    memcpy(&h, data, sizeof(h));
-    if (h.version != VERSION || h.type != MSG_HELLO) {
-        return;
-    }
-    h.firmware[sizeof(h.firmware) - 1] = '\0';
+    const uint8_t type = data[5];
     const int64_t now = esp_timer_get_time();
+    if (type == MSG_HELLO) {
+        if (len < (int) sizeof(hello_t)) {
+            return;
+        }
+        hello_t h;
+        memcpy(&h, data, sizeof(h));
+        h.firmware[sizeof(h.firmware) - 1] = '\0';
+        portENTER_CRITICAL(&s_mux);
+        friend_t *f = &s_friends[find(info->src_addr, true, now)];
+        f->awake = (h.flags & FLAG_AWAKE) != 0;
+        f->playing = (h.flags & FLAG_PLAYING) != 0;
+        f->rssi = info->rx_ctrl != NULL ? info->rx_ctrl->rssi : 0;
+        f->seen_us = now;
+        memcpy(f->firmware, h.firmware, sizeof(f->firmware));
+        portEXIT_CRITICAL(&s_mux);
+        return;
+    }
+    msg_t m;
+    memcpy(&m, data, sizeof(m));
     portENTER_CRITICAL(&s_mux);
-    friend_t *f = NULL, *free_slot = NULL, *oldest = NULL;
-    for (int i = 0; i < MAX_FRIENDS; i++) {
-        friend_t *c = &s_friends[i];
-        if (c->used && memcmp(c->mac, info->src_addr, 6) == 0) {
-            f = c;
+    // Only from a friend whose hello we heard.
+    const int who = find(info->src_addr, false, now);
+    if (who >= 0) {
+        friend_t *f = &s_friends[who];
+        f->seen_us = now;
+        switch (type) {
+        case MSG_EVENT:
+            if (m.kind < FRIEND_EV_COUNT && m.kind != FRIEND_BUMP) {
+                push((friend_ev_kind_t) m.kind, m.a, m.b, who);
+            }
+            break;
+        case MSG_JOLT:
+            f->jolt_us = now;
+            if (s_jolt_us != 0 && now - s_jolt_us < BUMP_WINDOW_US) {
+                bumped(who);
+            }
+            break;
+        case MSG_BALL:
+            if (s_playing) {
+                s_ball = true;
+                s_ball_along = (float) m.a / 1000.0f;
+                s_ball_speed = (float) m.b;
+            }
+            break;
+        case MSG_HEARD:
+            f->heard_us = now;
+            f->heard_db = (float) m.a / 10.0f;
+            break;
+        default:
             break;
         }
-        if (!c->used && free_slot == NULL) {
-            free_slot = c;
-        }
-        if (c->used && (oldest == NULL || c->seen_us < oldest->seen_us)) {
-            oldest = c;
-        }
     }
-    if (f == NULL) {
-        // A full table forgets the friend not heard from the longest.
-        f = free_slot != NULL ? free_slot : oldest;
-        memset(f, 0, sizeof(*f));
-        memcpy(f->mac, info->src_addr, 6);
-        f->used = true;
-    }
-    f->awake = (h.flags & FLAG_AWAKE) != 0;
-    f->rssi = info->rx_ctrl != NULL ? info->rx_ctrl->rssi : 0;
-    f->seen_us = now;
-    memcpy(f->firmware, h.firmware, sizeof(f->firmware));
     portEXIT_CRITICAL(&s_mux);
 }
 
@@ -131,6 +268,7 @@ static void radio(bool on)
             ESP_LOGW(TAG, "ESP-NOW unavailable: %s", esp_err_to_name(err));
             return;
         }
+        esp_read_mac(s_mac, ESP_MAC_WIFI_STA);
         esp_now_register_recv_cb(on_recv);
         // Channel 0: whatever the WiFi is on, the access point's.
         const esp_now_peer_info_t peer = {.ifidx = WIFI_IF_STA, .channel = 0, .encrypt = false};
@@ -147,8 +285,8 @@ static void radio(bool on)
         ESP_LOGI(TAG, "looking for friends");
     } else {
         esp_timer_stop(s_timer);
-        esp_now_deinit();
         s_on = false;
+        esp_now_deinit();
     }
 }
 
@@ -183,9 +321,86 @@ bool friends_enabled(void)
     return s_enabled;
 }
 
+/* ---- Sides, kept across restarts -------------------------------------------- */
+
+/* The LVGL task, outside s_mux: NVS takes a few ms. */
+static void keep_sides(void)
+{
+    for (int i = 0; i < MAX_FRIENDS; i++) {
+        portENTER_CRITICAL(&s_mux);
+        friend_t f = s_friends[i];
+        portEXIT_CRITICAL(&s_mux);
+        if (!f.used || (f.side_looked && !f.side_dirty)) {
+            continue;
+        }
+        char key[13];
+        link_hex(f.mac, 6, key);
+        nvs_handle_t nvs;
+        if (nvs_open(NVS_NAMESPACE, f.side_dirty ? NVS_READWRITE : NVS_READONLY, &nvs) != ESP_OK) {
+            portENTER_CRITICAL(&s_mux);
+            s_friends[i].side_looked = true;
+            portEXIT_CRITICAL(&s_mux);
+            continue;
+        }
+        if (f.side_dirty) {
+            const int16_t deg = (int16_t) lroundf(atan2f(f.side_y, f.side_x) * 180.0f / (float) M_PI);
+            nvs_set_i16(nvs, key, deg);
+            nvs_commit(nvs);
+            ESP_LOGI(TAG, "%s is at %d degrees", key, deg);
+        }
+        int16_t deg = 0;
+        const bool known = !f.side_dirty && nvs_get_i16(nvs, key, &deg) == ESP_OK;
+        nvs_close(nvs);
+        portENTER_CRITICAL(&s_mux);
+        friend_t *g = &s_friends[i];
+        if (g->used && memcmp(g->mac, f.mac, 6) == 0) {
+            g->side_looked = true;
+            g->side_dirty = false;
+            if (known && !g->sided) {
+                g->sided = true;
+                g->side_x = cosf((float) deg * (float) M_PI / 180.0f);
+                g->side_y = sinf((float) deg * (float) M_PI / 180.0f);
+            }
+        }
+        portEXIT_CRITICAL(&s_mux);
+    }
+}
+
+/* From the panel's axes to the picture's, the screen may be turned (as
+ * behaviour.c's lean). */
+static void to_picture(float x, float y, float *px, float *py)
+{
+    switch (lvgl_port_rotation()) {
+    case 1:
+        *px = -y;
+        *py = x;
+        break;
+    case 2:
+        *px = -x;
+        *py = -y;
+        break;
+    case 3:
+        *px = y;
+        *py = -x;
+        break;
+    default:
+        *px = x;
+        *py = y;
+        break;
+    }
+}
+
+/* ---- Every tick -------------------------------------------------------------- */
+
 bool friends_tick(bool awake, bool free)
 {
-    s_awake = awake;
+    if (s_awake != awake) {
+        s_awake = awake;
+        if (s_on) {
+            send_hello(NULL); // the others know at once
+        }
+    }
+    keep_sides();
     const int64_t now = esp_timer_get_time();
     bool greet = false;
     char met[13] = "";
@@ -216,16 +431,40 @@ bool friends_tick(bool awake, bool free)
     return greet;
 }
 
-int friends_count(void)
+static int count(bool awake_only)
 {
     const int64_t now = esp_timer_get_time();
     int n = 0;
     portENTER_CRITICAL(&s_mux);
     for (int i = 0; i < MAX_FRIENDS; i++) {
-        n += s_friends[i].used && now - s_friends[i].seen_us < (int64_t) GONE_MS * 1000;
+        const friend_t *f = &s_friends[i];
+        n += f->used && now - f->seen_us < (int64_t) GONE_MS * 1000 && (!awake_only || f->awake);
     }
     portEXIT_CRITICAL(&s_mux);
     return n;
+}
+
+int friends_count(void)
+{
+    return count(false);
+}
+
+int friends_awake(void)
+{
+    return count(true);
+}
+
+/* With s_mux held: the friend in range with the strongest signal, -1. */
+static int nearest(int64_t now)
+{
+    int best = -1;
+    for (int i = 0; i < MAX_FRIENDS; i++) {
+        const friend_t *f = &s_friends[i];
+        if (f->used && now - f->seen_us < (int64_t) GONE_MS * 1000 && (best < 0 || f->rssi > s_friends[best].rssi)) {
+            best = i;
+        }
+    }
+    return best;
 }
 
 cJSON *friends_status(void)
@@ -249,7 +488,180 @@ cJSON *friends_status(void)
         cJSON_AddNumberToObject(o, "seen_s", (int) ((now - f->seen_us) / 1000000));
         cJSON_AddBoolToObject(o, "awake", f->awake);
         cJSON_AddStringToObject(o, "firmware", f->firmware);
+        if (f->sided) {
+            const int deg = (int) lroundf(atan2f(f->side_y, f->side_x) * 180.0f / (float) M_PI);
+            cJSON_AddNumberToObject(o, "side_deg", deg);
+        }
+        if (f->playing) {
+            cJSON_AddBoolToObject(o, "playing", true);
+        }
         cJSON_AddItemToArray(arr, o);
     }
     return arr;
+}
+
+/* ---- What they tell each other ------------------------------------------ */
+
+void friends_send(friend_ev_kind_t kind, int16_t a, int16_t b)
+{
+    if (kind < FRIEND_EV_COUNT && kind != FRIEND_BUMP) {
+        send_msg(MSG_EVENT, (uint8_t) kind, a, b);
+    }
+}
+
+bool friends_next(friend_ev_t *ev)
+{
+    portENTER_CRITICAL(&s_mux);
+    if (s_ev_count == 0) {
+        portEXIT_CRITICAL(&s_mux);
+        return false;
+    }
+    const queued_t q = s_events[s_ev_head];
+    s_ev_head = (s_ev_head + 1) % EVENTS;
+    s_ev_count--;
+    const friend_t f = s_friends[q.who];
+    portEXIT_CRITICAL(&s_mux);
+    *ev = (friend_ev_t) {.kind = q.kind, .a = q.a, .b = q.b, .sided = f.sided};
+    if (f.sided) {
+        to_picture(f.side_x, f.side_y, &ev->side_x, &ev->side_y);
+    }
+    return true;
+}
+
+bool friends_side(float *x, float *y)
+{
+    portENTER_CRITICAL(&s_mux);
+    const int i = nearest(esp_timer_get_time());
+    const bool sided = i >= 0 && s_friends[i].sided;
+    const float sx = sided ? s_friends[i].side_x : 0, sy = sided ? s_friends[i].side_y : 0;
+    portEXIT_CRITICAL(&s_mux);
+    if (sided) {
+        to_picture(sx, sy, x, y);
+    }
+    return sided;
+}
+
+void friends_jolt(float dx, float dy)
+{
+    const float len = hypotf(dx, dy);
+    if (len <= 0) {
+        return;
+    }
+    const int64_t now = esp_timer_get_time();
+    send_msg(MSG_JOLT, 0, 0, 0);
+    portENTER_CRITICAL(&s_mux);
+    s_jolt_us = now;
+    s_jolt_x = dx / len;
+    s_jolt_y = dy / len;
+    for (int i = 0; i < MAX_FRIENDS; i++) {
+        if (s_friends[i].used && s_friends[i].jolt_us != 0 && now - s_friends[i].jolt_us < BUMP_WINDOW_US) {
+            bumped(i);
+            break;
+        }
+    }
+    portEXIT_CRITICAL(&s_mux);
+}
+
+static const char *const EV_NAMES[FRIEND_EV_COUNT] = {
+    "yawn", "sneeze", "hiccup", "dance", "asleep", "woke", "stroked", "talk", "chat", "firefly", "bump",
+};
+
+bool friends_tell(const char *name)
+{
+    for (int i = 0; i < FRIEND_EV_COUNT; i++) {
+        if (strcmp(name, EV_NAMES[i]) == 0 && i != FRIEND_BUMP) {
+            // A chat as its last turn (the other giggles), a firefly mid-edge.
+            friends_send((friend_ev_kind_t) i, i == FRIEND_CHAT ? 3 : 0, i == FRIEND_CHAT ? 3 : 0);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool friends_set_side(int deg)
+{
+    portENTER_CRITICAL(&s_mux);
+    const int i = nearest(esp_timer_get_time());
+    if (i >= 0) {
+        friend_t *f = &s_friends[i];
+        f->side_x = cosf((float) deg * (float) M_PI / 180.0f);
+        f->side_y = sinf((float) deg * (float) M_PI / 180.0f);
+        f->sided = f->side_looked = f->side_dirty = true;
+    }
+    portEXIT_CRITICAL(&s_mux);
+    return i >= 0;
+}
+
+/* ---- The ball -------------------------------------------------------------- */
+
+void friends_playing(bool on)
+{
+    s_playing = on;
+    if (!on) {
+        portENTER_CRITICAL(&s_mux);
+        s_ball = false;
+        portEXIT_CRITICAL(&s_mux);
+    }
+    if (s_on) {
+        send_hello(NULL);
+    }
+}
+
+bool friends_partner_playing(void)
+{
+    portENTER_CRITICAL(&s_mux);
+    const int i = nearest(esp_timer_get_time());
+    const bool playing = i >= 0 && s_friends[i].playing;
+    portEXIT_CRITICAL(&s_mux);
+    return playing;
+}
+
+void friends_throw(float along, float speed)
+{
+    const float a = along < -1 ? -1 : along > 1 ? 1 : along;
+    send_msg(MSG_BALL, 0, (int16_t) lroundf(a * 1000), (int16_t) fminf(30000, speed));
+}
+
+bool friends_catch(float *along, float *speed)
+{
+    portENTER_CRITICAL(&s_mux);
+    const bool got = s_ball;
+    s_ball = false;
+    *along = s_ball_along;
+    *speed = s_ball_speed;
+    portEXIT_CRITICAL(&s_mux);
+    return got;
+}
+
+/* ---- The wake word --------------------------------------------------------- */
+
+void friends_heard(float volume_db)
+{
+    portENTER_CRITICAL(&s_mux);
+    s_heard_us = esp_timer_get_time();
+    s_heard_db = volume_db;
+    s_heard_done = false;
+    portEXIT_CRITICAL(&s_mux);
+    send_msg(MSG_HEARD, 0, (int16_t) lroundf(volume_db * 10), 0);
+}
+
+bool friends_outheard(void)
+{
+    const int64_t now = esp_timer_get_time();
+    bool yield = false;
+    portENTER_CRITICAL(&s_mux);
+    if (s_heard_us != 0 && !s_heard_done && now - s_heard_us < HEARD_LATE_US) {
+        for (int i = 0; i < MAX_FRIENDS && !yield; i++) {
+            const friend_t *f = &s_friends[i];
+            if (!f->used || f->heard_us == 0 || llabs(f->heard_us - s_heard_us) > HEARD_WINDOW_US) {
+                continue;
+            }
+            // Louder answers; on a tie, the same board on both sides.
+            const float d = f->heard_db - s_heard_db;
+            yield = d > 0.5f || (d >= -0.5f && memcmp(f->mac, s_mac, 6) > 0);
+        }
+        s_heard_done = yield;
+    }
+    portEXIT_CRITICAL(&s_mux);
+    return yield;
 }

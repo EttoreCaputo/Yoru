@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "esp_random.h"
+#include "friends.h"
 #include "life_int.h"
 #include "lvgl.h"
 #include "playback.h"
@@ -43,6 +44,9 @@ const act_info_t ACTS[ACT_COUNT] = {
 #define FLY_RY 120
 #define FLY_MIN_MS 4500
 #define FLY_MAX_MS 8000
+/* Come from the other Yoru: from beyond the edge into its wander. */
+#define FLY_IN_MS 1400.0f
+#define FLY_EDGE 260.0f
 
 static struct {
     act_id_t id;
@@ -54,7 +58,30 @@ static struct {
     int n;
     float a, b; // the firefly's phases
     bool caught;
+    /* Joining another Yoru: the friends aren't told. */
+    bool guest;
+    /* The firefly: come from the other Yoru's screen, at (from_x, from_y)
+     * in pixels from the middle; or flying off to it, that way (to_x, to_y). */
+    bool from, to;
+    float from_x, from_y, to_x, to_y;
 } A;
+
+static bool s_guest;
+static bool s_from;
+static float s_from_x, s_from_y, s_from_along;
+
+void acts_as_guest(void)
+{
+    s_guest = true;
+}
+
+void acts_firefly_from(float x, float y, float along)
+{
+    s_from = true;
+    s_from_x = x;
+    s_from_y = y;
+    s_from_along = along;
+}
 
 static void wait_ms(uint32_t ms)
 {
@@ -339,6 +366,13 @@ static bool firefly(void)
         A.t0 = LT.now;
         A.n = (int) life_frange(FLY_MIN_MS, FLY_MAX_MS);
         A.caught = life_frange(0, 1) < 0.65f;
+        if (A.from) {
+            A.caught = life_frange(0, 1) < 0.85f; // a gift: mostly caught
+        } else if (friends_awake() > 0 && friends_side(&A.to_x, &A.to_y)) {
+            // A friend nearby: now and then it flies over there.
+            A.to = life_frange(0, 1) < 0.5f;
+            A.caught = A.caught && !A.to;
+        }
         eyes_set_mood(EYES_MOOD_CURIOUS);
         life_sound(SOUND_FLUTTER);
         next(1);
@@ -346,6 +380,12 @@ static bool firefly(void)
     case 1: {
         const uint32_t ms = LT.now - A.t0;
         fly_at(ms, &fx, &fy);
+        if (A.from && ms < FLY_IN_MS) {
+            // In from the edge facing the other Yoru, into its wander.
+            const float k = (float) ms / FLY_IN_MS, e = k * k * (3 - 2 * k);
+            fx = A.from_x + (fx - A.from_x) * e;
+            fy = A.from_y + (fy - A.from_y) * e;
+        }
         eyes_firefly(true, fx, fy);
         eyes_look_at(fx / 180, fy / 180);
         // The body lags behind, a lazy spring, a little short of it.
@@ -386,13 +426,27 @@ static bool firefly(void)
         next(6);
         return false;
     case 4: {
-        // It flies off upwards; Yoru stretches after it.
+        // It flies off upwards, or to the other Yoru; Yoru stretches after it.
         const float k = fminf(1, (float) (LT.now - A.t0) / 900.0f);
         fly_at(LT.now - A.t0 + (uint32_t) A.n, &fx, &fy);
-        fy -= k * 300;
+        if (A.to) {
+            fx += k * A.to_x * 320;
+            fy += k * A.to_y * 320;
+        } else {
+            fy -= k * 300;
+        }
         eyes_firefly(k < 1, fx, fy);
-        eyes_look_at(fx / 180, fmaxf(-1, fy / 180));
-        if (k >= 1) {
+        eyes_look_at(fmaxf(-1, fminf(1, fx / 180)), fmaxf(-1, fminf(1, fy / 180)));
+        if (k >= 1 && A.to) {
+            // Over to the friend: where along the edge it left.
+            const float along = (fx * -A.to_y + fy * A.to_x) / 150;
+            friends_send(FRIEND_FIREFLY, (int16_t) lroundf(fmaxf(-1, fminf(1, along)) * 1000), 0);
+            eyes_set_mood(EYES_MOOD_HAPPY);
+            eyes_gesture(EYES_GESTURE_WAVE);
+            life_sound(SOUND_HELLO);
+            wait_ms(1600);
+            next(5);
+        } else if (k >= 1) {
             eyes_set_mood(EYES_MOOD_SAD);
             life_sound(SOUND_AWW);
             wait_ms(1600);
@@ -757,6 +811,27 @@ static const act_fn FNS[ACT_COUNT] = {
     [ACT_SEARCH] = search,   [ACT_SAD] = sad,             [ACT_SULK] = sulk,
 };
 
+/* What the friends hear about, so they can join in. */
+static void tell_friends(act_id_t id)
+{
+    switch (id) {
+    case ACT_YAWN:
+        friends_send(FRIEND_YAWN, 0, 0);
+        break;
+    case ACT_SNEEZE:
+        friends_send(FRIEND_SNEEZE, 0, 0);
+        break;
+    case ACT_HICCUP:
+        friends_send(FRIEND_HICCUP, 0, 0);
+        break;
+    case ACT_DANCE:
+        friends_send(FRIEND_DANCE, 0, 0);
+        break;
+    default:
+        break;
+    }
+}
+
 void acts_start(act_id_t id, const act_style_t *style)
 {
     memset(&A, 0, sizeof(A));
@@ -764,6 +839,18 @@ void acts_start(act_id_t id, const act_style_t *style)
     A.style = *style;
     A.wait_until = LT.now;
     A.side = coin();
+    A.guest = s_guest;
+    s_guest = false;
+    if (A.id == ACT_FIREFLY && s_from) {
+        A.from = true;
+        // Beyond the edge facing the friend, `along` it.
+        A.from_x = s_from_x * FLY_EDGE - s_from_y * s_from_along * 150;
+        A.from_y = s_from_y * FLY_EDGE + s_from_x * s_from_along * 150;
+    }
+    s_from = false;
+    if (!A.guest) {
+        tell_friends(A.id);
+    }
 }
 
 bool acts_step(void)

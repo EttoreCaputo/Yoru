@@ -39,6 +39,9 @@ typedef enum {
     MOTION_LANDED,
     /* Turned fast on the desk. */
     MOTION_SPUN,
+    /* A sharp jolt along the glass, held or not: another Yoru bumped into
+     * it, maybe (friends.c); motion_jolt() says which way. */
+    MOTION_JOLT,
     MOTION_COUNT,
 } motion_event_t;
 
@@ -75,6 +78,10 @@ void motion_touched(void);
 /** Gravity in g and the last turn rate in degrees per second, screen axes,
  * for get_state and for checking the axes on a new board. */
 void motion_raw(float g[3], float w[3]);
+
+/** Which way the last MOTION_JOLT pushed the case, a unit vector in the
+ * panel's axes (x right, y down, unrotated). */
+void motion_jolt(float *dx, float *dy);
 
 const char *motion_event_name(motion_event_t event);
 

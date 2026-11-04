@@ -99,12 +99,16 @@ static const char *TAG = "motion";
 #define LEAN_FULL_G 0.40f
 #define UPRIGHT_FLAT_G 0.55f
 #define UPRIGHT_MS 800
+/* A jolt along the glass: sharper than a knock on the desk, from rest or
+ * not (one of two cases bumped together is in a hand). */
+#define JOLT_G 0.70f
+#define JOLT_COOL_MS 400
 /* After a landing the case still rings: nothing else for a moment. */
 #define LAND_QUIET_MS 1000
 
 static const char *const NAMES[MOTION_COUNT] = {
     "lifted", "put_down", "shaken", "shaken_long", "knock", "double_knock",
-    "rocked", "face_down", "face_up", "dropped", "landed", "spun",
+    "rocked", "face_down", "face_up", "dropped", "landed", "spun", "jolt",
 };
 
 typedef struct {
@@ -128,6 +132,7 @@ static volatile int s_zsign = 1;
 static volatile bool s_zsign_known;
 static volatile bool s_zsign_dirty;
 static float s_raw_z;
+static float s_jolt[2];
 static TaskHandle_t s_task;
 /* What the task does (motion_set_mode()); it only reads it. */
 static volatile motion_mode_t s_mode = MOTION_FULL;
@@ -157,6 +162,9 @@ static struct {
     rock_axis_t rock[2];
     int64_t rock_cool;
     int up_candidate, up_ms;
+    /* Jolts. */
+    float jolt_prev;
+    int64_t jolt_cool;
 } m;
 
 static void emit(motion_event_t ev)
@@ -375,6 +383,18 @@ static void step(const float a[3], const float w[3])
             emit(MOTION_LANDED);
         }
     }
+
+    // A jolt along the glass: its first sample says which way it pushed.
+    const float jolt = hypotf(dv[0], dv[1]);
+    if (!m.falling && jolt > JOLT_G && m.jolt_prev < JOLT_G * 0.5f && m.now >= m.jolt_cool) {
+        m.jolt_cool = m.now + JOLT_COOL_MS;
+        portENTER_CRITICAL(&s_mux);
+        s_jolt[0] = dv[0] / jolt;
+        s_jolt[1] = dv[1] / jolt;
+        portEXIT_CRITICAL(&s_mux);
+        emit(MOTION_JOLT);
+    }
+    m.jolt_prev = jolt;
 
     // Moving or resting. A short gap doesn't end a movement.
     const bool active = dyn > ACTIVE_G || wmag > ACTIVE_DPS;
@@ -663,6 +683,14 @@ void motion_raw(float g[3], float w[3])
     portENTER_CRITICAL(&s_mux);
     memcpy(g, s_g_out, sizeof(s_g_out));
     memcpy(w, s_w_out, sizeof(s_w_out));
+    portEXIT_CRITICAL(&s_mux);
+}
+
+void motion_jolt(float *dx, float *dy)
+{
+    portENTER_CRITICAL(&s_mux);
+    *dx = s_jolt[0];
+    *dy = s_jolt[1];
     portEXIT_CRITICAL(&s_mux);
 }
 

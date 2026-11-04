@@ -8,6 +8,7 @@
 #include "link.h"
 #include "cJSON.h"
 #include "ears_dir.h"
+#include "friends.h"
 #include "esp_afe_config.h"
 #include "esp_afe_sr_models.h"
 #include "esp_heap_caps.h"
@@ -115,6 +116,8 @@ static const char *TAG = "voice";
 #define RELEASE_BIT BIT5
 /* The host sets how long a pause ends the utterance (voice_set_pause()). */
 #define PAUSE_BIT BIT6
+/* Another Yoru answers this wake word (voice_yield()). */
+#define YIELD_BIT BIT7
 
 typedef enum {
     END_SPEECH,
@@ -123,11 +126,13 @@ typedef enum {
     END_HOST,
     END_MUTED,
     END_RELEASED,
+    END_YIELDED,
 } end_reason_t;
 
 static const char *const END_NAMES[] = {
     [END_SPEECH] = "end_of_speech", [END_NO_SPEECH] = "no_speech", [END_MAX_LENGTH] = "max_length",
     [END_HOST] = "host", [END_MUTED] = "muted", [END_RELEASED] = "released",
+    [END_YIELDED] = "yielded",
 };
 
 /* The utterance being streamed. Only the fetch task touches it. */
@@ -759,6 +764,8 @@ void voice_set_commands(const voice_phrase_t *list, int n, voice_command_cb_t cb
 static void on_wake(const afe_fetch_result_t *res)
 {
     ESP_LOGI(TAG, "wake word \"%s\" (%.1f dBFS)", voice_wake_word(), res->data_volume);
+    // Another Yoru may have heard it too: the louder one answers.
+    friends_heard(res->data_volume);
     cJSON *params = cJSON_CreateObject();
     cJSON_AddStringToObject(params, "word", voice_wake_word());
     cJSON_AddStringToObject(params, "model", s_model);
@@ -806,7 +813,7 @@ static void fetch_task(void *arg)
         // Muted or paused nothing is fed, and fetching would only get the AFE
         // to warn about its empty buffer every time.
         EventBits_t run = xEventGroupWaitBits(s_run, RUN_BIT, pdFALSE, pdTRUE, pdMS_TO_TICKS(FETCH_WAIT_MS));
-        EventBits_t req = xEventGroupClearBits(s_req, LISTEN_BIT | STOP_BIT | FOLLOW_UP_BIT | TALK_BIT | RELEASE_BIT | PAUSE_BIT);
+        EventBits_t req = xEventGroupClearBits(s_req, LISTEN_BIT | STOP_BIT | FOLLOW_UP_BIT | TALK_BIT | RELEASE_BIT | PAUSE_BIT | YIELD_BIT);
         // s_stream is only touched with s_fetch held.
         xSemaphoreTake(s_fetch, portMAX_DELAY);
         if (!(run & RUN_BIT)) {
@@ -815,6 +822,14 @@ static void fetch_task(void *arg)
         } else {
             if (req & STOP_BIT) {
                 stream_end(END_HOST);
+                local_end(VOICE_COMMAND_NONE);
+            }
+            if ((req & YIELD_BIT) && s_stream.active && !s_stream.button) {
+                // Nothing heard, as far as the host goes: it drops it.
+                s_stream.speech_us = 0;
+                stream_end(END_YIELDED);
+            }
+            if (req & YIELD_BIT) {
                 local_end(VOICE_COMMAND_NONE);
             }
             if (req & TALK_BIT) {
@@ -928,6 +943,13 @@ void voice_talk_end(void)
 {
     if (s_available) {
         xEventGroupSetBits(s_req, RELEASE_BIT);
+    }
+}
+
+void voice_yield(void)
+{
+    if (s_available) {
+        xEventGroupSetBits(s_req, YIELD_BIT);
     }
 }
 

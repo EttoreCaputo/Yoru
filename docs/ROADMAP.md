@@ -13,7 +13,7 @@ Firmware 0.13.0 (2026-11-02).
 - The menu as a watch's: Notifications, Timers, Tasks (Habits until 0.15.1), Games, Do not disturb and Settings around Yoru; every setting on the board, in Italian and English (M2).
 - Voice and link: wake word (Alexa, Hi ESP, Jarvis, Computer), push-to-talk on PWR, listening on after an answer, the host judging the end of a sentence (Smart Turn), speech on the speaker, USB and WiFi (M3).
 - The assistant's body (M4): the inbox (`show_notification`), the Allow and Deny card, the Timers and Habits apps (Tasks since 0.16.0) and the errands, all driven by Yoru Hub; BOOT opens the inbox, the screen goes dark after a minute asleep.
-- Games: Tilt ball, Slingshot, Constellations (since 0.11.9).
+- Games: Tilt ball, Slingshot, Constellations (since 0.11.9), Pass the ball with two Yorus (0.20.0).
 - Updates over WiFi (0.19.0, `ota.c`): two app slots, the image over the link, rollback when the new firmware doesn't get back on the WiFi (`docs/protocol.md`, OTA).
 - Talking without the host (0.14.0, `cloud.c`): speech to text, the brain and the voice called from the board over HTTPS with the keys Yoru Hub hands over (`cloud/set`), tags in the answer acting on the board, connections kept open and opened while you talk. The app partition grew to 4 MB for it. Since 0.17.0 it also searches the web through Tavily with the key Yoru Hub hands over (`search` in `cloud/set`).
 - Without the host (0.13.0): the board's own clock (`clock.c`: SNTP, or the host's time and zone), timers and pomodoros started on the board and handed to the host when it's back (`timer_new`), habits kept in NVS with their day and streaks (gone in 0.16.0), and a few phrases in English heard on the board by MultiNet 7 (`commands.c`).
@@ -169,7 +169,7 @@ Yoru is the physical side of the coding agents on the computer, the way the couc
 - 24-bit colour (0.11.2, setting `color_24bit`): smoother gradients and shadows than 16-bit.
 - Games (0.11.9): Tilt ball, Slingshot and Constellations, in the menu's Games app (`games_ui.c`, `game_*.c`); each keeps the level reached.
 - Music: bob to the beat (to do).
-- Friends (`docs/FRIENDS.md`): Yorus that find each other over ESP-NOW and greet (0.18.0); the bump, where the other is, playing together and one answer to "Alexa" are to do.
+- Friends (`docs/FRIENDS.md`): Yorus that find each other over ESP-NOW and greet (0.18.0); since 0.20.0 the bump (which side the other is), catching yawns, waking together, jealousy, chatter, the firefly crossing over, Pass the ball and one answer to "Alexa". Finding the side by sound is still open.
 
 ### M6: hackability and integrations
 - Moods and looks as data (JSON) that can be loaded and shared from the app.

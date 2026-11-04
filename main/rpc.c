@@ -293,9 +293,18 @@ void rpc_handle(uint8_t *payload, size_t len)
         // The hello to other Yorus, on at boot (docs/FRIENDS.md): switched
         // until the next restart, to test it or should a router mind it.
         const cJSON *on = cJSON_GetObjectItemCaseSensitive(params, "on");
-        if (on != NULL && !cJSON_IsBool(on)) {
+        const cJSON *tell = cJSON_GetObjectItemCaseSensitive(params, "tell");
+        const cJSON *side = cJSON_GetObjectItemCaseSensitive(params, "side_deg");
+        if ((on != NULL && !cJSON_IsBool(on)) || (tell != NULL && !cJSON_IsString(tell))
+            || (side != NULL && !cJSON_IsNumber(side))) {
             code = RPC_INVALID_PARAMS;
-            message = "expected {\"on\"?: bool}";
+            message = "expected {\"on\"?: bool, \"tell\"?: event, \"side_deg\"?: degrees}";
+        } else if (tell != NULL && !friends_tell(tell->valuestring)) {
+            code = RPC_INVALID_PARAMS;
+            message = "unknown event: yawn, sneeze, hiccup, dance, asleep, woke, stroked, talk, chat, firefly";
+        } else if (side != NULL && !friends_set_side(side->valueint)) {
+            code = RPC_INVALID_PARAMS;
+            message = "no friend in range";
         } else {
             if (on != NULL) {
                 friends_enable(cJSON_IsTrue(on));

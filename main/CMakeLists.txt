@@ -17,6 +17,7 @@ idf_component_register(SRCS "approval.c" "toast.c" "inbox_ui.c" "inbox.c" "main.
                             "game_tilt.c"
                             "game_sling.c"
                             "game_stars.c"
+                            "game_pass.c"
                             "approval.c"
                             "card.c"
                             "board_button.c"

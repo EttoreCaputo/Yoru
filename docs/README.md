@@ -13,7 +13,7 @@ Status: early development, firmware 0.13.0. What is in and what is left: [the ro
 - [Roadmap and hardware](ROADMAP.md)
 - [Protocol](protocol.md): what differs from DualEye's
 - [Firmware changelog](FIRMWARE_CHANGELOG.md)
-- [Friends](FRIENDS.md): Yorus that meet over ESP-NOW
+- [Friends](FRIENDS.md): Yorus that meet over ESP-NOW and live together
 - [Mascot states](mascot/STATES.md): the Rive file's inputs
 
 ## What is on the board
@@ -24,7 +24,7 @@ Status: early development, firmware 0.13.0. What is in and what is left: [the ro
 - **The menu,** a watch's honeycomb of round apps around Yoru (swipe down from the top): Notifications, Timers, Tasks, Games, Do not disturb and Settings.
 - **The host's side:** the inbox of notifications, timers and reminders, the tasks you gave Yoru (what each does, when it runs next, how it went, and "Do it now"), the Allow and Deny card before Yoru acts for you, and Yoru's errands while the assistant calls one of your services.
 - **Without the host:** Yoru talks with you over WiFi on its own, in any language, through the online services Yoru Hub hands over (speech to text, the assistant's brain, its voice: [Cloud voice](protocol.md#cloud-voice)), and sets timers, pomodoros, the volume or its face as you ask, and, with a Tavily key from Yoru Hub, looks things up on the web. It keeps the time itself (from the internet over WiFi, or the computer's), starts timers and pomodoros from the Timers app, and still shows your tasks (they're done once the computer is back). Without WiFi or services it understands a few phrases in English after the wake word ([the list](protocol.md#offline-commands)). What it did meanwhile goes to Yoru Hub when it's back.
-- **Games:** Tilt ball, Slingshot and Constellations.
+- **Games:** Tilt ball, Slingshot, Constellations and, with two Yorus, Pass the ball.
 - **Battery:** Yoru notices it: a bolt of energy when you plug him in, a charge ring while he charges, a clap when he's full, and a tired face and a small battery by his head when he runs low. Power profiles that save what they can while Yoru is idle (Balanced, or Saver with the mics off while it sleeps), a dark screen that really switches off, and hibernation after a while in the dark, until it's picked up.
 
 ## Host program

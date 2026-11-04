@@ -399,6 +399,28 @@ void life_attend(void)
     start(ACT_COME);
 }
 
+bool life_join(const char *act)
+{
+    tick();
+    const act_id_t a = acts_by_name(act);
+    if (L.act != ACT_MIND || a == ACT_COUNT) {
+        return false;
+    }
+    acts_as_guest();
+    return mind_act_now(a);
+}
+
+bool life_firefly_from(float x, float y, float along)
+{
+    tick();
+    if (L.act != ACT_MIND) {
+        return false;
+    }
+    acts_firefly_from(x, y, along);
+    acts_as_guest();
+    return mind_act_now(ACT_FIREFLY);
+}
+
 void life_feel(life_feel_t feel)
 {
     tick();
