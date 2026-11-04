@@ -102,6 +102,8 @@ static volatile bool s_awake = true;
 static volatile bool s_playing;
 static esp_timer_handle_t s_timer;
 static uint8_t s_mac[6];
+/* Jolts told and heard, for tuning the bump. */
+static int s_jolts_sent, s_jolts_heard, s_bumps;
 /* Our last jolt and wake word, under s_mux. */
 static int64_t s_jolt_us;
 static float s_jolt_x, s_jolt_y;
@@ -155,6 +157,7 @@ static void bumped(int who)
     f->sided = f->side_looked = f->side_dirty = true;
     f->jolt_us = 0;
     s_jolt_us = 0;
+    s_bumps++;
     push(FRIEND_BUMP, 0, 0, who);
 }
 
@@ -226,6 +229,7 @@ static void on_recv(const esp_now_recv_info_t *info, const uint8_t *data, int le
             }
             break;
         case MSG_JOLT:
+            s_jolts_heard++;
             f->jolt_us = now;
             if (s_jolt_us != 0 && now - s_jolt_us < BUMP_WINDOW_US) {
                 bumped(who);
@@ -550,6 +554,7 @@ void friends_jolt(float dx, float dy)
     const int64_t now = esp_timer_get_time();
     send_msg(MSG_JOLT, 0, 0, 0);
     portENTER_CRITICAL(&s_mux);
+    s_jolts_sent++;
     s_jolt_us = now;
     s_jolt_x = dx / len;
     s_jolt_y = dy / len;
@@ -576,6 +581,16 @@ bool friends_tell(const char *name)
         }
     }
     return false;
+}
+
+void friends_bump_stats(cJSON *out)
+{
+    portENTER_CRITICAL(&s_mux);
+    const int sent = s_jolts_sent, heard = s_jolts_heard, bumps = s_bumps;
+    portEXIT_CRITICAL(&s_mux);
+    cJSON_AddNumberToObject(out, "jolts_sent", sent);
+    cJSON_AddNumberToObject(out, "jolts_heard", heard);
+    cJSON_AddNumberToObject(out, "bumps", bumps);
 }
 
 bool friends_set_side(int deg)

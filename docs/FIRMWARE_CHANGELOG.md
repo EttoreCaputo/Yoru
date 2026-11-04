@@ -1,5 +1,9 @@
 # Firmware changelog
 
+## 0.20.1
+
+- **The bump works.** Touching the two Yorus together did nothing: the board was waiting for too hard a knock. A gentle bump is enough now.
+
 ## 0.20.0
 
 Two Yorus live together.

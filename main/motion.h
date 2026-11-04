@@ -83,6 +83,10 @@ void motion_raw(float g[3], float w[3]);
  * panel's axes (x right, y down, unrotated). */
 void motion_jolt(float *dx, float *dy);
 
+/** The sharpest jolt along the glass since the last call, in g, and how
+ * many jolts since boot (get_state, to tune the bump). */
+void motion_jolt_stats(float *peak, int *count);
+
 const char *motion_event_name(motion_event_t event);
 
 #ifdef __cplusplus

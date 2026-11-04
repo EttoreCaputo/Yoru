@@ -85,6 +85,8 @@ void friends_jolt(float dx, float dy);
 /** For tests (`debug/friends`): an event by its name (`yawn`, `chat`...),
  * as if this board had done it; false for an unknown one. */
 bool friends_tell(const char *name);
+/** For tuning (`debug/friends`): jolts told, heard, and bumps matched. */
+void friends_bump_stats(cJSON *out);
 /** For tests: the nearest friend is that way, in degrees in the panel's
  * axes (0 right, 90 down), as a bump would have said. */
 bool friends_set_side(int deg);

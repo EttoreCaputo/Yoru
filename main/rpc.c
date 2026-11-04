@@ -311,6 +311,7 @@ void rpc_handle(uint8_t *payload, size_t len)
             }
             result = cJSON_CreateObject();
             cJSON_AddBoolToObject(result, "on", friends_enabled());
+            friends_bump_stats(result);
             cJSON_AddItemToObject(result, "friends", friends_status());
         }
     } else if (strcmp(name, "debug/life") == 0) {

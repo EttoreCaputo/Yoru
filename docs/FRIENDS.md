@@ -25,7 +25,7 @@ What it doesn't do: reach a board with no WiFi set up (ESP-NOW starts when the W
 
 ### 2. The bump (0.20.0, done)
 
-Touching the two cases together introduces them. Each IMU sees a sharp jolt along the glass (`MOTION_JOLT`, `motion.c`: over 0.7 g in the screen's plane, from rest or held, at most every 400 ms) and says so (`MSG_JOLT`); a board that felt its own within 250 ms of the other's knows they bumped. Its first sample says which way the case was pushed: the other board is the opposite way. That side is kept in NVS (namespace `friends`, the friend's MAC, degrees in the panel's axes) and shown as `side_deg` in `get_state`'s `friends`. Both then play `highfive` (hearts, a clap, the ta-da) and look at each other, waking if asleep.
+Touching the two cases together introduces them. Each IMU sees a sharp jolt along the glass (`MOTION_JOLT`, `motion.c`: over 0.35 g in the screen's plane, from rest or held, at most every 400 ms; 0.7 g in 0.20.0 was never reached, as a bump lasts a few ms and the IMU is read every 10) and says so (`MSG_JOLT`); a board that felt its own within 250 ms of the other's knows they bumped. Its first sample says which way the case was pushed: the other board is the opposite way. That side is kept in NVS (namespace `friends`, the friend's MAC, degrees in the panel's axes) and shown as `side_deg` in `get_state`'s `friends`. Both then play `highfive` (hearts, a clap, the ta-da) and look at each other, waking if asleep.
 
 The side is in the panel's axes and assumes both boards lie the same way up; a board turned over or moved needs another bump.
 
@@ -48,7 +48,7 @@ Each board tells the others what it does (`MSG_EVENT`, `friend_ev_kind_t` in `fr
 - **The firefly crosses over.** With a friend awake whose side is known, half the fireflies get away towards it instead of upwards: Yoru waves it off, and on the other screen a firefly comes in from the edge facing this one, at the same height (`life_firefly_from`), and is mostly caught.
 - **Pass the ball**, a game in Games (`game_pass.c`): tilt the case to roll a ball about; the stretch of rim facing the other Yoru opens (green) when that one has the game open too, and the ball rolls out there and into its screen. The passes are counted. Without a bump the game says to bump them; a ball lost on the way comes back with a tap after 8 s.
 
-For tests, `debug/friends` takes `{"tell": "yawn"}` (any event above but `bump`), as if this board had done it, and `{"side_deg": 0}` to set where the nearest friend is.
+`get_state`'s `motion` has `jolt_peak` (the sharpest jolt along the glass since the last `get_state`, in g) and `jolts` (how many since boot), and `debug/friends` answers `jolts_sent`, `jolts_heard` and `bumps`, to tune the threshold. For tests, `debug/friends` takes `{"tell": "yawn"}` (any event above but `bump`), as if this board had done it, and `{"side_deg": 0}` to set where the nearest friend is.
 
 ### 5. One answers "Alexa" (0.20.0, done)
 
