@@ -43,8 +43,10 @@ ESP-IDF 6.1:
 ```bash
 source ~/.espressif/tools/activate_idf_v6.1.sh
 idf.py build merge-bin
-idf.py -p /dev/cu.usbmodem* flash
+tools/flash.sh
 ```
+
+`tools/flash.sh` flashes only a board that already runs Yoru, so a DualEye plugged into the same Mac is left alone. `--list` says what each board runs; a blank board takes `--port /dev/cu.usbmodemN`. Quit Yoru Hub first: it holds the port.
 
 If the board doesn't show up as a serial port, hold BOOT while plugging it in.
 

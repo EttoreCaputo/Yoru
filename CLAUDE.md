@@ -9,7 +9,7 @@ Host program: `../yoru-hub` (formerly Companion Hub), Yoru's personal assistant 
 1. Bump `version.txt` (patch by default). Check `git log` first: if the current version is committed, it must go up. Bump once per piece of work.
 2. Add a `## <version>` section at the top of `docs/FIRMWARE_CHANGELOG.md`, written for the person using the board.
 3. Build: `source ~/.espressif/tools/activate_idf_v6.1.sh && idf.py build merge-bin`. If it fails, fix it or report it clearly.
-4. Flash the board once the build passes: `idf.py -p <port> flash` (the port is `/dev/cu.usbmodem*`). If no board is connected or flashing fails, say so.
+4. Flash the board once the build passes: `tools/flash.sh`. Never `idf.py -p <port> flash` with a port you guessed: DualEye may be on the same Mac, and `/dev/cu.usbmodem*` may be it. The script flashes only a board that already runs Yoru (`--list` shows what each runs; `--port` is for a blank board, after checking which it is). If no board is connected or flashing fails, say so.
 5. Copy the build into Yoru Hub, which ships it: `../yoru-hub/tools/fetch_firmware.sh`.
 
 6. Build and install Yoru Hub (see below), so the app on the Mac ships the new build.
