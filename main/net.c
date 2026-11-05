@@ -594,6 +594,9 @@ const char *net_board_id(void)
 
 bool net_online(void)
 {
+    if (s_lock == NULL) {
+        return false; // before net_init (power.c asks from its first tick)
+    }
     lock();
     const bool up = s_state == ST_CONNECTED && !s_hibernating;
     unlock();
@@ -602,6 +605,9 @@ bool net_online(void)
 
 bool net_joining(void)
 {
+    if (s_lock == NULL) {
+        return false; // before net_init (power.c asks from its first tick)
+    }
     lock();
     const bool coming = s_started && s_enabled && s_ssid[0] != '\0'
                         && (s_hibernating || s_state == ST_CONNECTING || s_state == ST_DISCONNECTED);
