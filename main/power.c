@@ -179,9 +179,23 @@ static void run_count(void)
     }
 }
 
+/* Light sleep lets go of every pin (CONFIG_PM_SLP_DISABLE_GPIO), and a
+ * pin let go floats: the speaker's amplifier may switch on, the panel's and
+ * the touch's resets drift. These keep their level instead. */
+static void hold_pins_in_sleep(void)
+{
+    static const gpio_num_t pins[] = {
+        BOARD_AUDIO_PA_GPIO, BOARD_LCD_RST_GPIO, BOARD_LCD_CS_GPIO, BOARD_TOUCH_RST_GPIO,
+    };
+    for (size_t i = 0; i < sizeof(pins) / sizeof(pins[0]); i++) {
+        gpio_sleep_sel_dis(pins[i]);
+    }
+}
+
 void power_init(void)
 {
     run_load();
+    hold_pins_in_sleep();
     if (esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "awake", &s.awake) == ESP_OK) {
         esp_pm_lock_acquire(s.awake);
         s.awake_held = true;

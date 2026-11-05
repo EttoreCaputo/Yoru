@@ -1,11 +1,14 @@
 #include "board_touch.h"
 
 #include "board.h"
+#include "driver/gpio.h"
 #include "esp_attr.h"
 #include "esp_check.h"
 #include "esp_lcd_touch_cst9217.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char *TAG = "board_touch";
 
@@ -15,6 +18,11 @@ static const char *TAG = "board_touch";
 #define CST9217_REPORT_LEN 10
 #define CST9217_ACK 0xAB
 #define CST9217_STATUS_DOWN 0x06
+/* Deep sleep, as in Hynitron's driver and SensorLib: only a reset wakes it.
+ * The reset low this long, then this long for the chip to boot. */
+#define CST9217_SLEEP_CMD 0xD105
+#define CST9217_RESET_LOW_MS 10
+#define CST9217_BOOT_MS 50
 
 /* If an INT edge is ever lost, look anyway this often. */
 #define TOUCH_FALLBACK_US (1000 * 1000)
@@ -23,6 +31,7 @@ static esp_lcd_touch_handle_t s_tp;
 static i2c_master_dev_handle_t s_dev;
 static volatile bool s_irq;
 static bool s_down;
+static bool s_asleep;
 static int64_t s_last_read_us;
 
 /* The controller pulls INT low for every report it has, so with no edge and
@@ -104,4 +113,27 @@ bool board_touch_read(uint16_t *x, uint16_t *y)
     s_last_read_us = now;
     s_down = read_report(x, y);
     return s_down;
+}
+
+void board_touch_set_sleep(bool sleep)
+{
+    if (s_dev == NULL || sleep == s_asleep) {
+        return;
+    }
+    if (sleep) {
+        const uint8_t cmd[2] = {CST9217_SLEEP_CMD >> 8, CST9217_SLEEP_CMD & 0xFF};
+        if (i2c_master_transmit(s_dev, cmd, sizeof(cmd), 20) != ESP_OK) {
+            ESP_LOGW(TAG, "sleep command not taken");
+            return;
+        }
+    } else {
+        gpio_set_level(BOARD_TOUCH_RST_GPIO, 0);
+        vTaskDelay(pdMS_TO_TICKS(CST9217_RESET_LOW_MS));
+        gpio_set_level(BOARD_TOUCH_RST_GPIO, 1);
+        vTaskDelay(pdMS_TO_TICKS(CST9217_BOOT_MS));
+        s_down = false;
+        s_irq = true; // look once: whatever the boot left pending
+    }
+    s_asleep = sleep;
+    ESP_LOGI(TAG, "touch %s", sleep ? "asleep" : "awake");
 }

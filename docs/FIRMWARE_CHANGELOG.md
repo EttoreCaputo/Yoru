@@ -1,5 +1,9 @@
 # Firmware changelog
 
+## 0.20.5
+
+- **Hibernation that drains less.** In one night of hibernating, both boards lost between 1 and 3 % of the battery an hour. Two things stayed on while they slept: the touch controller, which kept scanning the dark screen, now sleeps until the screen lights up again; and while the chip slept it let go of every pin, so the speaker's amplifier could switch on by itself and the screen's and the touch's reset lines drifted. Those pins now keep their level.
+
 ## 0.20.4
 
 - **Starts again.** 0.20.3 restarted over and over a moment after switching on, before the eyes appeared. Fixed; the battery record of 0.20.3 is in this one.

@@ -11,6 +11,7 @@
 #include "board.h"
 #include "board_display.h"
 #include "board_settings.h"
+#include "board_touch.h"
 #include "card.h"
 #include "clock.h"
 #include "esp_log.h"
@@ -656,6 +657,7 @@ static void go_dark(void)
     s.dark = true;
     set_brightness(0);
     lvgl_port_set_touch(false);
+    board_touch_set_sleep(true);
     eyes_set_pace(EYES_PACE_STOPPED); // power.c keeps it so
     board_display_set_sleep(true);
 }
@@ -666,6 +668,7 @@ static void light_up(void)
     s.dark = false;
     board_display_set_sleep(false);
     eyes_set_pace(EYES_PACE_FULL); // power.c slows it again if it should
+    board_touch_set_sleep(false);
     lvgl_port_set_touch(true);
     s.last_touch_ms = lv_tick_get();
 }

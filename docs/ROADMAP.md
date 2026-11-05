@@ -17,13 +17,13 @@ Firmware 0.13.0 (2026-11-02).
 - Updates over WiFi (0.19.0, `ota.c`): two app slots, the image over the link, rollback when the new firmware doesn't get back on the WiFi (`docs/protocol.md`, OTA).
 - Talking without the host (0.14.0, `cloud.c`): speech to text, the brain and the voice called from the board over HTTPS with the keys Yoru Hub hands over (`cloud/set`), tags in the answer acting on the board, connections kept open and opened while you talk. The app partition grew to 4 MB for it. Since 0.17.0 it also searches the web through Tavily with the key Yoru Hub hands over (`search` in `cloud/set`).
 - Without the host (0.13.0): the board's own clock (`clock.c`: SNTP, or the host's time and zone), timers and pomodoros started on the board and handed to the host when it's back (`timer_new`), habits kept in NVS with their day and streaks (gone in 0.16.0), and a few phrases in English heard on the board by MultiNet 7 (`commands.c`).
-- Power (0.12.0, `power.c`): Desk on USB, Balanced or Saver on battery (WiFi modem sleep, frequency scaling, the speaker's amplifier and, in Saver, the mics off while asleep), the panel asleep with the dark screen, and hibernation in light sleep until the IMU's wake on motion, PWR, BOOT or USB.
+- Power (0.12.0, `power.c`): Desk on USB, Balanced or Saver on battery (WiFi modem sleep, frequency scaling, the speaker's amplifier and, in Saver, the mics off while asleep), the panel and (0.20.5) the touch controller asleep with the dark screen, the pins the board drives held at their level in light sleep (0.20.5), and hibernation in light sleep until the IMU's wake on motion, PWR, BOOT or USB.
 
 **Left**
 - Voice: the custom wake word "Yoru" (M6); the mic gain (M3); the second mic, with a two-mic AFE (M3); check the offline phrases with a real voice (in the first test, with the Mac's synthetic voice, "what time is it" and "volume up" were heard, the timer phrases weren't).
 - The pet's return: needs, with the late-night notice and the sounds' language (M5); 0.14.0 brought back greetings, 0.15.0 emotions, states and acts (`docs/life.md`). Next there: the tables in a file Yoru Hub can update without a new firmware.
 - Cloud voice: try it with a real voice in the room; the keys in NVS are in the clear (NVS encryption, or keys scoped to the board); the brain's tags as real tool calls; something said now and then on its own.
-- Power: measure what the profiles draw on the board; the touch controller asleep with the dark screen; waking from hibernation for a timer (M2).
+- Power: measure what the profiles draw on the board, hibernating above all (0.20.4's battery record: 1–3 % an hour); waking from hibernation for a timer (M2).
 - The menu: the Look items (name, colour, eye shape: the host can set `eye_color` and `eye_style`, the menu can't yet) and pairing a computer from the board (M2).
 - Checks on the board: which way the IMU's x and y and the two mics lie (M2); internal RAM with WiFi and ESP-SR on together (M3), which also decides Bluetooth.
 - Gestures sent to the host (M2), growing up (M5), bobbing to music (M5), moods and looks as data, a desktop simulator (M6), Bluetooth (M4).
