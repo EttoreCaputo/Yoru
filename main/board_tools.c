@@ -372,6 +372,29 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
     cJSON_AddBoolToObject(b, "usb", bat.usb);
     cJSON_AddBoolToObject(b, "charging", bat.charging);
     cJSON_AddStringToObject(b, "profile", power_profile_name(power_profile()));
+    // The last stretch on battery, to see where a charge went.
+    power_run_t run;
+    power_run_get(&run);
+    cJSON *r = cJSON_AddObjectToObject(b, "run");
+    cJSON_AddBoolToObject(r, "running", run.running);
+    cJSON_AddNumberToObject(r, "battery_s", run.battery_s);
+    cJSON_AddNumberToObject(r, "dark_s", run.dark_s);
+    cJSON_AddNumberToObject(r, "hibernated_s", run.hibernated_s);
+    cJSON *held = cJSON_AddObjectToObject(r, "held_s");
+    for (int i = 0; i < POWER_HOLD_COUNT; i++) {
+        cJSON_AddNumberToObject(held, power_hold_name((power_hold_t) i), run.held_s[i]);
+    }
+    cJSON_AddNumberToObject(r, "offline_s", run.offline_s);
+    cJSON_AddNumberToObject(r, "hibernations", run.hibernations);
+    cJSON *woke = cJSON_AddObjectToObject(r, "woke");
+    cJSON_AddNumberToObject(woke, "moved", run.woke_moved);
+    cJSON_AddNumberToObject(woke, "key", run.woke_key);
+    cJSON_AddNumberToObject(woke, "usb", run.woke_usb);
+    cJSON_AddNumberToObject(r, "restarts", run.restarts);
+    cJSON_AddBoolToObject(r, "motion_wake_off", run.motion_wake_off);
+    cJSON_AddNumberToObject(r, "start_percent", run.start_percent);
+    cJSON_AddNumberToObject(r, "percent", run.percent);
+    cJSON_AddNumberToObject(r, "mv", run.mv);
     if (motion_present()) {
         // Gravity and turn rate on the screen's axes, for checking them.
         float g[3], w[3], lx, ly;

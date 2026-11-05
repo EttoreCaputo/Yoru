@@ -1,5 +1,9 @@
 # Firmware changelog
 
+## 0.20.3
+
+- **Where the battery went.** Yoru keeps a record of his last stretch on battery, from unplugging to plugging in again: how long the screen was on, dark and hibernating, what kept him from hibernating (a timer, an errand, a conversation, the menu, or hibernation set to never), how long the WiFi wasn't joined, how many times he hibernated and what woke him (moved, a key, USB), and the battery at the start and at the end. It survives a restart and a flat battery, so after a night that drained one board the Mac can read what happened.
+
 ## 0.20.2
 
 - **No more knocking: bring them together.** Hold the two Yorus apart, then bring them quickly up against each other: they high-five and look at each other. Simply lying next to each other doesn't count, and neither does moving them about.

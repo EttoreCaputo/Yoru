@@ -50,9 +50,15 @@ void board_pmu_power_off(void);
 /** Poll the PWR key less often (the screen is dark). */
 void board_pmu_set_slow(bool slow);
 
+typedef enum {
+    BOARD_PMU_WAKE_NONE,
+    BOARD_PMU_WAKE_KEY,
+    BOARD_PMU_WAKE_USB,
+} board_pmu_wake_t;
+
 /** While hibernating (power.c): PWR was pressed, or USB plugged in. Takes the
  * key's flags. */
-bool board_pmu_wake_check(void);
+board_pmu_wake_t board_pmu_wake_check(void);
 
 #ifdef __cplusplus
 }

@@ -841,12 +841,16 @@ static void battery_tick(uint32_t now)
  * (unless it's still face down). */
 static void power_step(void)
 {
+    const power_hold_t hold = timers_count() > 0                     ? POWER_HOLD_TIMER
+                              : errand_busy()                        ? POWER_HOLD_ERRAND
+                              : s.voice != VOICE_IDLE || s.talking   ? POWER_HOLD_VOICE
+                              : card_up() || s.menu || s.view        ? POWER_HOLD_SCREEN
+                                                                     : POWER_HOLD_NONE;
     const power_scene_t scene = {
         .asleep = s.asleep,
         .dark = s.dark,
         .busy = s.voice != VOICE_IDLE || s.talking,
-        .can_hibernate = timers_count() == 0 && !errand_busy() && s.voice == VOICE_IDLE && !s.talking
-                         && !card_up() && !s.menu && !s.view,
+        .hold = hold,
     };
     if (power_tick(&scene) && !s.face_down) {
         light_up();

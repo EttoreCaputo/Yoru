@@ -249,21 +249,21 @@ void board_pmu_set_slow(bool slow)
     s_slow = slow;
 }
 
-bool board_pmu_wake_check(void)
+board_pmu_wake_t board_pmu_wake_check(void)
 {
     if (s_dev == NULL) {
-        return false;
+        return BOARD_PMU_WAKE_NONE;
     }
     uint8_t irq = 0, st = 0;
-    bool wake = false;
+    board_pmu_wake_t wake = BOARD_PMU_WAKE_NONE;
     if (rd(AXP_INTSTS2, &irq, 1) == ESP_OK && (irq & (KEY_DOWN_BIT | KEY_SHORT_BIT))) {
         // Taken here: the poll task mustn't see it as a tap that puts Yoru
         // back to sleep.
         wr(AXP_INTSTS2, irq & KEY_BITS);
-        wake = true;
+        wake = BOARD_PMU_WAKE_KEY;
     }
     if (rd(AXP_STATUS1, &st, 1) == ESP_OK && (st & 0x20)) {
-        wake = true; // plugged in
+        wake = BOARD_PMU_WAKE_USB; // plugged in
     }
     return wake;
 }
