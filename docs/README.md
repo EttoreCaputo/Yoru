@@ -15,6 +15,7 @@ Status: early development, firmware 0.13.0. What is in and what is left: [the ro
 - [Firmware changelog](FIRMWARE_CHANGELOG.md)
 - [Friends](FRIENDS.md): Yorus that meet over ESP-NOW and live together
 - [Mascot states](mascot/STATES.md): the Rive file's inputs
+- [Animation library](animations.md): the hand-keyed clips drawn in Rive for the board
 
 ## What is on the board
 
