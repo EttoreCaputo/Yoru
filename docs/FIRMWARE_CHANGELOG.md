@@ -1,5 +1,23 @@
 # Firmware changelog
 
+## 0.20.8
+
+- **Twelve more hand-made animations**, keyed in Rive like the first ten:
+  - **hiccups**: two jolts, the second bigger, then a giggle behind his hand;
+  - **a dance** on the beat, swaying and squashing with his arms up in turn, then two hops with both up;
+  - **hide and seek** (now and then, instead of peeking out of the glass): he dashes out at one edge, peeks in from the other, and pops back with a "ta-da";
+  - **melting** when you stroke him: eyes shut happily, he flattens into your finger, sways with it and pulls himself together;
+  - **pointing at a noise** off to one side: his eyes snap there, he leans and points (at most once every 45 seconds);
+  - **dizzy** when shaken or spun: a wobble that dies down, eyes rolling and mismatched, then he shakes it off;
+  - **nodding off**: he sinks, the lids fall, the head drops, and he jolts awake looking round;
+  - **a curious head tilt**, one eye bigger, with a little "hm?" bob;
+  - **sadness**: he sinks and stays low, the lids drooping outside, with a sniffle and a sigh;
+  - **shyness**: he hides his eyes in his hands, sways, peeks round one hand and hides again;
+  - **a sleepy wave goodnight** from his corner before a nap;
+  - **being picked up**: a startled stretch, a dangling sway, a look down, then happy eyes at you.
+- The scenes `dance`, `curious`, `sad`, `dizzy`, `shy`, `lifted` and `point` play them too.
+- To see any of them now, from the Yoru Hub folder: `cargo run -p yoru-core --example rpc -- debug/clip '{"name":"hide_seek"}'` (or hiccup, dance, melt, point_sound, dizzy, nod_off, curious_tilt, sad_droop, shy_peek, sleepy_wave, lifted).
+
 ## 0.20.7
 
 - **Eight more hand-made animations.** All of Yoru's first animation library is now keyed by hand in Rive and plays on the board:

@@ -181,9 +181,9 @@ static bool tilt(void)
 {
     if (A.phase == 0) {
         eyes_set_mood(EYES_MOOD_CURIOUS);
-        eyes_look_at(0, -0.1f);
+        eyes_play(CLIP_CURIOUS_TILT, coin() < 0);
         life_sound(SOUND_HMM);
-        wait_ms(1500);
+        wait_ms(2300);
         next(1);
         return false;
     }
@@ -231,28 +231,42 @@ static bool sneeze(void)
     }
 }
 
-/* Two hiccups, a jolt each, then a giggle at itself. */
+/* Two hiccups, a jolt each, then a giggle at itself. The hiccup clip
+ * jolts at these times; the sounds come with them. */
+#define HIC_FIRST_MS 230
+#define HIC_SECOND_MS 1370
+#define HIC_GIGGLE_MS 1800
+
 static bool hiccup(void)
 {
     if (waiting()) {
         return false;
     }
-    if (A.phase < 2) {
+    switch (A.phase) {
+    case 0:
         eyes_set_mood(EYES_MOOD_SURPRISED);
-        life_sound(SOUND_HICCUP);
-        eyes_knock(0, -0.45f);
-        wait_ms((uint32_t) life_frange(1100, 1700));
-        next(A.phase + 1);
+        eyes_play(CLIP_HICCUP, coin() < 0);
+        wait_ms(HIC_FIRST_MS);
+        next(1);
         return false;
-    }
-    if (A.phase == 2) {
-        eyes_set_mood(EYES_MOOD_DELIGHTED);
-        life_sound(SOUND_GIGGLE);
-        wait_ms(1200);
+    case 1:
+        life_sound(SOUND_HICCUP);
+        wait_ms(HIC_SECOND_MS - HIC_FIRST_MS);
+        next(2);
+        return false;
+    case 2:
+        life_sound(SOUND_HICCUP);
+        wait_ms(HIC_GIGGLE_MS - HIC_SECOND_MS);
         next(3);
         return false;
+    case 3:
+        eyes_set_mood(EYES_MOOD_DELIGHTED);
+        life_sound(SOUND_GIGGLE);
+        next(4);
+        return false;
+    default:
+        return !busy();
     }
-    return true;
 }
 
 /* Off to the very edge, peering out of the glass; back with a look over
@@ -263,6 +277,13 @@ static bool peek(void)
     case 0:
         A.side = coin();
         eyes_set_mood(EYES_MOOD_CURIOUS);
+        if (life_frange(0, 1) < 0.35f) {
+            // Hide and seek: out at one edge, back in at the other.
+            eyes_play(CLIP_HIDE_SEEK, A.side < 0);
+            life_sound(SOUND_GIGGLE);
+            next(9);
+            return false;
+        }
         eyes_move_to((float) A.side * 175, life_frange(-25, 30), 1.0f, 1400, EYES_PATH_GLIDE);
         eyes_look_at((float) A.side, 0);
         next(1);
@@ -285,6 +306,13 @@ static bool peek(void)
         eyes_move_to(0, 0, 1, 1700, EYES_PATH_DRIFT);
         next(3);
         return false;
+    case 9:
+        if (busy()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_DELIGHTED);
+        mood_feel(LIFE_FEEL_FUN);
+        return true;
     default:
         if (busy()) {
             return false;
@@ -481,24 +509,16 @@ static bool dance(void)
 {
     if (A.phase == 0) {
         eyes_set_mood(EYES_MOOD_HAPPY);
-        const eyes_pos_t hops[] = {life_at(-28, 0, 1), life_at(28, 0, 1), life_at(-28, 0, 1), life_at(28, 0, 1),
-                                   life_at(0, 0, 1)};
-        eyes_move(hops, 5, 2600, EYES_PATH_HOP);
+        eyes_play(CLIP_DANCE, coin() < 0);
         life_sound(SOUND_SING);
         next(1);
         return false;
     }
-    if (A.phase == 1) {
-        if (busy()) {
-            return false;
-        }
-        eyes_gesture(EYES_GESTURE_CLAP);
-        mood_feel(LIFE_FEEL_FUN);
-        wait_ms(1300);
-        next(2);
+    if (busy()) {
         return false;
     }
-    return !waiting();
+    mood_feel(LIFE_FEEL_FUN);
+    return true;
 }
 
 static bool loop_the_loop(void)
@@ -642,38 +662,32 @@ static bool yawn(void)
 }
 
 /* Nodding off: sinking, eyes closing, then a jolt awake. */
+/* The nod_off clip jolts awake this far in. */
+#define NOD_JOLT_MS 2130
+
 static bool nod(void)
 {
     switch (A.phase) {
-    case 0: {
+    case 0:
         eyes_set_mood(EYES_MOOD_SLEEPY);
-        const eyes_pos_t me = eyes_where();
-        eyes_move_to(me.x, me.y + 35 * me.z, me.z, 3200, EYES_PATH_DRIFT);
-        eyes_look_at(0, 0.7f);
+        eyes_play(CLIP_NOD_OFF, coin() < 0);
+        wait_ms(NOD_JOLT_MS);
         next(1);
         return false;
-    }
     case 1:
-        if (busy()) {
-            return false;
-        }
-        eyes_knock(0, -0.6f);
-        eyes_set_mood(EYES_MOOD_SURPRISED);
-        life_sound(SOUND_EEP);
-        wait_ms(700);
-        next(2);
-        return false;
-    case 2: {
         if (waiting()) {
             return false;
         }
-        eyes_set_mood(EYES_MOOD_SLEEPY);
-        const eyes_pos_t me = eyes_where();
-        eyes_move_to(me.x, me.y - 35 * me.z, me.z, 1500, EYES_PATH_GLIDE);
-        eyes_look_around();
-        next(3);
+        life_sound(SOUND_EEP);
+        next(2);
         return false;
-    }
+    case 2:
+        if (busy()) {
+            return false;
+        }
+        eyes_set_mood(EYES_MOOD_SLEEPY);
+        eyes_look_around();
+        return true;
     default:
         return !busy();
     }
@@ -793,11 +807,10 @@ static bool search(void)
 static bool sad(void)
 {
     if (A.phase == 0) {
+        // The clip sinks it and leaves it there, low.
         eyes_set_mood(EYES_MOOD_SAD);
-        eyes_look_at(0, 0.3f);
-        const eyes_pos_t me = eyes_where();
-        eyes_move_to(me.x, me.y + 20 * me.z, me.z, 2000, EYES_PATH_DRIFT);
-        wait_ms((uint32_t) life_frange(4000, 6000));
+        eyes_play(CLIP_SAD_DROOP, coin() < 0);
+        wait_ms((uint32_t) life_frange(4500, 6500));
         next(1);
         return false;
     }

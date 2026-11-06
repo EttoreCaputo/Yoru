@@ -195,8 +195,9 @@ static life_want_t nap(void)
         if (busy()) {
             return LIFE_NOTHING;
         }
-        eyes_blink();
-        wait_ms(1800);
+        // A drowsy little wave goodnight, with the hand away from the edge.
+        eyes_play(CLIP_SLEEPY_WAVE, L.side > 0);
+        wait_ms(3000);
         next(3);
         break;
     case 3:

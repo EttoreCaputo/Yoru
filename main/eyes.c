@@ -486,6 +486,8 @@ static bool has_overlay(eyes_mood_t mood)
  * blended, so it plays at the same speed whatever the frame rate. It starts
  * and ends in the rest pose, so the engine takes over unseen. */
 #define CLIP_FRAME_MS (1000.0f / 30.0f)
+/* A jump this big between two frames is a cut, not a move (Rive units). */
+#define CLIP_CUT 300.0f
 
 /* The same frame the other way round: left for right. */
 static void clip_mirror(clip_frame_t *f)
@@ -533,8 +535,9 @@ static bool clip_step(void)
         at = (float) s.clip_ms / CLIP_FRAME_MS;
     }
     const int i = LV_MIN((int) at, s.clip->n - 2);
-    const float k = at - (float) i;
     const float *a = (const float *) &s.clip->frames[i], *b = (const float *) &s.clip->frames[i + 1];
+    // A cut (off one edge, back in at the other) holds instead of sweeping across.
+    const float k = fabsf(s.clip->frames[i + 1].bx - s.clip->frames[i].bx) > CLIP_CUT ? 0 : at - (float) i;
     float *o = (float *) &s.cf;
     for (size_t j = 0; j < sizeof(clip_frame_t) / sizeof(float); j++) {
         o[j] = lerp(a[j], b[j], k);

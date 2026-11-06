@@ -33,7 +33,7 @@ Offsets are screen pixels at the resting distance; the sphere's radius is 98 px 
 
 ## The clips
 
-All ten are animated in `yoru.riv` and played on the board since 0.20.7 (`celebrate` and `wake_stretch` since 0.20.6). `debug/clip` plays any of them by name (`docs/protocol.md`).
+All twenty-two are animated in `yoru.riv` and played on the board: the first ten since 0.20.7 (`celebrate` and `wake_stretch` since 0.20.6), clips 11 to 22 since 0.20.8. `debug/clip` plays any of them by name (`docs/protocol.md`).
 
 ### 1. `celebrate` — a build passed, a task is done
 Joy. 84 frames (2.8 s), once. Ends in the rest pose. **Animated** in `yoru.riv` (`clip_celebrate`).
@@ -131,6 +131,66 @@ Pique. 119 frames (4 s), once, either way round. **Animated**; played by the sul
 
 Huff: stretch 0.95 / 1.05 and out. A turn away (the face slides to the far side, narrowing to 0.55), the body drifts 30 px towards the edge, lids sloping cross, both hands crossed low in front, on the side it faces. Hold. Glances back, half way, and snaps away again when it meets your eyes. Hold, then a sigh and back to the rest pose.
 
+### 11. `hiccup` — now and then, idle
+Comedy. 83 frames (2.8 s), once, either way round. **Animated**; played by the hiccups Yoru gets on his own, the sounds on the jolts (230 and 1370 ms) and the giggle at 1800 ms.
+
+A crouch and a jolt up (stretch 0.91 / 1.12, eyes wide), a land with a squash; again, bigger and tilted. Then happy eyes and little bobs, the right hand over his "mouth".
+
+### 12. `dance` — music, or dancing with a friend
+Joy. 94 frames (3.1 s), once, either way round. **Animated**; played by the dance Yoru does on his own and `react` `dance`.
+
+A beat every 12 frames (150 bpm): squash on the beat, up between, swaying 30 left and right with the tilt following; the arm on the side he sways to goes up. Then two hops in place with both arms up and out (not over the head: there they read as ears), and settle. Happy eyes throughout.
+
+### 13. `hide_seek` — playing, idle
+Mischief. 129 frames (4.3 s), once, either way round. **Animated**; played instead of peeking out of the glass about a third of the time.
+
+Looks right and crouches, dashes out right (accelerating, stretched), and at frame 25 jumps to the far left off screen (the player holds across a jump this big instead of sweeping across). Waits, then peeks in from the left edge (half the body showing, eyes wide, a blink, a tilt), backs off a little and pops back to the middle on an arc, landing with a squash, hands out "ta-da", happy eyes.
+
+### 14. `melt` — stroked
+Contentment. 91 frames (3 s), once. **Animated**; played when a stroke is felt (not when jealousy is won back: that is `love`).
+
+Happy eyes at once; the body flattens (1.15 / 0.86) and sinks 16, a little nearer, the hands flopped out low; it sways with the finger, then pulls itself together with a wobble.
+
+### 15. `point_sound` — a noise off to one side
+Alertness. 63 frames (2.1 s), once, either way round. **Animated**; played when a noise is heard well off to one side (|x| > 0.45), at most once every 45 s, and by `react` `point`. Authored for a noise on its right.
+
+The eyes snap there first (a small start), the body leans 22 and tilts 7, the hand overshoots out pointing and settles; a blink; back.
+
+### 16. `dizzy` — shaken or spun
+Muddle. 89 frames (3 s), once, either way round. **Animated**; played by `react` `dizzy` (shaken, spun).
+
+A wobble that dies down (tilt 12 → 0), the eyes rolling round and swapping sizes (one 1.38 tall while the other is 0.66), the hands bobbing out of phase. Then a quick head shake with the eyes shut, and open.
+
+### 17. `nod_off` — drowsy
+Sleepiness. 115 frames (3.8 s), once, either way round. **Animated**; played by the nod Yoru does on his own, the "eep" on the jolt (2130 ms).
+
+Sinks 22 over two seconds as the lids fall (to 0.85) and the eyes look down; the head drops; a jolt up with huge eyes; a look left and right ("was I asleep?"); the lids settle a little low.
+
+### 18. `curious_tilt` — something interesting
+Curiosity. 69 frames (2.3 s), once, either way round. **Animated**; played by the tilt Yoru does on his own and `react` `curious`.
+
+A tilt to 16 that settles at 14, leaning nearer (1.08); the left eye bigger, the right one smaller with its lid a little low; a blink; a "hm?" bob; back.
+
+### 19. `sad_droop` — sad
+Sadness. 101 frames (3.4 s), once. **Animated**; played by the sad mood Yoru falls into and `react` `sad`. Ends 26 lower than it started, and Yoru stays there.
+
+Sinks slowly, heavier (1.05 / 0.95) and a little smaller; the lids slope down outside; looks down and away; the hands hang low. A sniffle, a sigh (rising and sinking again), and the face back to the mood's.
+
+### 20. `shy_peek` — shy
+Bashfulness. 97 frames (3.2 s), once. **Animated**; played by `react` `shy`.
+
+Hunches, a little smaller, and covers both eyes with its hands (in front, low enough to hide the eyes whole); sways bashfully; the right hand slides aside and the right eye peeks, blinks; the hand snaps back; then the hands come down to a smile.
+
+### 21. `sleepy_wave` — goodnight before a nap
+Drowsiness. 89 frames (3 s), once, either way round. **Animated**; played in the nap once Yoru has reached its corner, waving with the hand away from the edge.
+
+Lids half down; a slow, lazy wave; the hand drops; the eyes close, and open again half shut.
+
+### 22. `lifted` — picked up
+Surprise, then delight. 57 frames (1.9 s), once, either way round. **Animated**; played by `react` `lifted` (picked up).
+
+A startled stretch up (0.90 / 1.14) with the hands flying out, a dangling sway that dies down with the hands lagging, a look down at the floor, then up at you with happy eyes.
+
 ## Production
 
 **In Rive** (`docs/mascot/yoru.riv`, the cloud file "Yoru mascot"):
@@ -141,7 +201,7 @@ Huff: stretch 0.95 / 1.05 and out. A turn away (the face slides to the far side,
 - Animate the body in a neutral grey with no tint and no badge: the player adds them, so a clip works in every state and with any body colour.
 - The Rive MCP lives in the Rive desktop app (macOS) and only runs while the app is open; with it open, the timelines can be built from this file.
 
-**On the board since 0.20.6: the clip as numbers, not pictures.** The clips only move the rig (body, hands, eyes, face), and the eye engine draws the same rig with the same parameters. So a clip goes to the board as its keys, not as frames: `python3 tools/clips/fetch.py` (with the Rive app open on the file) saves the keys of every `clip_*` timeline, with their cubic curves, into `tools/clips/keyframes.json`, and `python3 tools/clips/clips.py` samples them every 1/30 s into `main/clips.c` and `main/clips.h`. `eyes_play()` plays one, left for right if asked: for its length the clip sets the body's offset, squash, tilt and nearness (`Character`'s scale), the hands (relative to the body, in front of it where they overlap it), the face's offset and turn, and each eye's place, size, top lid (from its top corners) and bottom lid; moves, knocks, the mood and the tint go on underneath, and a gesture stops it. A clip that ends away from where it started (the firefly) leaves Yoru there. A clip costs about 9 KB of flash and nothing to draw beyond what Yoru always draws. Left out on the board for now: the hands' rotation and the sparkles. To update a clip: key it in Rive, run the two scripts, build.
+**On the board since 0.20.6: the clip as numbers, not pictures.** The clips only move the rig (body, hands, eyes, face), and the eye engine draws the same rig with the same parameters. So a clip goes to the board as its keys, not as frames: `python3 tools/clips/fetch.py` (with the Rive app open on the file) saves the keys of every `clip_*` timeline, with their cubic curves, into `tools/clips/keyframes.json`, and `python3 tools/clips/clips.py` samples them every 1/30 s into `main/clips.c` and `main/clips.h`. `eyes_play()` plays one, left for right if asked: for its length the clip sets the body's offset, squash, tilt and nearness (`Character`'s scale), the hands (relative to the body, in front of it where they overlap it), the face's offset and turn, and each eye's place, size, top lid (from its top corners) and bottom lid; moves, knocks, the mood and the tint go on underneath, and a gesture stops it. A clip that ends away from where it started (the firefly, the sad droop) leaves Yoru there; a jump of more than 300 between two frames (hide and seek) is held, not swept across. A clip costs about 9 KB of flash (3 s) and nothing to draw beyond what Yoru always draws. Left out on the board for now: the hands' rotation and the sparkles. To update a clip: key it in Rive, run the two scripts, build.
 
 Frames are still the way for a clip that draws what the rig can't (a prop, a squiggle, a hand-drawn effect):
 

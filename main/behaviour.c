@@ -61,6 +61,9 @@
 #define STROKE_MIN_MS 350
 /* A sound from one side is looked at this long. */
 #define HEARD_LOOK_MS 1500
+/* A noise this far to a side gets pointed at, at most this often. */
+#define HEARD_POINT_X 0.45f
+#define HEARD_POINT_GAP_MS 45000
 /* Rocked twice within this long, it falls asleep. */
 #define LULLABY_MS 60000
 #define LEAN_MS 50
@@ -117,7 +120,10 @@ static const struct {
 } SCENE_CLIPS[] = {
     {"proud", CLIP_CELEBRATE, false},   {"stretch", CLIP_WAKE_STRETCH, false},
     {"yawn", CLIP_YAWN, false},         {"surprised", CLIP_STARTLE, true},
-    {"thinking", CLIP_THINK, false},
+    {"thinking", CLIP_THINK, false},    {"dance", CLIP_DANCE, true},
+    {"curious", CLIP_CURIOUS_TILT, true}, {"sad", CLIP_SAD_DROOP, false},
+    {"dizzy", CLIP_DIZZY, true},        {"shy", CLIP_SHY_PEEK, false},
+    {"lifted", CLIP_LIFTED, true},      {"point", CLIP_POINT_SOUND, true},
 };
 
 #define G(name) EYES_GESTURE_##name
@@ -132,7 +138,7 @@ static const scene_t SCENES[] = {
     // After the bolt of a cable plugged in (its sound came with the bolt).
     {"plugged", EYES_MOOD_HAPPY, 2200, FX_NONE, G(CLAP), SOUND_COUNT},
     // Bobbing to the beat comes with the music, in M5.
-    {"dance", EYES_MOOD_HAPPY, 3000, FX_POKE, G(CLAP), SOUND_BEAT},
+    {"dance", EYES_MOOD_HAPPY, 3200, FX_NONE, G(NONE), SOUND_BEAT},
     {"love", EYES_MOOD_LOVING, 3500, FX_NONE, G(NONE), SOUND_AWW},
     {"curious", EYES_MOOD_CURIOUS, 2500, FX_NONE, G(NONE), SOUND_HMM},
     {"thinking", EYES_MOOD_THINKING, 3200, FX_NONE, G(NONE), SOUND_COUNT},
@@ -152,16 +158,16 @@ static const scene_t SCENES[] = {
     {"blink", EYES_MOOD_NEUTRAL, 0, FX_BLINK, G(NONE), SOUND_COUNT},
     // The hands on their own.
     {"wave", EYES_MOOD_HAPPY, 1800, FX_NONE, G(WAVE), SOUND_HELLO},
-    {"point", EYES_MOOD_CURIOUS, 1800, FX_NONE, G(POINT), SOUND_HMM},
-    {"shy", EYES_MOOD_HAPPY, 3000, FX_NONE, G(COVER), SOUND_COUNT},
+    {"point", EYES_MOOD_CURIOUS, 2100, FX_NONE, G(NONE), SOUND_HMM},
+    {"shy", EYES_MOOD_HAPPY, 3300, FX_NONE, G(NONE), SOUND_COUNT},
     {"clap", EYES_MOOD_HAPPY, 1300, FX_NONE, G(CLAP), SOUND_COUNT},
     {"stretch", EYES_MOOD_NEUTRAL, 3000, FX_NONE, G(NONE), SOUND_YAWN},
     // The case as an input (motion.c) and slaps.
-    {"dizzy", EYES_MOOD_DIZZY, 3200, FX_POKE, G(HOLD), SOUND_CONFUSED},
+    {"dizzy", EYES_MOOD_DIZZY, 3200, FX_NONE, G(NONE), SOUND_CONFUSED},
     {"annoyed", EYES_MOOD_GRUMPY, 2800, FX_POKE, G(SHOO), SOUND_GRUMBLE},
     {"falling", EYES_MOOD_SCARED, 1500, FX_NONE, G(FLAIL), SOUND_EEP},
     {"drowsy", EYES_MOOD_SLEEPY, 4000, FX_NONE, G(NONE), SOUND_YAWN},
-    {"lifted", EYES_MOOD_CURIOUS, 1800, FX_BLINK, G(NONE), SOUND_CHIRP},
+    {"lifted", EYES_MOOD_CURIOUS, 1900, FX_NONE, G(NONE), SOUND_CHIRP},
     // With another Yoru (docs/FRIENDS.md).
     {"highfive", EYES_MOOD_LOVING, 3000, FX_POKE, G(CLAP), SOUND_TADA},
     {"jealous", EYES_MOOD_GRUMPY, 2200, FX_NONE, G(NONE), SOUND_GRUMBLE},
@@ -488,7 +494,8 @@ static void watch_finger(lv_indev_t *indev)
             return;
         }
         playback_sound(SOUND_PURR);
-        react(EYES_MOOD_HAPPY, 2500);
+        eyes_play(CLIP_MELT, false); // melts into the hand
+        react(EYES_MOOD_HAPPY, 3000);
     }
 }
 
@@ -1428,7 +1435,14 @@ void behaviour_heard_from(float x)
     lvgl_port_lock();
     if (!s.asleep && !s.pressed && !s.menu && !s.view && !card_up() && s.voice == VOICE_IDLE
         && board_settings_on(SETTING_PET_HEARING)) {
-        // The gaze turns to the noise, and drifts back on its own.
+        // The gaze turns to the noise, and drifts back on its own. A clear one
+        // off to a side, now and then, gets pointed at.
+        static uint32_t pointed_ms;
+        const uint32_t now = lv_tick_get();
+        if (fabsf(x) > HEARD_POINT_X && !eyes_playing() && now - pointed_ms > HEARD_POINT_GAP_MS) {
+            pointed_ms = now;
+            eyes_play(CLIP_POINT_SOUND, x < 0);
+        }
         hold_gaze(x * 0.9f, 0, HEARD_LOOK_MS);
         life_feel(LIFE_FEEL_SOUND);
     }
