@@ -197,11 +197,11 @@ static bool tilt(void)
 static bool stretch(void)
 {
     if (A.phase == 0) {
-        eyes_gesture(EYES_GESTURE_STRETCH);
+        eyes_play(CLIP_WAKE_STRETCH);
         if (mood(EMO_ENERGY) < 0) {
             life_sound(SOUND_YAWN);
         }
-        wait_ms(2000);
+        wait_ms(3000);
         next(1);
         return false;
     }

@@ -1,5 +1,9 @@
 # Firmware changelog
 
+## 0.20.6
+
+- **Yoru's first hand-made animations.** Two moments are now animated by hand in Rive, pose by pose, and played on the board: **a celebration** (he crouches, jumps with his hands up, spins round, lands with a squash, hops again with happy eyes and claps over his head) when the battery is full or the computer says "proud", and **a big stretch** (sleepy eyes, a crouch, a long stretch with his hands far out and a tremble, then a bounce back and a blink) in the morning greeting, when he stretches on his own and when the computer says "stretch". To see them now: `yoru call react --name proud` or `--name stretch`.
+
 ## 0.20.5
 
 - **Hibernation that drains less.** In one night of hibernating, both boards lost between 1 and 3 % of the battery an hour. Two things stayed on while they slept: the touch controller, which kept scanning the dark screen, now sleeps until the screen lights up again; and while the chip slept it let go of every pin, so the speaker's amplifier could switch on by itself and the screen's and the touch's reset lines drifted. Those pins now keep their level.

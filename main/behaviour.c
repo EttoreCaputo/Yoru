@@ -109,12 +109,22 @@ typedef struct {
     sound_t sound;
 } scene_t;
 
+/* The scenes that play a clip from the Rive file instead of a gesture. */
+static const struct {
+    const char *scene;
+    clip_id_t clip;
+} SCENE_CLIPS[] = {
+    {"proud", CLIP_CELEBRATE},
+    {"stretch", CLIP_WAKE_STRETCH},
+};
+
 #define G(name) EYES_GESTURE_##name
 static const scene_t SCENES[] = {
     {"happy", EYES_MOOD_HAPPY, 2000, FX_NONE, G(NONE), SOUND_HAPPY},
     {"excited", EYES_MOOD_HAPPY, 2500, FX_POKE, G(CLAP), SOUND_EXCITED},
     {"wink", EYES_MOOD_HAPPY, 1200, FX_BLINK, G(NONE), SOUND_WINK},
-    {"proud", EYES_MOOD_HAPPY, 2500, FX_NONE, G(CLAP), SOUND_TADA},
+    // The happy mood shows on after the clip.
+    {"proud", EYES_MOOD_HAPPY, 3600, FX_NONE, G(NONE), SOUND_TADA},
     {"relieved", EYES_MOOD_HAPPY, 1800, FX_BLINK, G(NONE), SOUND_PHEW},
     {"charged", EYES_MOOD_HAPPY, 1500, FX_POKE, G(NONE), SOUND_CHARGE},
     // After the bolt of a cable plugged in (its sound came with the bolt).
@@ -143,7 +153,7 @@ static const scene_t SCENES[] = {
     {"point", EYES_MOOD_CURIOUS, 1800, FX_NONE, G(POINT), SOUND_HMM},
     {"shy", EYES_MOOD_HAPPY, 3000, FX_NONE, G(COVER), SOUND_COUNT},
     {"clap", EYES_MOOD_HAPPY, 1300, FX_NONE, G(CLAP), SOUND_COUNT},
-    {"stretch", EYES_MOOD_SLEEPY, 1800, FX_NONE, G(STRETCH), SOUND_YAWN},
+    {"stretch", EYES_MOOD_NEUTRAL, 3000, FX_NONE, G(NONE), SOUND_YAWN},
     // The case as an input (motion.c) and slaps.
     {"dizzy", EYES_MOOD_DIZZY, 3200, FX_POKE, G(HOLD), SOUND_CONFUSED},
     {"annoyed", EYES_MOOD_GRUMPY, 2800, FX_POKE, G(SHOO), SOUND_GRUMBLE},
@@ -313,6 +323,11 @@ static bool play(const char *name)
         }
         if (sc->gesture != EYES_GESTURE_NONE) {
             eyes_gesture(sc->gesture);
+        }
+        for (size_t j = 0; j < sizeof(SCENE_CLIPS) / sizeof(SCENE_CLIPS[0]); j++) {
+            if (strcmp(name, SCENE_CLIPS[j].scene) == 0) {
+                eyes_play(SCENE_CLIPS[j].clip);
+            }
         }
         if (sc->ms > 0) {
             react(sc->mood, sc->ms);

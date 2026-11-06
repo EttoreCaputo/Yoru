@@ -244,9 +244,9 @@ static void greet(void)
         eyes_look_at(0, 0);
         eyes_move_to(0, 12 * 0.78f, 0.78f, 900, EYES_PATH_GLIDE);
         if (L.morning) {
-            eyes_gesture(EYES_GESTURE_STRETCH);
+            eyes_play(CLIP_WAKE_STRETCH);
             life_sound(SOUND_YAWN);
-            wait_ms(1900);
+            wait_ms(3000);
         }
         next(1);
         break;

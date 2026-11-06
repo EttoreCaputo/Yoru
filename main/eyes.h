@@ -17,6 +17,7 @@
 
 #include <stdbool.h>
 
+#include "clips.h"
 #include "lvgl.h"
 
 #ifdef __cplusplus
@@ -166,8 +167,15 @@ void eyes_blink(void);
 void eyes_set_status(eyes_status_t status);
 eyes_status_t eyes_get_status(void);
 
-/** Play a gesture now, replacing the one playing. */
+/** Play a gesture now, replacing the one playing (and any clip). */
 void eyes_gesture(eyes_gesture_t gesture);
+
+/** Play a clip keyed in the Rive file (docs/animations.md): for its length
+ * it moves the body, the hands and the eyes itself, then the engine takes
+ * over from the rest pose it ends in. Moves, knocks and the mood go on
+ * underneath; a gesture stops it. */
+void eyes_play(clip_id_t clip);
+bool eyes_playing(void);
 const char *eyes_gesture_name(eyes_gesture_t gesture);
 
 /** A finger held on the screen at (x, y): both hands reach out and hold it,

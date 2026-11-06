@@ -429,6 +429,11 @@ static struct {
     bool fly, fly_shown;
     float fly_x, fly_y;
     lv_area_t fly_drawn;
+    /* A clip from the Rive file playing (NULL: none), how far in, and this
+     * frame's pose, blended from its two nearest frames. */
+    const clip_t *clip;
+    int32_t clip_ms;
+    clip_frame_t cf;
 } s;
 
 static float lerp(float a, float b, float k)
@@ -474,6 +479,34 @@ static bool has_overlay(eyes_mood_t mood)
            || mood == EYES_MOOD_DIZZY;
 }
 
+/* ---- Clips ---------------------------------------------------------------- */
+
+/* A clip is keyed at 30 frames a second; between two of them the pose is
+ * blended, so it plays at the same speed whatever the frame rate. It starts
+ * and ends in the rest pose, so the engine takes over unseen. */
+#define CLIP_FRAME_MS (1000.0f / 30.0f)
+
+static bool clip_step(void)
+{
+    if (s.clip == NULL) {
+        return false;
+    }
+    s.clip_ms += s.dt_ms;
+    const float at = (float) s.clip_ms / CLIP_FRAME_MS;
+    const int i = (int) at;
+    if (i >= s.clip->n - 1) {
+        s.clip = NULL;
+        return false;
+    }
+    const float k = at - (float) i;
+    const float *a = (const float *) &s.clip->frames[i], *b = (const float *) &s.clip->frames[i + 1];
+    float *o = (float *) &s.cf;
+    for (size_t j = 0; j < sizeof(clip_frame_t) / sizeof(float); j++) {
+        o[j] = lerp(a[j], b[j], k);
+    }
+    return true;
+}
+
 /* ---- Hands ---------------------------------------------------------------- */
 
 static hand_pose_t pose_lerp(hand_pose_t a, hand_pose_t b, float k)
@@ -504,6 +537,12 @@ static void hands_step(void)
 {
     if (s.clutch) {
         clutch_step();
+        return;
+    }
+    if (s.clip != NULL) {
+        s.hand[0] = (hand_pose_t) {s.cf.lx, s.cf.ly, s.cf.ls};
+        s.hand[1] = (hand_pose_t) {s.cf.rx, s.cf.ry, s.cf.rs};
+        s.hands_front = false;
         return;
     }
     const gesture_t *g = &s_gestures[s.gesture];
@@ -575,16 +614,26 @@ static void body_layout(body_vis_t *v)
     const float near1 = fminf(1, v->dist);
     // Breathing: a slow bob of a few pixels. Not asleep (far away and still),
     // not with the tint on (the halo covers the screen), not under the menu.
-    const bool still = s.near < 0.5f || s.tint > 0.01f || s.size < 0.999f;
+    // A clip moves the body itself.
+    const bool still = s.near < 0.5f || s.tint > 0.01f || s.size < 0.999f || s.clip != NULL;
     const float bob = still ? 0 : 3 * sinf(t * 2.1f) * near1;
     // Scared, it trembles; knocked, it is pushed and springs back; leaning,
     // it sags towards the low side.
     const float shiver = s.mood == EYES_MOOD_SCARED && s.near > 0.5f ? 2.2f * sinf(t * 70) : 0;
     v->bx = CX + (int32_t) lroundf(s.mv.pos.x / zf + (s.kx + shiver + s.lx * 8 * s.near) * near1);
     v->by = CY + (int32_t) lroundf(s.mv.pos.y / zf + bob + (s.ky + s.ly * 6 * s.near) * near1);
-    const float sq = clampf(s.squash + stretch_amount() + s.vsq, -1, 1);
-    v->rx = ball_radius(R * (1 + LOOK_SQUASH * sq) * v->dist);
-    v->ry = ball_radius(R * (1 - LOOK_SQUASH * sq) * v->dist);
+    if (s.clip != NULL) {
+        // The clip's own squash and stretch, and its offset in the Rive
+        // file's units.
+        v->bx += (int32_t) lroundf(s.cf.bx * K * v->dist);
+        v->by += (int32_t) lroundf(s.cf.by * K * v->dist);
+        v->rx = ball_radius(R * s.cf.bsx * v->dist);
+        v->ry = ball_radius(R * s.cf.bsy * v->dist);
+    } else {
+        const float sq = clampf(s.squash + stretch_amount() + s.vsq, -1, 1);
+        v->rx = ball_radius(R * (1 + LOOK_SQUASH * sq) * v->dist);
+        v->ry = ball_radius(R * (1 - LOOK_SQUASH * sq) * v->dist);
+    }
     v->sx = (float) v->rx / R;
     v->sy = (float) v->ry / R;
     v->near = s.near;
@@ -605,8 +654,34 @@ static void body_layout(body_vis_t *v)
     }
 }
 
+/* A clip draws the eyes as the Rive file does: the neutral pills, scaled,
+ * with the face where the clip puts it and as narrow as its turn. */
+static void clip_eye_layout(void)
+{
+    const eye_shape_t *n = &s_moods[EYES_MOOD_NEUTRAL];
+    const float w = n->w * K * s.cf.turn * s.cf.ew * s.body.sx;
+    const float h = n->h * K * s.cf.eh * s.body.sy;
+    for (int i = 0; i < 2; i++) {
+        const int side = i == 0 ? -1 : 1;
+        eye_box_t *e = &s.eye[i];
+        e->w = w;
+        e->h = h;
+        e->x = (float) s.body.bx + ((float) side * EYE_SPACING * s.cf.turn + s.cf.fx * K) * s.body.sx;
+        e->y = (float) s.body.by + (FACE_Y + s.cf.fy * K) * s.body.sy;
+        const float hh = e->h < 2 ? 2 : e->h;
+        e->top_l = e->top_r = -hh / 2;
+        e->bottom = s.cf.bottom;
+        e->spiral = 0;
+        e->phase = 0;
+    }
+}
+
 static void eye_layout(void)
 {
+    if (s.clip != NULL) {
+        clip_eye_layout();
+        return;
+    }
     // Near the edge of the ball the eyes get narrower: it seems to turn.
     const float nx = 1 - 0.3f * s.gx * s.gx;
     const float ny = 1 - 0.25f * s.gy * s.gy;
@@ -1494,6 +1569,7 @@ static void battery_step(void)
 
 static bool step(void)
 {
+    const bool clipping = clip_step();
     const eye_shape_t *want = &s_moods[s.mood];
     eye_shape_t before = s.cur;
     float *c = (float *) &s.cur;
@@ -1544,8 +1620,9 @@ static bool step(void)
     float gx = lerp(s.gx, s.tgx, ease(gk));
     float gy = lerp(s.gy, s.tgy, ease(gk));
 
-    // Blinks every 2.2-5.2 s, one in five doubled; none while asleep.
-    if (s.mood != EYES_MOOD_ASLEEP) {
+    // Blinks every 2.2-5.2 s, one in five doubled; none while asleep, and
+    // none during a clip, which blinks when it means to.
+    if (s.mood != EYES_MOOD_ASLEEP && !clipping) {
         s.next_blink_ms -= s.dt_ms;
         if (s.next_blink_ms <= 0) {
             eyes_blink();
@@ -1582,7 +1659,7 @@ static bool step(void)
 
     bool moved = fabsf(gx - s.gx) > 0.002f || fabsf(gy - s.gy) > 0.002f || fabsf(lid - s.lid) > 0.002f
                  || fabsf(squash) > 0.002f || fabsf(level - s.level) > 0.002f || memcmp(&before, &s.cur, sizeof(before)) != 0
-                 || winked;
+                 || winked || clipping;
     s.level = level;
     s.gx = gx;
     s.gy = gy;
@@ -1713,7 +1790,7 @@ static void frame_cb(lv_timer_t *timer)
     // The hands, each on its own.
     for (int i = 0; i < 2; i++) {
         lv_area_t now = hand_area(i);
-        if (!areas_equal(&now, &s.hand_drawn[i]) || s.gesture != EYES_GESTURE_NONE) {
+        if (!areas_equal(&now, &s.hand_drawn[i]) || s.gesture != EYES_GESTURE_NONE || s.clip != NULL) {
             invalidate_move(&s.hand_drawn[i], &now);
             s.hand_drawn[i] = now;
         }
@@ -1949,12 +2026,34 @@ eyes_status_t eyes_get_status(void)
     return s.status;
 }
 
+void eyes_play(clip_id_t clip)
+{
+    const clip_t *c = clips_get(clip);
+    if (c == NULL || c->n < 2) {
+        return;
+    }
+    // The clip has the hands from its first frame, and its own blinks.
+    s.clutch = false;
+    s.gesture = EYES_GESTURE_NONE;
+    s.blink_ms = 0;
+    s.lid = 1;
+    s.clip = c;
+    s.clip_ms = 0;
+    s.cf = c->frames[0];
+}
+
+bool eyes_playing(void)
+{
+    return s.clip != NULL;
+}
+
 void eyes_gesture(eyes_gesture_t gesture)
 {
     if (gesture >= EYES_GESTURE_COUNT) {
         return;
     }
     s.clutch = false; // a gesture needs the hands
+    s.clip = NULL;    // and the body back
     s.hand_from[0] = s.hand[0];
     s.hand_from[1] = s.hand[1];
     s.gesture = gesture;

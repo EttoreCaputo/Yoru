@@ -1,6 +1,6 @@
 # Yoru's animation library
 
-Hand-keyed clips for the moments that matter, drawn in Rive and played on the board next to the eye engine. The eye engine (`main/eyes.c`) stays in charge of everything that reacts: gaze towards sounds, touch, tilt, depth, sleep, tints. A clip takes over only for one beat of acting, then hands Yoru back.
+Hand-keyed clips for the moments that matter, drawn in Rive and played on the board by the eye engine. The eye engine (`main/eyes.c`) stays in charge of everything that reacts: gaze towards sounds, touch, tilt, depth, sleep, tints. A clip takes over only for one beat of acting, then hands Yoru back.
 
 Why: the procedural engine moves Yoru well, but it can't act. A wake-up stretch, a sneeze or a gulped firefly need poses timed by hand, with anticipation, overshoot and overlap placed frame by frame. That is what makes Taby's clips (TRIIIS LABS) look alive. Their artwork is licensed for Taby only; everything here is Yoru's own.
 
@@ -53,13 +53,13 @@ Joy. 84 frames (2.8 s), once. Ends in the rest pose. **Animated** in `yoru.riv` 
 Secondary: the player blooms the green "done" tint on the landing (it isn't in the clip, see Production). Ambient: the sparkles (the `Stars` node) from the apex to the landing.
 
 ### 2. `wake_stretch` — waking up
-Comfort. 90 frames (3 s), once. Starts with the eyes closed.
+Comfort. 86 frames (2.9 s), once. Starts with the eyes closed. **Animated** in `yoru.riv` (`clip_wake_stretch`); played by the morning greeting, the stretch Yoru does on his own and `react` `stretch`.
 
 | Frames | Pose |
 |---|---|
-| 0–12 | Eyes half open (lids 0.5), gaze down, slow drowsy blink. |
-| 12–24 | Anticipation: body sinks 6 px, squash 1.08 / 0.93, hands come out low. |
-| 24–48 | Stretch: up 14 px, 0.88 / 1.14, hands far out and up (±120 px, −40 px) on arcs, eyes squeezed shut. |
+| 0–12 | Eyes half open (0.5, the right a little lower), gaze down, slow drowsy blink. |
+| 12–24 | Anticipation: body sinks 6 px, squash 1.08 / 0.93, hands come out low (the right 2 frames later). |
+| 24–48 | Stretch: up 14 px, 0.88 / 1.14, a 3° lean, hands far out and high (±140 px, −105 px, on arcs), eyes squeezed shut. Out level with the face, the hands didn't read as a stretch. |
 | 48–60 | Hold, a 1 px tremble (the effort). |
 | 60–66 | Release (ease-in): snap down to squash 1.10 / 0.91, hands fall in. |
 | 66–78 | Overshoot 0.97 / 1.03 → 1 / 1 (ease-out-back). A big blink at 72. |
@@ -139,8 +139,12 @@ Huff: stretch 0.95 / 1.05, then a sharp turn away (the eyes slide to the far sid
 - Animate the body in a neutral grey with no tint and no badge: the player adds them, so a clip works in every state and with any body colour.
 - The Rive MCP lives in the Rive desktop app (macOS) and only runs while the app is open; with it open, the timelines can be built from this file.
 
-**Export:** the frames of each clip, rendered by a Rive runtime scrubbing its timeline (the editor's export gives only the `.riv`), then a converter (to do, `tools/`) that crops every clip to the box its frames cover (even-aligned, as everything sent to the CO5300), scales it to the board's size, reduces it to a 256-colour palette and writes it to the `assets` partition. Format: GIF to begin with (LVGL 9.3 plays it); a format of our own if GIF turns out too slow next to WiFi and ESP-SR. With an indexed palette, recolouring Yoru or tinting it is rewriting the palette, not redrawing the frames.
+**On the board since 0.20.6: the clip as numbers, not pictures.** The clips so far only move the rig (body, hands, eyes, face), and the eye engine draws the same rig with the same parameters. So a clip goes to the board as its keys, not as frames: `tools/clips/keyframes.json` holds the keys of each `clip_*` timeline as the Rive MCP reports them (with their cubic curves), and `python3 tools/clips/clips.py` samples them every 1/30 s into `main/clips.c` and `main/clips.h`. `eyes_play()` plays one: for its length the clip sets the body's offset and squash, the hands (relative to the body) and the eyes' size, bottom lid and turn; moves, knocks, the mood and the tint go on underneath, and a gesture stops it. A clip costs about 5 KB of flash and nothing to draw beyond what Yoru always draws. Left out on the board for now: the body's and the hands' rotation and the sparkles. To update a clip: key it in Rive, fetch its keys into `keyframes.json` (the MCP's `queryKeyFrames`, plus each cubic interpolator's `x1 y1 x2 y2`), run the script, build.
+
+Frames are still the way for a clip that draws what the rig can't (a prop, a squiggle, a hand-drawn effect):
+
+**Export (frames):** the frames of each clip, rendered by a Rive runtime scrubbing its timeline (the editor's export gives only the `.riv`), then a converter (to do, `tools/`) that crops every clip to the box its frames cover (even-aligned, as everything sent to the CO5300), scales it to the board's size, reduces it to a 256-colour palette and writes it to the `assets` partition. Format: GIF to begin with (LVGL 9.3 plays it); a format of our own if GIF turns out too slow next to WiFi and ESP-SR. With an indexed palette, recolouring Yoru or tinting it is rewriting the palette, not redrawing the frames.
 
 **Budget:** the `assets` partition has about 3.9 MB. A clip cropped to the sphere and the hands' reach (about 300 × 300) should stay under 300 KB, so about a dozen fit; the 32 MB flash of some boards would hold many more.
 
-**On the board** (to do): a clip player that waits for the engine to reach the rest pose, hides the engine's drawing for the clip's length, plays the clip at Yoru's position, and hands back the pose or mood the clip ends in. `behaviour.c` and `life.c` pick clips; the eye engine never does.
+**On the board, frames** (to do, for such clips): a clip player that waits for the engine to reach the rest pose, hides the engine's drawing for the clip's length, plays the clip at Yoru's position, and hands back the pose or mood the clip ends in. `behaviour.c` and `life.c` pick clips; the eye engine never does.
