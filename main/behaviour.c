@@ -61,6 +61,8 @@
 #define STROKE_MIN_MS 350
 /* A sound from one side is looked at this long. */
 #define HEARD_LOOK_MS 1500
+/* The glow while it listens: the wake word's cyan. */
+#define LISTEN_RGB 0x40C8E0
 /* A noise this far to a side gets pointed at, at most this often. */
 #define HEARD_POINT_X 0.45f
 #define HEARD_POINT_GAP_MS 45000
@@ -1321,6 +1323,8 @@ static void show_voice(voice_state_t state)
         show_status(EYES_STATUS_IDLE, 0);
         eyes_set_mood(EYES_MOOD_LISTENING);
         eyes_look_at(0, -0.15f); // at you
+        // A hand cupped by its ear, a glow breathing, until it stops listening.
+        eyes_play_fx(CLIP_LISTEN_LOOP, false, LISTEN_RGB, NULL);
         break;
     case VOICE_THINKING:
         show_status(EYES_STATUS_THINKING, 0);
@@ -1346,6 +1350,9 @@ static void show_voice(voice_state_t state)
 void behaviour_voice(voice_state_t state)
 {
     const voice_state_t was = s.voice;
+    if (state != VOICE_LISTENING && eyes_clip() == CLIP_LISTEN_LOOP) {
+        eyes_stop_clip();
+    }
     if (state != VOICE_IDLE) {
         let_go(false); // it listens with its hands free
     }
@@ -1653,15 +1660,88 @@ static void on_errand(bool busy)
     }
 }
 
-bool behaviour_fetch(const char *id, const char *source, const char *state)
+/* Where Yoru can show what it does for you: awake, on the screen, and not
+ * over what you are doing. */
+static bool can_show_work(void)
 {
+    return !s.asleep && !s.dark && !s.face_down && !s.menu && !s.view && !card_up() && !s.pressed
+           && (s.voice == VOICE_IDLE || s.voice == VOICE_THINKING);
+}
+
+/* A tool that isn't an errand: a clip in the service's colour. A search
+ * scans until its end comes; the rest are over in a moment. */
+static bool tool_clip(const char *id, const char *source, const char *state, const char *kind)
+{
+    static char search_id[24];
+    const bool start = strcmp(state, "start") == 0;
+    uint32_t rgb;
+    const char *glyph;
+    if (strcmp(kind, "search") == 0) {
+        errand_look(source[0] != '\0' ? source : "web", &rgb, &glyph);
+        if (start) {
+            if (!can_show_work()) {
+                return false;
+            }
+            snprintf(search_id, sizeof(search_id), "%s", id);
+            eyes_play_fx(CLIP_SEARCH_LOOP, false, rgb, glyph);
+            return true;
+        }
+        if (eyes_clip() != CLIP_SEARCH_LOOP || strcmp(id, search_id) != 0) {
+            return false;
+        }
+        const bool ok = strcmp(state, "done") == 0;
+        eyes_play_fx(ok ? CLIP_SEARCH_FOUND : CLIP_TOOL_FAILED, false, rgb, glyph);
+        if (s.voice == VOICE_IDLE) {
+            playback_sound(ok ? SOUND_TADA : SOUND_WHIMPER);
+        }
+        return true;
+    }
+    if (strcmp(kind, "send") == 0) {
+        errand_look(source, &rgb, &glyph);
+        if (start) {
+            if (!can_show_work()) {
+                return false;
+            }
+            eyes_play_fx(CLIP_SEND_NOTE, eyes_where().x > 0, rgb, glyph);
+            if (s.voice == VOICE_IDLE) {
+                playback_sound(SOUND_WHISTLE);
+            }
+            return true;
+        }
+        if (strcmp(state, "failed") == 0 && can_show_work()) {
+            eyes_play_fx(CLIP_TOOL_FAILED, false, rgb, glyph);
+            return true;
+        }
+        return false;
+    }
+    if (!start || !can_show_work()) {
+        return false; // a memory or a note is over as it starts
+    }
+    if (strcmp(kind, "note") == 0) {
+        errand_look(source, &rgb, &glyph);
+        eyes_play_fx(CLIP_JOT_NOTE, false, rgb, glyph);
+    } else {
+        errand_look("memory", &rgb, &glyph);
+        const bool forget = strcmp(kind, "forget") == 0;
+        eyes_play_fx(forget ? CLIP_MEMORY_FORGET : CLIP_MEMORY_SAVE, eyes_where().x > 0, rgb, NULL);
+    }
+    if (s.voice == VOICE_IDLE) {
+        playback_sound(SOUND_CHIRP);
+    }
+    return true;
+}
+
+bool behaviour_fetch(const char *id, const char *source, const char *state, const char *kind)
+{
+    if (kind[0] != '\0' && strcmp(kind, "fetch") != 0) {
+        s.last_touch_ms = lv_tick_get();
+        return tool_clip(id, source, state, kind);
+    }
     if (strcmp(state, "start") != 0) {
         errand_end(id, strcmp(state, "done") == 0);
         return errand_busy();
     }
-    // Only where it can be seen, and not over what you are doing.
-    if (s.asleep || s.dark || s.face_down || s.menu || s.view || card_up() || s.pressed
-        || (s.voice != VOICE_IDLE && s.voice != VOICE_THINKING)) {
+    if (!can_show_work()) {
         return false;
     }
     errand_start(id, source);

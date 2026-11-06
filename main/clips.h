@@ -12,13 +12,17 @@
  * as near). The hands from the body's centre (scale 0 tucked), and whether
  * they are in front of it. The face's offset and width (a turn narrows it).
  * Each eye (l, r): its x on the face, its scale, the top lid's cut at its
- * left and right edge (0 none, 1 shut) and the bottom lid (1: ^ ^). */
+ * left and right edge (0 none, 1 shut) and the bottom lid (1: ^ ^).
+ * The effects, in the colour the player picks: the prop from the body's
+ * centre and its scale (0 hidden), the glow round the body (0..1) and how
+ * fast sparkles fly (0..1). */
 typedef struct {
     float bx, by, bsx, bsy, rot, near;
     float lx, ly, ls, rx, ry, rs, front;
     float fx, fy, turn;
     float lex, lew, leh, ltl, ltr, lbot;
     float rex, rew, reh, rtl, rtr, rbot;
+    float px, py, ps, glow, spark;
 } clip_frame_t;
 
 typedef enum {
@@ -31,18 +35,26 @@ typedef enum {
     CLIP_GREET_BACK,
     CLIP_HICCUP,
     CLIP_HIDE_SEEK,
+    CLIP_JOT_NOTE,
     CLIP_KNOCK_GLASS,
     CLIP_LIFTED,
+    CLIP_LISTEN_LOOP,
     CLIP_MELT,
+    CLIP_MEMORY_FORGET,
+    CLIP_MEMORY_SAVE,
     CLIP_NOD_OFF,
     CLIP_POINT_SOUND,
     CLIP_SAD_DROOP,
+    CLIP_SEARCH_FOUND,
+    CLIP_SEARCH_LOOP,
+    CLIP_SEND_NOTE,
     CLIP_SHY_PEEK,
     CLIP_SLEEPY_WAVE,
     CLIP_SNEEZE,
     CLIP_STARTLE,
     CLIP_SULK_TURN,
     CLIP_THINK,
+    CLIP_TOOL_FAILED,
     CLIP_WAKE_STRETCH,
     CLIP_YAWN,
     CLIP_COUNT,

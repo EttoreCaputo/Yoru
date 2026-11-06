@@ -75,11 +75,13 @@ void behaviour_power_key(board_pmu_key_t ev);
  * inbox when one is up; held, nothing. With the LVGL lock held. */
 void behaviour_boot_key(bool long_press);
 
-/** The host's assistant called a connector (`show_fetch`): `state` is
- * `start`, `done` or `failed`; `id` pairs a start with its end. A start
- * shows only while Yoru is awake, on the screen and free or thinking.
- * Returns whether Yoru is on the errand. With the LVGL lock held. */
-bool behaviour_fetch(const char *id, const char *source, const char *state);
+/** The host's assistant called a tool (`show_fetch`): `state` is `start`,
+ * `done` or `failed`; `id` pairs a start with its end. `kind` "" or fetch is
+ * an errand through a portal; send, search, remember, forget and note play a
+ * clip in the service's colour. A start shows only while Yoru is awake, on
+ * the screen and free or thinking. Returns whether Yoru shows it. With the
+ * LVGL lock held. */
+bool behaviour_fetch(const char *id, const char *source, const char *state, const char *kind);
 
 /** Where the host's pointer is, -1..1 each way (rpc.c's eyes/gaze). Safe
  * from any task. */

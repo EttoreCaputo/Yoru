@@ -176,7 +176,13 @@ void eyes_gesture(eyes_gesture_t gesture);
  * `mirror` plays it left for right. Moves, knocks and the mood go on
  * underneath; a gesture stops it. A `_loop` clip plays until stopped. */
 void eyes_play(clip_id_t clip, bool mirror);
+/** The same, with the clip's effects (its glow, sparkles and prop) in `rgb`,
+ * the prop a card showing `glyph` (an LV_SYMBOL or a few letters, kept by
+ * the caller), or a glowing orb when NULL. eyes_play() uses gold and the orb. */
+void eyes_play_fx(clip_id_t clip, bool mirror, uint32_t rgb, const char *glyph);
 bool eyes_playing(void);
+/** The clip playing, or CLIP_NONE. */
+clip_id_t eyes_clip(void);
 void eyes_stop_clip(void);
 const char *eyes_gesture_name(eyes_gesture_t gesture);
 

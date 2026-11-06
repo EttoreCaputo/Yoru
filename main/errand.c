@@ -67,6 +67,9 @@ static const look_t LOOKS[] = {
     {"discord", 0x5865F2, LV_SYMBOL_CALL},  {"spotify", 0x1DB954, LV_SYMBOL_AUDIO},
     {"music", 0xFA2D48, LV_SYMBOL_AUDIO},   {"web", 0x40C8E0, LV_SYMBOL_GPS},
     {"search", 0x40C8E0, LV_SYMBOL_GPS},    {"memory", 0xBF5AF2, LV_SYMBOL_SAVE},
+    {"task", 0x34C759, LV_SYMBOL_OK},       {"timer", 0xFF9F0A, LV_SYMBOL_BELL},
+    {"remind", 0xFF9F0A, LV_SYMBOL_BELL},   {"inbox", 0x0A84FF, LV_SYMBOL_BELL},
+    {"notif", 0x0A84FF, LV_SYMBOL_BELL},
 };
 #define LOOKS_N ((int) (sizeof(LOOKS) / sizeof(LOOKS[0])))
 #define DEFAULT_RGB 0xBF5AF2
@@ -131,6 +134,23 @@ static bool contains(const char *hay, const char *word)
     }
     low[i] = '\0';
     return strstr(low, word) != NULL;
+}
+
+void errand_look(const char *source, uint32_t *rgb, const char **glyph)
+{
+    static char initial[2];
+    *rgb = DEFAULT_RGB;
+    for (int i = 0; i < LOOKS_N; i++) {
+        if (contains(source, LOOKS[i].word)) {
+            *rgb = LOOKS[i].rgb;
+            *glyph = LOOKS[i].glyph;
+            return;
+        }
+    }
+    const char c = source[0] != '\0' ? source[0] : '?';
+    initial[0] = isalnum((unsigned char) c) ? (char) toupper((unsigned char) c) : '?';
+    initial[1] = '\0';
+    *glyph = initial;
 }
 
 static void pick_look(const char *source)

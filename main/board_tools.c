@@ -648,17 +648,26 @@ static bool tool_set_tasks(const cJSON *args, char *text, cJSON **structured)
 
 static bool tool_show_fetch(const cJSON *args, char *text, cJSON **structured)
 {
-    const char *id, *source, *state;
+    const char *id, *source, *state, *kind;
     if (!get_str(args, "id", false, 23, &id, text) || !get_str(args, "source", false, 24, &source, text)
-        || !get_str(args, "state", true, 0, &state, text)) {
+        || !get_str(args, "state", true, 0, &state, text) || !get_str(args, "kind", false, 12, &kind, text)) {
         return false;
     }
     if (strcmp(state, "start") != 0 && strcmp(state, "done") != 0 && strcmp(state, "failed") != 0) {
         snprintf(text, TEXT_MAX, "state must be start, done or failed");
         return false;
     }
+    static const char *const KINDS[] = {"fetch", "send", "search", "remember", "forget", "note"};
+    bool known = kind[0] == '\0';
+    for (size_t i = 0; i < sizeof(KINDS) / sizeof(KINDS[0]) && !known; i++) {
+        known = strcmp(kind, KINDS[i]) == 0;
+    }
+    if (!known) {
+        snprintf(text, TEXT_MAX, "kind must be fetch, send, search, remember, forget or note");
+        return false;
+    }
     lvgl_port_lock();
-    const bool out = behaviour_fetch(id, source, state);
+    const bool out = behaviour_fetch(id, source, state, kind);
     lvgl_port_unlock();
     snprintf(text, TEXT_MAX, out ? "Yoru is on the errand" : "not shown");
     return true;
@@ -766,11 +775,15 @@ static const tool_t TOOLS[] = {
     },
     {
         .name = "show_fetch",
-        .description = "The host's assistant calls one of its connectors: on `start` Yoru dives into a portal in "
-                       "the connector's colour, and on `done` (or `failed`) comes back with a parcel (or empty "
-                       "handed). `id` pairs a start with its end. The host sends it itself.",
+        .description = "The host's assistant calls one of its tools. `kind` fetch (or none): on `start` Yoru "
+                       "dives into a portal in the connector's colour, and on `done` (or `failed`) comes back with "
+                       "a parcel (or empty handed). send: writes on a card and throws it. search: scans holding "
+                       "a card until the end. remember, forget: an orb into or out of its head. note: stamps a "
+                       "card. `id` pairs a start with its end. The host sends it itself.",
         .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\",\"maxLength\":23},"
                   "\"source\":{\"type\":\"string\",\"maxLength\":24},"
+                  "\"kind\":{\"type\":\"string\",\"enum\":[\"fetch\",\"send\",\"search\",\"remember\","
+                  "\"forget\",\"note\"]},"
                   "\"state\":{\"type\":\"string\",\"enum\":[\"start\",\"done\",\"failed\"]}},"
                   "\"required\":[\"state\"]}",
         .fn = tool_show_fetch,

@@ -1,6 +1,7 @@
 #include "rpc.h"
 
 #include <stdlib.h>
+#include <math.h>
 #include <string.h>
 
 #include "audio_selftest.h"
@@ -11,6 +12,7 @@
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "errand.h"
 #include "eyes.h"
 #include "friends.h"
 #include "life.h"
@@ -319,18 +321,45 @@ void rpc_handle(uint8_t *payload, size_t len)
             friends_bump_stats(result);
             cJSON_AddItemToObject(result, "friends", friends_status());
         }
+    } else if (strcmp(name, "debug/clips") == 0) {
+        // The clips this firmware has, for a host to list them.
+        result = cJSON_CreateObject();
+        cJSON *list = cJSON_AddArrayToObject(result, "clips");
+        for (int i = CLIP_NONE + 1; i < CLIP_COUNT; i++) {
+            const clip_t *c = clips_get((clip_id_t) i);
+            cJSON *item = cJSON_CreateObject();
+            cJSON_AddStringToObject(item, "name", c->name);
+            cJSON_AddNumberToObject(item, "seconds", round((double) (c->n - 1) * 100.0 / 30.0) / 100.0);
+            cJSON_AddBoolToObject(item, "loop", c->loop);
+            cJSON_AddItemToArray(list, item);
+        }
+    } else if (strcmp(name, "debug/clip") == 0 && cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(params, "stop"))) {
+        lvgl_port_lock();
+        eyes_stop_clip();
+        lvgl_port_unlock();
+        result = cJSON_CreateObject();
+        cJSON_AddBoolToObject(result, "stopped", true);
     } else if (strcmp(name, "debug/clip") == 0) {
         // Play one of the clips keyed in the Rive file (docs/animations.md),
         // to see it on the board.
         const cJSON *clip = cJSON_GetObjectItemCaseSensitive(params, "name");
         const cJSON *mirror = cJSON_GetObjectItemCaseSensitive(params, "mirror");
+        const cJSON *source = cJSON_GetObjectItemCaseSensitive(params, "source");
         const clip_id_t id = cJSON_IsString(clip) ? clips_find(clip->valuestring) : CLIP_NONE;
-        if (id == CLIP_NONE || (mirror != NULL && !cJSON_IsBool(mirror))) {
+        if (id == CLIP_NONE || (mirror != NULL && !cJSON_IsBool(mirror)) || (source != NULL && !cJSON_IsString(source))) {
             code = RPC_INVALID_PARAMS;
-            message = "expected {\"name\": a clip in docs/animations.md, \"mirror\"?: bool}";
+            message = "expected {\"name\": a clip in docs/animations.md, \"mirror\"?: bool, \"source\"?: string}";
         } else {
             lvgl_port_lock();
-            eyes_play(id, cJSON_IsTrue(mirror));
+            if (cJSON_IsString(source)) {
+                // In a service's colour, with its glyph on the prop.
+                uint32_t rgb;
+                const char *glyph;
+                errand_look(source->valuestring, &rgb, &glyph);
+                eyes_play_fx(id, cJSON_IsTrue(mirror), rgb, glyph);
+            } else {
+                eyes_play(id, cJSON_IsTrue(mirror));
+            }
             lvgl_port_unlock();
             result = cJSON_CreateObject();
             cJSON_AddStringToObject(result, "playing", clip->valuestring);

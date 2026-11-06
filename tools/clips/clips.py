@@ -10,8 +10,13 @@ the board only blends two neighbouring frames.
 The rig's numbers stay in the Rive file's units (the board scales them by
 LOOK_SCALE, as it does the gestures). Hands are made relative to the body, as
 the board places them, and in front of it where they overlap it. A clip whose
-name ends in `_loop` loops. The hands' rotation, the face's opacity and the
-sparkles have no counterpart on the board yet and are left out.
+name ends in `_loop` loops. The hands' rotation and the face's opacity have
+no counterpart on the board yet and are left out.
+
+The effects: `Prop` (a thing held, relative to the body like the hands; the
+board draws it as a card with the service's glyph), `Halo`'s opacity (a glow
+round the body) and `Stars`' opacity (how fast sparkles fly). Their colour is
+not in the clip: whoever plays it picks one (the service's, the memory's).
 
 Usage: python3 tools/clips/clips.py
 """
@@ -33,6 +38,7 @@ CLIP_FPS = 30
 # The rig's nodes in yoru.riv, and their values at rest (the design pose)
 # for a property a clip doesn't key.
 CHARACTER, BODY, HAND_L, HAND_R, LOOK = "0-17", "0-19", "0-20", "0-21", "0-5637"
+PROP, HALO, STARS = "3-7167", "0-18", "0-5788"
 EYES = [  # node, shape, top-left, top-right and bottom-middle vertices
     {"node": "0-77", "shape": "0-79", "tl": "0-81", "tr": "0-82", "bm": "0-84", "x": -32},
     {"node": "0-78", "shape": "0-88", "tl": "0-90", "tr": "0-91", "bm": "0-93", "x": 32},
@@ -43,6 +49,8 @@ REST = {
     (HAND_L, "x"): -112, (HAND_L, "y"): 40, (HAND_L, "sx"): 0,
     (HAND_R, "x"): 112, (HAND_R, "y"): 40, (HAND_R, "sx"): 0,
     (LOOK, "x"): 0, (LOOK, "y"): 0, (LOOK, "sx"): 100,
+    (PROP, "x"): 0, (PROP, "y"): 110, (PROP, "sx"): 0,
+    (HALO, "opacity"): 0, (STARS, "opacity"): 0,
 }
 for e in EYES:
     REST.update({(e["node"], "x"): e["x"], (e["shape"], "sx"): 100, (e["shape"], "sy"): 100,
@@ -57,7 +65,8 @@ FIELDS = ["bx", "by", "bsx", "bsy", "rot", "near",
           "lx", "ly", "ls", "rx", "ry", "rs", "front",
           "fx", "fy", "turn",
           "lex", "lew", "leh", "ltl", "ltr", "lbot",
-          "rex", "rew", "reh", "rtl", "rtr", "rbot"]
+          "rex", "rew", "reh", "rtl", "rtr", "rbot",
+          "px", "py", "ps", "glow", "spark"]
 
 
 def bezier_ease(x1, y1, x2, y2, t):
@@ -124,7 +133,9 @@ def sample(rows):
         frames.append([bx, by, v(BODY, "sx", f) / 100, v(BODY, "sy", f) / 100, v(BODY, "r", f),
                        v(CHARACTER, "sx", f) / 100]
                       + hands + [1.0 if front else 0.0]
-                      + [v(LOOK, "x", f), v(LOOK, "y", f), v(LOOK, "sx", f) / 100] + eyes)
+                      + [v(LOOK, "x", f), v(LOOK, "y", f), v(LOOK, "sx", f) / 100] + eyes
+                      + [v(PROP, "x", f) - bx, v(PROP, "y", f) - by, v(PROP, "sx", f) / 100,
+                         v(HALO, "opacity", f) / 100, v(STARS, "opacity", f) / 100])
     return frames
 
 
@@ -151,13 +162,17 @@ def main():
         " * as near). The hands from the body's centre (scale 0 tucked), and whether",
         " * they are in front of it. The face's offset and width (a turn narrows it).",
         " * Each eye (l, r): its x on the face, its scale, the top lid's cut at its",
-        " * left and right edge (0 none, 1 shut) and the bottom lid (1: ^ ^). */",
+        " * left and right edge (0 none, 1 shut) and the bottom lid (1: ^ ^).",
+        " * The effects, in the colour the player picks: the prop from the body's",
+        " * centre and its scale (0 hidden), the glow round the body (0..1) and how",
+        " * fast sparkles fly (0..1). */",
         "typedef struct {",
         "    float bx, by, bsx, bsy, rot, near;",
         "    float lx, ly, ls, rx, ry, rs, front;",
         "    float fx, fy, turn;",
         "    float lex, lew, leh, ltl, ltr, lbot;",
         "    float rex, rew, reh, rtl, rtr, rbot;",
+        "    float px, py, ps, glow, spark;",
         "} clip_frame_t;",
         "",
         "typedef enum {",

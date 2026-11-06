@@ -1,5 +1,18 @@
 # Firmware changelog
 
+## 0.20.9
+
+- **Colourful animations for what Yoru does for you.** The animations can now light Yoru up in a colour, throw sparkles and hold a card with a service's icon, in that service's colour:
+  - **while he listens** to you, a hand cupped by his "ear" and a cyan glow breathing round him;
+  - **when he remembers something**, a purple orb appears over his head: he catches it and presses it in, with a flash and sparkles; **when he forgets**, he pulls it out and flicks it away, pop;
+  - **while he searches the web**, he holds a card and scans left and right, then lifts it up high with a burst of sparkles when he finds it (or it sputters and drops if the search fails);
+  - **when he sends something** for you (a mail, a message, an event), he writes on the service's card and throws it off to the edge of the screen;
+  - **when he adds a task or sets a timer**, he stamps a card twice and tucks it into himself.
+  - Fetching from a service (reading your mail, your calendar...) is still the trip through the portal.
+- The celebration now has its sparkles too.
+- Needs Yoru Hub with this firmware to tell him which is which; an older Yoru Hub still shows them all as the portal.
+- To see any of them now (with a service's colours): `cargo run -p yoru-core --example rpc -- debug/clip '{"name":"send_note","source":"Gmail"}'`; the animations' list is `debug/clips`.
+
 ## 0.20.8
 
 - **Twelve more hand-made animations**, keyed in Rive like the first ten:

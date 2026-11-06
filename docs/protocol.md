@@ -316,7 +316,8 @@ The brain's answer may carry tags, which are taken out before it is said and act
 - **Failures** show in a line over the bottom rim (no internet, a key refused, too many requests) with the red ring; nothing is said.
 - **Not while a host is there:** with one, everything goes to it as before. Without the services or the WiFi, the offline phrases above.
 - `debug/cloud` `{"text": "..."}` answers a text as if it had been heard, for tests.
-- `debug/clip` `{"name": "sneeze", "mirror"?: bool}` (since 0.20.7) plays one of the clips in `docs/animations.md` now, left for right with `mirror`, and answers `{"playing": name}`; an unknown name is an invalid params error.
+- `debug/clip` `{"name": "sneeze", "mirror"?: bool, "source"?: string}` (since 0.20.7) plays one of the clips in `docs/animations.md` now, left for right with `mirror`, and answers `{"playing": name}`; an unknown name is an invalid params error. Since 0.20.9 `source` (a service, as `show_fetch` takes it) puts its effects in that service's colour and glyph, and `{"stop": true}` stops the clip playing (a `_loop` one plays until then), answering `{"stopped": true}`.
+- `debug/clips` (since 0.20.9) lists the clips this firmware has: `{"clips": [{"name", "seconds", "loop"}]}`.
 
 ## Debugging Yoru's life
 
@@ -341,7 +342,7 @@ Since 0.11.0, with the `fetch` capability (Yoru Hub: `core/src/bridge/errands.rs
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
-| `show_fetch` | `state`: `start` · `done` · `failed`, `source`?: the connector's name (at most 24 bytes), `id`?: at most 23 bytes | `start`: Yoru goes; `done` or `failed` with the same `id`: that call ended. Without an `id` an end ends the oldest call out |
+| `show_fetch` | `state`: `start` · `done` · `failed`, `source`?: the connector's name (at most 24 bytes), `id`?: at most 23 bytes, `kind`? (0.20.9): `fetch` · `send` · `search` · `remember` · `forget` · `note` | `start`: Yoru goes; `done` or `failed` with the same `id`: that call ended. Without an `id` an end ends the oldest call out |
 
 ```json
 {"state":"start","id":"t1","source":"Gmail"}
@@ -352,3 +353,4 @@ Since 0.11.0, with the `fetch` capability (Yoru Hub: `core/src/bridge/errands.rs
 - `source` picks the portal's colour and what is drawn in it (mail, calendar, drive, GitHub, Slack, Spotify, web and others by name; anything else its initial) and where on the upper rim it opens.
 - `done` for at least one call: Yoru comes back with a parcel and opens it in sparkles. Only `failed`: empty-handed and sad. Nothing after 20 s: it just comes back.
 - Opening the menu, a view or a card, or talking to it, calls Yoru back at once.
+- `kind` (since 0.20.9; none is `fetch`) is how Yoru shows the call, with the clips of `docs/animations.md` in the service's colour and glyph: `fetch` the portal above; `send` (a tool that acts: sends, creates, deletes) writes on the service's card and throws it, and a `failed` end shows the card sputtering and dropping; `search` holds the card and scans until the end with the same `id`, then lifts it up in sparkles (`done`) or drops it (`failed`); `remember` and `forget` (Yoru's memory) and `note` (a task, a timer, a notification) are over at once and shown on `start`, their end ignored. They follow the same rules for when a start shows. Yoru Hub sends `remember` and `forget` for its memory tools, `note` for a change to the tasks or the timers, `search` for Claude's web search (source `Web`) and `send` for a connector's tool that acts. A board before 0.20.9 shows every kind as `fetch`.

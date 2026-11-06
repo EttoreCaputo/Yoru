@@ -33,6 +33,10 @@ void errand_start(const char *id, const char *source);
  * inside a moment at least. An id that isn't out is fine. */
 void errand_end(const char *id, bool ok);
 
+/** A service's colour and glyph (an LV_SYMBOL, or its initial), as its
+ * portal shows them. The glyph stays valid until the next call. */
+void errand_look(const char *source, uint32_t *rgb, const char **glyph);
+
 /** An errand has the eyes now. */
 bool errand_busy(void);
 /** Something else needs Yoru: the portal goes at once; whoever calls moves

@@ -33,7 +33,7 @@ Offsets are screen pixels at the resting distance; the sphere's radius is 98 px 
 
 ## The clips
 
-All twenty-two are animated in `yoru.riv` and played on the board: the first ten since 0.20.7 (`celebrate` and `wake_stretch` since 0.20.6), clips 11 to 22 since 0.20.8. `debug/clip` plays any of them by name (`docs/protocol.md`).
+All thirty are animated in `yoru.riv` and played on the board: the first ten since 0.20.7 (`celebrate` and `wake_stretch` since 0.20.6), clips 11 to 22 since 0.20.8, 23 to 30 (with colour) since 0.20.9. `debug/clip` plays any of them by name (`docs/protocol.md`).
 
 ### 1. `celebrate` — a build passed, a task is done
 Joy. 84 frames (2.8 s), once. Ends in the rest pose. **Animated** in `yoru.riv` (`clip_celebrate`).
@@ -191,6 +191,50 @@ Surprise, then delight. 57 frames (1.9 s), once, either way round. **Animated**;
 
 A startled stretch up (0.90 / 1.14) with the hands flying out, a dangling sway that dies down with the hands lagging, a look down at the floor, then up at you with happy eyes.
 
+## Clips with effects: what Yoru does for you (0.20.9)
+
+These light Yoru up. Three tracks beyond the rig: `Prop` (a thing held, keyed like a hand: position from the body and scale, 0 hidden), `Halo`'s opacity (a glow round the body, with the body washed in the same colour) and `Stars`' opacity (how fast sparkles fly: off the prop while it shows, off the top of the head otherwise). Their colour isn't keyed: whoever plays the clip gives it, so one clip serves every service. On the board the prop is a rounded card in the colour with the service's glyph on it (the portal's: an envelope for mail, 31 for a calendar, a folder for files, its initial for anything else), or a glowing orb without a glyph; in Rive it is a purple ball. They play from `show_fetch`'s `kind` (`docs/protocol.md`).
+
+### 23. `listen_loop` — listening
+Attention. 61 frames (2 s), a loop, until Yoru stops listening. Cyan (the wake word's).
+
+The right hand cupped by its "ear", a little tilt, a slow bob with the body breathing (1.02 / 0.98), the eyes a little big, a blink every loop, the glow breathing 0.3 → 0.6 and a few sparkles.
+
+### 24. `memory_save` — it remembers something
+Delight in knowing. 73 frames (2.4 s), once, either way round. Purple orb (the memory's colour).
+
+An orb appears over its head; it looks up, crouches, reaches up and catches it in both hands, and pulls it down into its head: a stretch, a flash of glow and a burst of sparkles, then happy eyes and a nod.
+
+### 25. `memory_forget` — it forgets something
+Letting go. 57 frames (1.9 s), once, either way round. Purple orb.
+
+Squinting, it reaches to its head and pulls an orb out, holds it up, flicks it away to the side, where it swells and pops in sparkles; a shake of the head and a blink.
+
+### 26. `search_loop` — searching the web
+Focus. 61 frames (2 s), a loop, until the search ends. In the service's colour (the web's cyan, a globe).
+
+Holding the card low in front with both hands, scanning left and right with a tilt and a hop each way, a blink; the glow breathing and sparkles off the card.
+
+### 27. `search_found` — found
+Triumph. 48 frames (1.6 s), once; after `search_loop`, from its pose.
+
+A crouch and a hop with the card lifted high in both hands, glow and sparkles at full, happy eyes; the card shrinks away up there and the hands come down.
+
+### 28. `send_note` — sending something for you
+Purpose. 77 frames (2.6 s), once, either way round (the throw towards the middle of the screen). In the service's colour.
+
+The card appears in its hands; it looks down and scribbles on it with the right hand; winds up (leaning back, the card pulled down and to the side) and throws it: the card flies off past the rim leaving sparkles, the hand follows through, the glow flashes. It watches it go, happy.
+
+### 29. `jot_note` — a task or a timer
+Tidiness. 65 frames (2.2 s), once. In the service's colour (a check for tasks, a bell for timers).
+
+The card in its hands, two stamps on it with the right hand (each a pulse of glow and sparkles), then the card shrinks into its body with a flash; happy eyes, a nod.
+
+### 30. `tool_failed` — it didn't work
+Disappointment. 53 frames (1.8 s), once; after `search_loop` or for a send that failed, the card back in its hands.
+
+The card trembles and sputters (the glow flickering, a few sparkles), then drops out of its hands and falls away; Yoru sinks a little with sad lids, looks down, and lets it go.
+
 ## Production
 
 **In Rive** (`docs/mascot/yoru.riv`, the cloud file "Yoru mascot"):
@@ -201,7 +245,7 @@ A startled stretch up (0.90 / 1.14) with the hands flying out, a dangling sway t
 - Animate the body in a neutral grey with no tint and no badge: the player adds them, so a clip works in every state and with any body colour.
 - The Rive MCP lives in the Rive desktop app (macOS) and only runs while the app is open; with it open, the timelines can be built from this file.
 
-**On the board since 0.20.6: the clip as numbers, not pictures.** The clips only move the rig (body, hands, eyes, face), and the eye engine draws the same rig with the same parameters. So a clip goes to the board as its keys, not as frames: `python3 tools/clips/fetch.py` (with the Rive app open on the file) saves the keys of every `clip_*` timeline, with their cubic curves, into `tools/clips/keyframes.json`, and `python3 tools/clips/clips.py` samples them every 1/30 s into `main/clips.c` and `main/clips.h`. `eyes_play()` plays one, left for right if asked: for its length the clip sets the body's offset, squash, tilt and nearness (`Character`'s scale), the hands (relative to the body, in front of it where they overlap it), the face's offset and turn, and each eye's place, size, top lid (from its top corners) and bottom lid; moves, knocks, the mood and the tint go on underneath, and a gesture stops it. A clip that ends away from where it started (the firefly, the sad droop) leaves Yoru there; a jump of more than 300 between two frames (hide and seek) is held, not swept across. A clip costs about 9 KB of flash (3 s) and nothing to draw beyond what Yoru always draws. Left out on the board for now: the hands' rotation and the sparkles. To update a clip: key it in Rive, run the two scripts, build.
+**On the board since 0.20.6: the clip as numbers, not pictures.** The clips only move the rig (body, hands, eyes, face), and the eye engine draws the same rig with the same parameters. So a clip goes to the board as its keys, not as frames: `python3 tools/clips/fetch.py` (with the Rive app open on the file) saves the keys of every `clip_*` timeline, with their cubic curves, into `tools/clips/keyframes.json`, and `python3 tools/clips/clips.py` samples them every 1/30 s into `main/clips.c` and `main/clips.h`. `eyes_play()` plays one, left for right if asked: for its length the clip sets the body's offset, squash, tilt and nearness (`Character`'s scale), the hands (relative to the body, in front of it where they overlap it), the face's offset and turn, and each eye's place, size, top lid (from its top corners) and bottom lid; moves, knocks, the mood and the tint go on underneath, and a gesture stops it. A clip that ends away from where it started (the firefly, the sad droop) leaves Yoru there; a jump of more than 300 between two frames (hide and seek) is held, not swept across. A clip costs about 11 KB of flash (3 s) and nothing to draw beyond what Yoru always draws. Left out on the board for now: the hands' rotation. Since 0.20.9 a clip also carries the prop, the glow and the sparkles (see Clips with effects), 34 numbers a frame; `eyes_play_fx()` gives their colour and glyph. To update a clip: key it in Rive, run the two scripts, build.
 
 Frames are still the way for a clip that draws what the rig can't (a prop, a squiggle, a hand-drawn effect):
 

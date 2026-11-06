@@ -344,6 +344,18 @@ typedef struct {
     bool valid;
 } eye_sprite_t;
 
+/* The clips' effects. Sparkles: screen pixels from the middle, per second. */
+#define FX_PARTS 24
+#define FX_RATE 36.0f      // sparkles a second at spark 1
+#define FX_PROP_HALF 34.0f // the prop card's half size, Rive units
+#define FX_DEFAULT_RGB 0xFFD45C
+
+typedef struct {
+    float x, y, vx, vy;
+    int16_t age, life; // ms
+    bool white;
+} fx_part_t;
+
 static struct {
     lv_obj_t *obj;
     lv_timer_t *timer;
@@ -435,6 +447,15 @@ static struct {
     int32_t clip_ms;
     bool clip_mirror; // played the other way round, left for right
     clip_frame_t cf;
+    /* The clip's effects: their colour, the prop's glyph (NULL: a glowing
+     * orb), the sparkles flying (they outlive the clip), how many are due,
+     * and the box they were last drawn in. */
+    uint32_t fx_rgb;
+    const char *fx_glyph;
+    fx_part_t fx[FX_PARTS];
+    float fx_due;
+    bool fx_shown;
+    lv_area_t fx_drawn;
 } s;
 
 static float lerp(float a, float b, float k)
@@ -500,6 +521,7 @@ static void clip_mirror(clip_frame_t *f)
     f->rx = -m.lx, f->ry = m.ly, f->rs = m.ls;
     f->lex = -m.rex, f->lew = m.rew, f->leh = m.reh, f->ltl = m.rtr, f->ltr = m.rtl, f->lbot = m.rbot;
     f->rex = -m.lex, f->rew = m.lew, f->reh = m.leh, f->rtl = m.ltr, f->rtr = m.ltl, f->rbot = m.lbot;
+    f->px = -m.px;
 }
 
 /* A clip that ends away from where it started (it pounced on something)
@@ -1286,6 +1308,179 @@ static void draw_firefly(lv_layer_t *layer)
     draw_disc(layer, x, y, 3.5f, lv_color_hex(0xFFFFE0), (lv_opa_t) (255 * flick));
 }
 
+/* ---- The clips' effects --------------------------------------------------- */
+
+static bool fx_on(void)
+{
+    return s.clip != NULL && (s.cf.glow > 0.01f || s.cf.ps > 0.02f);
+}
+
+static void fx_prop_at(float *x, float *y, float *half)
+{
+    const float d = s.body.dist;
+    *x = (float) s.body.bx + s.cf.px * K * d;
+    *y = (float) s.body.by + s.cf.py * K * d;
+    *half = FX_PROP_HALF * K * d * s.cf.ps;
+}
+
+/* Sparkles fly off the prop while it shows, off the top of the body if not,
+ * as fast as the clip's spark says; the old ones fall and fade. */
+static void fx_step(void)
+{
+    const float dt = (float) s.dt_ms / 1000.0f;
+    for (int i = 0; i < FX_PARTS; i++) {
+        fx_part_t *p = &s.fx[i];
+        if (p->age >= p->life) {
+            continue;
+        }
+        p->age = (int16_t) LV_MIN(p->age + s.dt_ms, INT16_MAX);
+        p->vy += 120 * dt;
+        p->x += p->vx * dt;
+        p->y += p->vy * dt;
+    }
+    if (s.clip == NULL || s.cf.spark <= 0.01f) {
+        s.fx_due = 0;
+        return;
+    }
+    s.fx_due += s.cf.spark * FX_RATE * dt;
+    while (s.fx_due >= 1) {
+        s.fx_due -= 1;
+        int slot = -1;
+        for (int i = 0; i < FX_PARTS && slot < 0; i++) {
+            if (s.fx[i].age >= s.fx[i].life) {
+                slot = i;
+            }
+        }
+        if (slot < 0) {
+            return;
+        }
+        float x, y, half;
+        fx_prop_at(&x, &y, &half);
+        const float a = frand() * 2 * (float) M_PI;
+        if (s.cf.ps <= 0.02f) {
+            // Off the upper half of the sphere.
+            const float up = -(float) M_PI * (0.1f + 0.8f * frand());
+            x = (float) s.body.bx + cosf(up) * (float) s.body.rx;
+            y = (float) s.body.by + sinf(up) * (float) s.body.ry;
+            half = 0;
+        }
+        const float v = 60 + 90 * frand();
+        s.fx[slot] = (fx_part_t) {x - CX + cosf(a) * half, y - CY + sinf(a) * half, cosf(a) * v, sinf(a) * v - 70, 0,
+                                  (int16_t) (450 + 450 * frand()), frand() < 0.35f};
+    }
+}
+
+/* The glow behind the body: the halo in the effects' colour. */
+static void draw_fx_glow(lv_layer_t *layer, const body_vis_t *v)
+{
+    if (s.clip == NULL || s.cf.glow <= 0.01f) {
+        return;
+    }
+    const float d = fminf(1, v->dist);
+    look_draw(layer, &look_get()->halo, v->bx, v->by, d, d, 0, (lv_opa_t) (150 * s.cf.glow), lv_color_hex(s.fx_rgb));
+}
+
+/* The same colour washed over the sphere, lighter than a tint. */
+static void draw_fx_wash(lv_layer_t *layer, const body_vis_t *v)
+{
+    if (s.clip == NULL || s.cf.glow <= 0.01f) {
+        return;
+    }
+    look_draw(layer, &look_get()->tint, v->bx, v->by, v->sx, v->sy, 0, (lv_opa_t) (90 * s.cf.glow),
+              lv_color_hex(s.fx_rgb));
+}
+
+/* The prop: a card in the colour with its glyph, or a glowing orb. */
+static void draw_fx_prop(lv_layer_t *layer)
+{
+    if (s.clip == NULL || s.cf.ps <= 0.02f) {
+        return;
+    }
+    float x, y, h;
+    fx_prop_at(&x, &y, &h);
+    const lv_color_t c = lv_color_hex(s.fx_rgb);
+    const lv_opa_t opa = (lv_opa_t) (255 * s.body.fog);
+    if (s.fx_glyph == NULL) {
+        draw_disc(layer, x, y, h * 1.5f, c, (lv_opa_t) (opa / 4));
+        draw_disc(layer, x, y, h, c, opa);
+        draw_disc(layer, x - h * 0.2f, y - h * 0.2f, h * 0.45f, lv_color_mix(lv_color_white(), c, 170), opa);
+        return;
+    }
+    draw_disc(layer, x, y, h * 1.45f, c, (lv_opa_t) (opa / 5));
+    fill_rect(layer, x - h, y - h, x + h, y + h, c, (int32_t) (h * 0.35f), opa);
+    fill_rect(layer, x - h * 0.8f, y - h * 0.85f, x + h * 0.8f, y - h * 0.55f, lv_color_mix(lv_color_white(), c, 90),
+              (int32_t) (h * 0.15f), (lv_opa_t) (opa / 3));
+    if (h > 10) {
+        lv_draw_label_dsc_t dsc;
+        lv_draw_label_dsc_init(&dsc);
+        dsc.font = h > 22 ? &lv_font_montserrat_28 : &lv_font_montserrat_20;
+        dsc.color = lv_color_white();
+        dsc.opa = opa;
+        dsc.align = LV_TEXT_ALIGN_CENTER;
+        dsc.text = s.fx_glyph;
+        const int32_t lh = lv_font_get_line_height(dsc.font);
+        const lv_area_t a = {(int32_t) (x - h), (int32_t) y - lh / 2, (int32_t) (x + h), (int32_t) y + lh / 2};
+        lv_draw_label(layer, &dsc, &a);
+    }
+}
+
+static void draw_fx_sparks(lv_layer_t *layer)
+{
+    for (int i = 0; i < FX_PARTS; i++) {
+        const fx_part_t *p = &s.fx[i];
+        if (p->age >= p->life) {
+            continue;
+        }
+        const float k = (float) p->age / p->life;
+        const lv_color_t c = p->white ? lv_color_white() : lv_color_hex(s.fx_rgb);
+        const float r = 4.5f * (1 - k * 0.6f);
+        const lv_opa_t opa = (lv_opa_t) (255 * (1 - k));
+        fill_triangle(layer, CX + p->x - r, CY + p->y, CX + p->x + r, CY + p->y, CX + p->x, CY + p->y - 2.2f * r, c, opa);
+        fill_triangle(layer, CX + p->x - r, CY + p->y, CX + p->x + r, CY + p->y, CX + p->x, CY + p->y + 2.2f * r, c, opa);
+        fill_triangle(layer, CX + p->x, CY + p->y - r, CX + p->x, CY + p->y + r, CX + p->x - 2.2f * r, CY + p->y, c, opa);
+        fill_triangle(layer, CX + p->x, CY + p->y - r, CX + p->x, CY + p->y + r, CX + p->x + 2.2f * r, CY + p->y, c, opa);
+    }
+}
+
+static lv_area_t area_union(lv_area_t a, lv_area_t b)
+{
+    return (lv_area_t) {LV_MIN(a.x1, b.x1), LV_MIN(a.y1, b.y1), LV_MAX(a.x2, b.x2), LV_MAX(a.y2, b.y2)};
+}
+
+/* One box round all of it: the glow, the prop and every sparkle. */
+static bool fx_area(lv_area_t *out)
+{
+    bool any = false;
+    lv_area_t a = {0};
+    const body_vis_t *v = &s.body;
+    if (fx_on()) {
+        const float d = fminf(1, v->dist);
+        a = look_area(&look_get()->halo, v->bx, v->by, d, d, false);
+        if (s.cf.ps > 0.02f) {
+            float x, y, h;
+            fx_prop_at(&x, &y, &h);
+            const lv_area_t p = box(x, y, h * 1.5f + 3, h * 1.5f + 3, h * 1.5f + 3, h * 1.5f + 3);
+            a = area_union(a, p);
+        }
+        any = true;
+    }
+    for (int i = 0; i < FX_PARTS; i++) {
+        const fx_part_t *p = &s.fx[i];
+        if (p->age >= p->life) {
+            continue;
+        }
+        const lv_area_t b = box(CX + p->x, CY + p->y, 12, 12, 12, 12);
+        if (any) {
+            a = area_union(a, b);
+        } else {
+            a = b;
+            any = true;
+        }
+    }
+    *out = a;
+    return any;
+}
+
 static void draw_cb(lv_event_t *e)
 {
     lv_layer_t *layer = lv_event_get_layer(e);
@@ -1297,6 +1492,7 @@ static void draw_cb(lv_event_t *e)
         const float d = fminf(1, v->dist);
         look_draw(layer, &lk->halo, v->bx, v->by, d, d, 0, (lv_opa_t) (90 * v->tint), rgb_color(v->tint_rgb));
     }
+    draw_fx_glow(layer, v);
     draw_countdown(layer, v);
     draw_charge(layer, v);
     draw_zap(layer);
@@ -1315,16 +1511,19 @@ static void draw_cb(lv_event_t *e)
     if (v->tint > 0.01f) {
         look_draw(layer, &lk->tint, v->bx, v->by, v->sx, v->sy, 0, (lv_opa_t) (217 * v->tint), rgb_color(v->tint_rgb));
     }
+    draw_fx_wash(layer, v);
     draw_badge(layer, v);
     for (int i = 0; i < 2; i++) {
         look_draw(layer, &s.eye_sp[i].sp, (int32_t) lroundf(s.eye[i].x), (int32_t) lroundf(s.eye[i].y), 1, 1, 0,
                   LV_OPA_COVER, black);
     }
     draw_parcel(layer);
+    draw_fx_prop(layer);
     if (s.hands_front) {
         draw_hands(layer);
     }
     draw_overlays(layer);
+    draw_fx_sparks(layer);
     draw_lowbat(layer);
     draw_firefly(layer);
 }
@@ -1619,6 +1818,7 @@ static void battery_step(void)
 static bool step(void)
 {
     const bool clipping = clip_step();
+    fx_step();
     const eye_shape_t *want = &s_moods[s.mood];
     eye_shape_t before = s.cur;
     float *c = (float *) &s.cur;
@@ -1858,6 +2058,23 @@ static void frame_cb(lv_timer_t *timer)
         s.carry_shown = parcel;
     }
 
+    // The clip's effects, as one box, and once more as they go.
+    lv_area_t fx_now;
+    const bool fx = fx_area(&fx_now);
+    if (fx || s.fx_shown) {
+        if (s.fx_shown && fx) {
+            invalidate_move(&s.fx_drawn, &fx_now);
+        } else if (fx) {
+            lv_obj_invalidate_area(s.obj, &fx_now);
+        } else {
+            lv_obj_invalidate_area(s.obj, &s.fx_drawn);
+        }
+        if (fx) {
+            s.fx_drawn = fx_now;
+        }
+        s.fx_shown = fx;
+    }
+
     // The bolt: its column while it runs, and once more as it goes.
     if (s.zapping || s.zap_shown) {
         lv_area_t now = zap_area();
@@ -2077,10 +2294,17 @@ eyes_status_t eyes_get_status(void)
 
 void eyes_play(clip_id_t clip, bool mirror)
 {
+    eyes_play_fx(clip, mirror, FX_DEFAULT_RGB, NULL);
+}
+
+void eyes_play_fx(clip_id_t clip, bool mirror, uint32_t rgb, const char *glyph)
+{
     const clip_t *c = clips_get(clip);
     if (c == NULL || c->n < 2) {
         return;
     }
+    s.fx_rgb = rgb;
+    s.fx_glyph = glyph;
     s.clip_mirror = mirror;
     // The clip has the hands from its first frame, and its own blinks.
     s.clutch = false;
@@ -2098,6 +2322,16 @@ void eyes_play(clip_id_t clip, bool mirror)
 bool eyes_playing(void)
 {
     return s.clip != NULL;
+}
+
+clip_id_t eyes_clip(void)
+{
+    for (int i = CLIP_NONE + 1; i < CLIP_COUNT && s.clip != NULL; i++) {
+        if (clips_get((clip_id_t) i) == s.clip) {
+            return (clip_id_t) i;
+        }
+    }
+    return CLIP_NONE;
 }
 
 void eyes_stop_clip(void)
