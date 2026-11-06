@@ -36,21 +36,21 @@ Offsets are screen pixels at the resting distance; the sphere's radius is 98 px 
 Production order: the first five are the showpieces, the rest follow.
 
 ### 1. `celebrate` — a build passed, a task is done
-Joy. 84 frames (2.8 s), once. Ends in the rest pose with happy eyes for the engine.
+Joy. 84 frames (2.8 s), once. Ends in the rest pose. **Animated** in `yoru.riv` (`clip_celebrate`).
 
 | Frames | Pose |
 |---|---|
-| 0–6 | Notices: eyes widen (scale 1.15), body rises 4 px. |
-| 6–12 | Anticipation: crouch, squash 1.12 / 0.90, body down 10 px, hands pop out low at its sides. |
-| 12–20 | Jump: up 60 px on an arc, stretch 0.90 / 1.12 while rising (ease-out), hands swing up over its head, right hand 2 frames ahead. |
-| 20–34 | Apex and spin: the eyes slide off the right edge of the sphere and come back from the left (a full turn, eyes leading), body back to 1 / 1, hold the hang 4 frames at the top. |
-| 34–40 | Fall (ease-in), stretch 0.94 / 1.06. |
-| 40–44 | Land: squash 1.15 / 0.87, hands drag up. |
-| 44–56 | Second smaller hop, 20 px, happy `^ ^` eyes. |
-| 56–72 | Two claps (8 frames each), body bobbing 3 px with each. |
-| 72–84 | Settle with overshoot 0.97 / 1.03 → 1 / 1, hands tuck (left first). |
+| 0–6 | Notices: eyes widen (1.10 wide, 1.18 tall), body rises 4 px. |
+| 6–12 | Anticipation: crouch, squash 1.12 / 0.90, body down 10 px, hands pop out low at its sides (110% then 100%). |
+| 12–21 | Jump: up 60 px on an arc, stretch 0.90 / 1.12 while rising (ease-out), hands swing up into a wide V over its head, the right hand 2 frames ahead. |
+| 21–35 | Apex and spin: the eyes slide off the right edge of the sphere (narrowing to 30%) and come back from the left with a small overshoot, a full turn with the eyes leading; body back to 1 / 1, hanging at the top; sparkles round its head. |
+| 35–41 | Fall (ease-in), stretch 0.94 / 1.06, hands lagging above. |
+| 41–45 | Land: squash 1.15 / 0.87, hands drag up, sparkles fade. |
+| 45–57 | Second smaller hop, 20 px; the eyes turn into happy `^ ^` arches. |
+| 57–73 | Hands up over its head for two claps (6 frames apart), the eyes looking up at them, the body bobbing 3 px with each. Over the head, not in front: hands in front of the face read as a muzzle. |
+| 73–84 | Settle with overshoot 0.97 / 1.03 → 1 / 1, eyes back to pills, hands tuck (left first). |
 
-Secondary: the green "done" tint blooms on the landing and fades. Ambient: a few sparks rising from the apex, gone by frame 50.
+Secondary: the player blooms the green "done" tint on the landing (it isn't in the clip, see Production). Ambient: the sparkles (the `Stars` node) from the apex to the landing.
 
 ### 2. `wake_stretch` — waking up
 Comfort. 90 frames (3 s), once. Starts with the eyes closed.
@@ -131,13 +131,15 @@ Huff: stretch 0.95 / 1.05, then a sharp turn away (the eyes slide to the far sid
 
 ## Production
 
-**In Rive** (`docs/mascot/yoru.riv`):
-- One timeline per clip, named `clip_<id>` (`clip_celebrate`), at 30 fps on the 466 × 466 artboard, black background.
+**In Rive** (`docs/mascot/yoru.riv`, the cloud file "Yoru mascot"):
+- One timeline per clip, named `clip_<id>` (`clip_celebrate`), on the 466 × 466 artboard, black background. The file's timelines run at 60 fps, so a storyboard frame is two timeline frames; the export takes every other frame.
+- The rig a clip keys: `Body` (position, rotation, squash as scale), `HandL` / `HandR` (position, rotation, scale: 0 is tucked at ±112, 40; out is ±168, 40), `Look` (the gaze: x/y, and x scale with opacity for a turn), `EyeShapeL` / `EyeShapeR` (scale), the bottom-middle vertex of each eye (`L_BM`, `R_BM`) and `Stars`. Happy `^ ^` eyes: eye scale 1.15 / 0.60, bottom-middle vertex at y −12 with radius 8.
+- Clips aren't in the state machine: they are timelines for export only, so they never fight the layers the app drives.
 - Key the poses first (pose to pose), check the timing with only the keys, then add the breakdowns and the overlap. Loops: the last frame equals the first.
 - Animate the body in a neutral grey with no tint and no badge: the player adds them, so a clip works in every state and with any body colour.
 - The Rive MCP lives in the Rive desktop app (macOS) and only runs while the app is open; with it open, the timelines can be built from this file.
 
-**Export:** a PNG sequence per clip, then a converter (to do, `tools/`) that crops every clip to the box its frames cover (even-aligned, as everything sent to the CO5300), scales it to the board's size, reduces it to a 256-colour palette and writes it to the `assets` partition. Format: GIF to begin with (LVGL 9.3 plays it); a format of our own if GIF turns out too slow next to WiFi and ESP-SR. With an indexed palette, recolouring Yoru or tinting it is rewriting the palette, not redrawing the frames.
+**Export:** the frames of each clip, rendered by a Rive runtime scrubbing its timeline (the editor's export gives only the `.riv`), then a converter (to do, `tools/`) that crops every clip to the box its frames cover (even-aligned, as everything sent to the CO5300), scales it to the board's size, reduces it to a 256-colour palette and writes it to the `assets` partition. Format: GIF to begin with (LVGL 9.3 plays it); a format of our own if GIF turns out too slow next to WiFi and ESP-SR. With an indexed palette, recolouring Yoru or tinting it is rewriting the palette, not redrawing the frames.
 
 **Budget:** the `assets` partition has about 3.9 MB. A clip cropped to the sphere and the hands' reach (about 300 × 300) should stay under 300 KB, so about a dozen fit; the 32 MB flash of some boards would hold many more.
 
