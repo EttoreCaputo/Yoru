@@ -433,6 +433,7 @@ static struct {
      * frame's pose, blended from its two nearest frames. */
     const clip_t *clip;
     int32_t clip_ms;
+    bool clip_mirror; // played the other way round, left for right
     clip_frame_t cf;
 } s;
 
@@ -486,23 +487,60 @@ static bool has_overlay(eyes_mood_t mood)
  * and ends in the rest pose, so the engine takes over unseen. */
 #define CLIP_FRAME_MS (1000.0f / 30.0f)
 
+/* The same frame the other way round: left for right. */
+static void clip_mirror(clip_frame_t *f)
+{
+    const clip_frame_t m = *f;
+    f->bx = -m.bx;
+    f->rot = -m.rot;
+    f->fx = -m.fx;
+    f->lx = -m.rx, f->ly = m.ry, f->ls = m.rs;
+    f->rx = -m.lx, f->ry = m.ly, f->rs = m.ls;
+    f->lex = -m.rex, f->lew = m.rew, f->leh = m.reh, f->ltl = m.rtr, f->ltr = m.rtl, f->lbot = m.rbot;
+    f->rex = -m.lex, f->rew = m.lew, f->reh = m.leh, f->rtl = m.ltr, f->rtr = m.ltl, f->rbot = m.lbot;
+}
+
+/* A clip that ends away from where it started (it pounced on something)
+ * leaves Yoru there: its last offset becomes where it is. */
+static void clip_end(void)
+{
+    clip_frame_t last = s.clip->frames[s.clip->n - 1];
+    if (s.clip_mirror) {
+        clip_mirror(&last);
+    }
+    s.mv.pos.x += last.bx * K * s.size;
+    s.mv.pos.y += last.by * K * s.size;
+    if (s.mv.follow) {
+        s.mv.to = s.mv.pos;
+    }
+    s.clip = NULL;
+}
+
 static bool clip_step(void)
 {
     if (s.clip == NULL) {
         return false;
     }
     s.clip_ms += s.dt_ms;
-    const float at = (float) s.clip_ms / CLIP_FRAME_MS;
-    const int i = (int) at;
-    if (i >= s.clip->n - 1) {
-        s.clip = NULL;
-        return false;
+    float at = (float) s.clip_ms / CLIP_FRAME_MS;
+    if (at >= (float) (s.clip->n - 1)) {
+        if (!s.clip->loop) {
+            clip_end();
+            return false;
+        }
+        // A loop's last frame is its first again.
+        s.clip_ms %= (int32_t) ((float) (s.clip->n - 1) * CLIP_FRAME_MS);
+        at = (float) s.clip_ms / CLIP_FRAME_MS;
     }
+    const int i = LV_MIN((int) at, s.clip->n - 2);
     const float k = at - (float) i;
     const float *a = (const float *) &s.clip->frames[i], *b = (const float *) &s.clip->frames[i + 1];
     float *o = (float *) &s.cf;
     for (size_t j = 0; j < sizeof(clip_frame_t) / sizeof(float); j++) {
         o[j] = lerp(a[j], b[j], k);
+    }
+    if (s.clip_mirror) {
+        clip_mirror(&s.cf);
     }
     return true;
 }
@@ -542,7 +580,7 @@ static void hands_step(void)
     if (s.clip != NULL) {
         s.hand[0] = (hand_pose_t) {s.cf.lx, s.cf.ly, s.cf.ls};
         s.hand[1] = (hand_pose_t) {s.cf.rx, s.cf.ry, s.cf.rs};
-        s.hands_front = false;
+        s.hands_front = s.cf.front > 0.5f;
         return;
     }
     const gesture_t *g = &s_gestures[s.gesture];
@@ -611,6 +649,9 @@ static void body_layout(body_vis_t *v)
     // Perspective: the size and the offset from the middle shrink together
     // with the distance, so going away also draws it towards the middle.
     v->dist = s.size / zf;
+    if (s.clip != NULL) {
+        v->dist *= s.cf.near; // the clip comes nearer or goes back
+    }
     const float near1 = fminf(1, v->dist);
     // Breathing: a slow bob of a few pixels. Not asleep (far away and still),
     // not with the tint on (the halo covers the screen), not under the menu.
@@ -654,23 +695,28 @@ static void body_layout(body_vis_t *v)
     }
 }
 
-/* A clip draws the eyes as the Rive file does: the neutral pills, scaled,
- * with the face where the clip puts it and as narrow as its turn. */
+/* A clip draws the eyes as the Rive file does: the neutral pills, each
+ * scaled and lidded on its own, on a face as far off and as narrow as the
+ * clip says, turned with the body's tilt. */
 static void clip_eye_layout(void)
 {
     const eye_shape_t *n = &s_moods[EYES_MOOD_NEUTRAL];
-    const float w = n->w * K * s.cf.turn * s.cf.ew * s.body.sx;
-    const float h = n->h * K * s.cf.eh * s.body.sy;
+    const float a = s.cf.rot * (float) M_PI / 180.0f;
+    const float ca = cosf(a), sa = sinf(a);
     for (int i = 0; i < 2; i++) {
-        const int side = i == 0 ? -1 : 1;
+        // ex, ew, eh, top lid left and right, bottom lid
+        const float *p = i == 0 ? &s.cf.lex : &s.cf.rex;
         eye_box_t *e = &s.eye[i];
-        e->w = w;
-        e->h = h;
-        e->x = (float) s.body.bx + ((float) side * EYE_SPACING * s.cf.turn + s.cf.fx * K) * s.body.sx;
-        e->y = (float) s.body.by + (FACE_Y + s.cf.fy * K) * s.body.sy;
+        e->w = n->w * K * s.cf.turn * p[1] * s.body.sx;
+        e->h = n->h * K * p[2] * s.body.sy;
+        const float dx = (p[0] * s.cf.turn + s.cf.fx) * K * s.body.sx;
+        const float dy = (FACE_Y + s.cf.fy * K) * s.body.sy;
+        e->x = (float) s.body.bx + dx * ca - dy * sa;
+        e->y = (float) s.body.by + dx * sa + dy * ca;
         const float hh = e->h < 2 ? 2 : e->h;
-        e->top_l = e->top_r = -hh / 2;
-        e->bottom = s.cf.bottom;
+        e->top_l = -hh / 2 + p[3] * hh;
+        e->top_r = -hh / 2 + p[4] * hh;
+        e->bottom = p[5];
         e->spiral = 0;
         e->phase = 0;
     }
@@ -2026,12 +2072,13 @@ eyes_status_t eyes_get_status(void)
     return s.status;
 }
 
-void eyes_play(clip_id_t clip)
+void eyes_play(clip_id_t clip, bool mirror)
 {
     const clip_t *c = clips_get(clip);
     if (c == NULL || c->n < 2) {
         return;
     }
+    s.clip_mirror = mirror;
     // The clip has the hands from its first frame, and its own blinks.
     s.clutch = false;
     s.gesture = EYES_GESTURE_NONE;
@@ -2040,11 +2087,21 @@ void eyes_play(clip_id_t clip)
     s.clip = c;
     s.clip_ms = 0;
     s.cf = c->frames[0];
+    if (mirror) {
+        clip_mirror(&s.cf);
+    }
 }
 
 bool eyes_playing(void)
 {
     return s.clip != NULL;
+}
+
+void eyes_stop_clip(void)
+{
+    if (s.clip != NULL) {
+        clip_end();
+    }
 }
 
 void eyes_gesture(eyes_gesture_t gesture)

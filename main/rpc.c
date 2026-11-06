@@ -11,6 +11,7 @@
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "eyes.h"
 #include "friends.h"
 #include "life.h"
 #include "link.h"
@@ -317,6 +318,22 @@ void rpc_handle(uint8_t *payload, size_t len)
             cJSON_AddBoolToObject(result, "on", friends_enabled());
             friends_bump_stats(result);
             cJSON_AddItemToObject(result, "friends", friends_status());
+        }
+    } else if (strcmp(name, "debug/clip") == 0) {
+        // Play one of the clips keyed in the Rive file (docs/animations.md),
+        // to see it on the board.
+        const cJSON *clip = cJSON_GetObjectItemCaseSensitive(params, "name");
+        const cJSON *mirror = cJSON_GetObjectItemCaseSensitive(params, "mirror");
+        const clip_id_t id = cJSON_IsString(clip) ? clips_find(clip->valuestring) : CLIP_NONE;
+        if (id == CLIP_NONE || (mirror != NULL && !cJSON_IsBool(mirror))) {
+            code = RPC_INVALID_PARAMS;
+            message = "expected {\"name\": a clip in docs/animations.md, \"mirror\"?: bool}";
+        } else {
+            lvgl_port_lock();
+            eyes_play(id, cJSON_IsTrue(mirror));
+            lvgl_port_unlock();
+            result = cJSON_CreateObject();
+            cJSON_AddStringToObject(result, "playing", clip->valuestring);
         }
     } else if (strcmp(name, "debug/life") == 0) {
         // Push Yoru's own life about (tests): a state, an act, a feeling,

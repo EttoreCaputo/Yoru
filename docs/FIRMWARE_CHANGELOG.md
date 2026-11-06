@@ -1,5 +1,18 @@
 # Firmware changelog
 
+## 0.20.7
+
+- **Eight more hand-made animations.** All of Yoru's first animation library is now keyed by hand in Rive and plays on the board:
+  - **a sneeze** ("ah… ah… CHOO", knocked back, a dazed blink and a sheepish look away) when he sneezes on his own;
+  - **gulping a firefly**: he stares, wiggles, pounces, catches it in both hands, peeks at it, swallows it and hiccups happily;
+  - **a greeting** when you come back: he notices you, hops towards you and waves with happy eyes;
+  - **a yawn** with a hand over his mouth, before a nap, when he's tired, and for "yawn";
+  - **a fright**: a jump with huge eyes, a tremble and a blink, for "surprised";
+  - **knocking on the glass** with a hopeful look when something waits for you;
+  - **thinking** with a hand under his chin and his eyes up, for "thinking";
+  - **a sulk**: he turns away to his edge with his hands crossed, glances back, snaps away with a "pfft" and lets it go with a sigh.
+- To see any of them now, from the Yoru Hub folder: `cargo run -p yoru-core --example rpc -- debug/clip '{"name":"sneeze"}'` (or firefly_gulp, greet_back, yawn, startle, knock_glass, think, sulk_turn, celebrate, wake_stretch; add `"mirror":true` for the other way round).
+
 ## 0.20.6
 
 - **Yoru's first hand-made animations.** Two moments are now animated by hand in Rive, pose by pose, and played on the board: **a celebration** (he crouches, jumps with his hands up, spins round, lands with a squash, hops again with happy eyes and claps over his head) when the battery is full or the computer says "proud", and **a big stretch** (sleepy eyes, a crouch, a long stretch with his hands far out and a tremble, then a bounce back and a blink) in the morning greeting, when he stretches on his own and when the computer says "stretch". To see them now: `yoru call react --name proud` or `--name stretch`.

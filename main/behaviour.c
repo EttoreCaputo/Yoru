@@ -113,9 +113,11 @@ typedef struct {
 static const struct {
     const char *scene;
     clip_id_t clip;
+    bool either_side; // mirrored half the time
 } SCENE_CLIPS[] = {
-    {"proud", CLIP_CELEBRATE},
-    {"stretch", CLIP_WAKE_STRETCH},
+    {"proud", CLIP_CELEBRATE, false},   {"stretch", CLIP_WAKE_STRETCH, false},
+    {"yawn", CLIP_YAWN, false},         {"surprised", CLIP_STARTLE, true},
+    {"thinking", CLIP_THINK, false},
 };
 
 #define G(name) EYES_GESTURE_##name
@@ -133,12 +135,12 @@ static const scene_t SCENES[] = {
     {"dance", EYES_MOOD_HAPPY, 3000, FX_POKE, G(CLAP), SOUND_BEAT},
     {"love", EYES_MOOD_LOVING, 3500, FX_NONE, G(NONE), SOUND_AWW},
     {"curious", EYES_MOOD_CURIOUS, 2500, FX_NONE, G(NONE), SOUND_HMM},
-    {"thinking", EYES_MOOD_THINKING, 3000, FX_NONE, G(THINK), SOUND_COUNT},
+    {"thinking", EYES_MOOD_THINKING, 3200, FX_NONE, G(NONE), SOUND_COUNT},
     {"focus", EYES_MOOD_THINKING, 3000, FX_BLINK, G(NONE), SOUND_SCAN},
     {"angry", EYES_MOOD_GRUMPY, 2500, FX_POKE, G(NONE), SOUND_GRUMBLE},
     {"hot", EYES_MOOD_HOT, 4000, FX_NONE, G(NONE), SOUND_PANT},
     {"sleepy", EYES_MOOD_SLEEPY, 2500, FX_NONE, G(NONE), SOUND_COUNT},
-    {"yawn", EYES_MOOD_SLEEPY, 2000, FX_NONE, G(STRETCH), SOUND_YAWN},
+    {"yawn", EYES_MOOD_SLEEPY, 2000, FX_NONE, G(NONE), SOUND_YAWN},
     {"tired", EYES_MOOD_SLEEPY, 2500, FX_BLINK, G(NONE), SOUND_DRAIN},
     // A sigh: squash, then a slow, heavy-lidded moment.
     {"sigh", EYES_MOOD_SLEEPY, 1200, FX_POKE, G(NONE), SOUND_SIGH},
@@ -326,7 +328,7 @@ static bool play(const char *name)
         }
         for (size_t j = 0; j < sizeof(SCENE_CLIPS) / sizeof(SCENE_CLIPS[0]); j++) {
             if (strcmp(name, SCENE_CLIPS[j].scene) == 0) {
-                eyes_play(SCENE_CLIPS[j].clip);
+                eyes_play(SCENE_CLIPS[j].clip, SCENE_CLIPS[j].either_side && (esp_random() & 1));
             }
         }
         if (sc->ms > 0) {

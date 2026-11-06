@@ -172,10 +172,12 @@ void eyes_gesture(eyes_gesture_t gesture);
 
 /** Play a clip keyed in the Rive file (docs/animations.md): for its length
  * it moves the body, the hands and the eyes itself, then the engine takes
- * over from the rest pose it ends in. Moves, knocks and the mood go on
- * underneath; a gesture stops it. */
-void eyes_play(clip_id_t clip);
+ * over from the rest pose it ends in (where it ends, if it moved away).
+ * `mirror` plays it left for right. Moves, knocks and the mood go on
+ * underneath; a gesture stops it. A `_loop` clip plays until stopped. */
+void eyes_play(clip_id_t clip, bool mirror);
 bool eyes_playing(void);
+void eyes_stop_clip(void);
 const char *eyes_gesture_name(eyes_gesture_t gesture);
 
 /** A finger held on the screen at (x, y): both hands reach out and hold it,

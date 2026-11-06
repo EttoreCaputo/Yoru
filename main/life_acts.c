@@ -95,7 +95,7 @@ static bool waiting(void)
 
 static bool busy(void)
 {
-    return waiting() || eyes_moving();
+    return waiting() || eyes_moving() || eyes_playing();
 }
 
 static void next(int phase)
@@ -197,7 +197,7 @@ static bool tilt(void)
 static bool stretch(void)
 {
     if (A.phase == 0) {
-        eyes_play(CLIP_WAKE_STRETCH);
+        eyes_play(CLIP_WAKE_STRETCH, false);
         if (mood(EMO_ENERGY) < 0) {
             life_sound(SOUND_YAWN);
         }
@@ -212,8 +212,9 @@ static bool sneeze(void)
 {
     switch (A.phase) {
     case 0:
-        eyes_set_mood(EYES_MOOD_SURPRISED);
-        wait_ms(700);
+        // "Ah... ah..." is the clip's; the sound comes with its "choo".
+        eyes_play(CLIP_SNEEZE, coin() < 0);
+        wait_ms(1100);
         next(1);
         return false;
     case 1:
@@ -221,17 +222,9 @@ static bool sneeze(void)
             return false;
         }
         life_sound(SOUND_SNEEZE);
-        eyes_poke();
-        wait_ms(900);
-        next(2);
-        return false;
-    case 2:
-        if (waiting()) {
-            return false;
-        }
         eyes_set_mood(EYES_MOOD_HAPPY);
-        wait_ms(1200);
-        next(3);
+        wait_ms(1100);
+        next(2);
         return false;
     default:
         return !waiting();
@@ -356,6 +349,13 @@ static void fly_at(uint32_t ms, float *x, float *y)
 
 /* A firefly, the one thing it knows from home: it drifts in, Yoru follows
  * it with its eyes and its whole body, and pounces. Sometimes it gets away. */
+/* The firefly_gulp clip pounces this far (screen pixels, right and up) and
+ * closes its hands on the firefly this far in; it lasts the rest. */
+#define GULP_DX 110
+#define GULP_DY 40
+#define GULP_CATCH_MS 900
+#define GULP_REST_MS 2200
+
 static bool firefly(void)
 {
     float fx, fy;
@@ -395,7 +395,9 @@ static bool firefly(void)
         }
         if ((int32_t) ms >= A.n) {
             if (A.caught) {
-                eyes_move_to(fx, fy, 1, 380, EYES_PATH_DART);
+                // Beside it, where the clip's pounce lands on it.
+                A.side = fx < 0 ? -1 : 1;
+                eyes_move_to(fx - (float) A.side * GULP_DX, fy + GULP_DY, 1, 380, EYES_PATH_DART);
                 next(2);
             } else {
                 // Away, out of the screen.
@@ -409,12 +411,20 @@ static bool firefly(void)
         if (busy()) {
             return false;
         }
+        eyes_play(CLIP_FIREFLY_GULP, A.side < 0);
+        wait_ms(GULP_CATCH_MS);
+        next(7);
+        return false;
+    case 7:
+        // The hands close on it.
+        if (waiting()) {
+            return false;
+        }
         eyes_firefly(false, 0, 0);
         eyes_set_mood(EYES_MOOD_DELIGHTED);
-        eyes_gesture(EYES_GESTURE_CLAP);
         life_sound(SOUND_GIGGLE);
         mood_feel(LIFE_FEEL_FUN);
-        wait_ms(1500);
+        wait_ms(GULP_REST_MS);
         next(3);
         return false;
     case 3:
@@ -622,9 +632,9 @@ static bool yawn(void)
 {
     if (A.phase == 0) {
         eyes_set_mood(EYES_MOOD_SLEEPY);
-        eyes_gesture(EYES_GESTURE_STRETCH);
+        eyes_play(CLIP_YAWN, false);
         life_sound(SOUND_YAWN);
-        wait_ms(2300);
+        wait_ms(2100);
         next(1);
         return false;
     }
@@ -669,7 +679,11 @@ static bool nod(void)
     }
 }
 
-/* Sulking: off to one side, turned away; a glance back now and then. */
+/* Sulking: off to one side, turned away; a glance back now and then. The
+ * sulk_turn clip snaps away again this far in, and lasts the rest. */
+#define SULK_PFFT_MS 2500
+#define SULK_REST_MS 1500
+
 static bool sulk(void)
 {
     switch (A.phase) {
@@ -685,26 +699,18 @@ static bool sulk(void)
         if (busy()) {
             return false;
         }
-        wait_ms((uint32_t) life_frange(4000, 7000));
+        // Turned away towards its edge, a glance back, "pfft", away again.
+        eyes_play(CLIP_SULK_TURN, A.side < 0);
+        wait_ms(SULK_PFFT_MS);
         next(2);
         return false;
     case 2:
         if (waiting()) {
             return false;
         }
-        // Is anybody coming? A quick glance back.
-        eyes_look_at(-(float) A.side * 0.7f, 0);
-        wait_ms(900);
-        next(3);
-        return false;
-    case 3:
-        if (waiting()) {
-            return false;
-        }
         life_sound(SOUND_PFFT);
-        eyes_look_at((float) A.side, 0.2f);
-        wait_ms(1500);
-        next(4);
+        wait_ms(SULK_REST_MS);
+        next(3);
         return false;
     default:
         return !waiting();

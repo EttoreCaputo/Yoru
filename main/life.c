@@ -98,7 +98,7 @@ static bool waiting(void)
 
 static bool busy(void)
 {
-    return waiting() || eyes_moving();
+    return waiting() || eyes_moving() || eyes_playing();
 }
 
 static void next(int phase)
@@ -143,12 +143,8 @@ static void call(void)
             return;
         }
         eyes_look_at(0, -0.12f);
-        // Knock, knock: two taps on the glass, then pointing at what
-        // waits for you.
-        const eyes_pos_t taps[] = {life_at(0, 22, 0.54f), life_at(0, 22, CALL_Z), life_at(0, 22, 0.54f),
-                                   life_at(0, 22, CALL_Z)};
-        eyes_move(taps, 4, 700, EYES_PATH_GLIDE);
-        eyes_gesture(EYES_GESTURE_POINT);
+        // Knock, knock on the glass, a hopeful look, a little wave.
+        eyes_play(CLIP_KNOCK_GLASS, false);
         playback_sound(SOUND_HMM);
         wait_ms(CALL_WAIT_MS + (uint32_t) life_frange(0, 4000));
         next(2);
@@ -180,7 +176,7 @@ static life_want_t nap(void)
     switch (L.phase) {
     case 0:
         eyes_set_mood(EYES_MOOD_SLEEPY);
-        eyes_gesture(EYES_GESTURE_STRETCH);
+        eyes_play(CLIP_YAWN, false);
         life_sound(SOUND_YAWN);
         wait_ms(2200);
         next(1);
@@ -244,7 +240,7 @@ static void greet(void)
         eyes_look_at(0, 0);
         eyes_move_to(0, 12 * 0.78f, 0.78f, 900, EYES_PATH_GLIDE);
         if (L.morning) {
-            eyes_play(CLIP_WAKE_STRETCH);
+            eyes_play(CLIP_WAKE_STRETCH, false);
             life_sound(SOUND_YAWN);
             wait_ms(3000);
         }
@@ -254,10 +250,10 @@ static void greet(void)
         if (busy()) {
             return;
         }
-        eyes_gesture(EYES_GESTURE_WAVE);
+        eyes_play(CLIP_GREET_BACK, false);
         playback_sound(SOUND_HELLO);
         mood_feel(LIFE_FEEL_GREETED);
-        wait_ms(1900);
+        wait_ms(2400);
         next(2);
         break;
     case 2:

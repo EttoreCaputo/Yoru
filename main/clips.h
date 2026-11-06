@@ -4,24 +4,35 @@
  * clip_* timelines of docs/mascot/yoru.riv). Don't edit: key the clip in
  * Rive, fetch its keys and run the script again. */
 
+#include <stdbool.h>
 #include <stdint.h>
 
-/* One frame of a clip, every 1/30 s, in the Rive file's units: the body's
- * offset and scale, the hands from the body's centre (scale 0 tucked), the
- * eyes' scale and bottom lid (1: ^ ^), and the face's offset and width (a
- * turn narrows it). */
+/* One frame of a clip, every 1/30 s, in the Rive file's units. The body:
+ * offset, scale, tilt (degrees) and nearness (Character's scale: 2 twice
+ * as near). The hands from the body's centre (scale 0 tucked), and whether
+ * they are in front of it. The face's offset and width (a turn narrows it).
+ * Each eye (l, r): its x on the face, its scale, the top lid's cut at its
+ * left and right edge (0 none, 1 shut) and the bottom lid (1: ^ ^). */
 typedef struct {
-    float bx, by, bsx, bsy;
-    float lx, ly, ls;
-    float rx, ry, rs;
-    float ew, eh, bottom;
+    float bx, by, bsx, bsy, rot, near;
+    float lx, ly, ls, rx, ry, rs, front;
     float fx, fy, turn;
+    float lex, lew, leh, ltl, ltr, lbot;
+    float rex, rew, reh, rtl, rtr, rbot;
 } clip_frame_t;
 
 typedef enum {
     CLIP_NONE,
     CLIP_CELEBRATE,
+    CLIP_FIREFLY_GULP,
+    CLIP_GREET_BACK,
+    CLIP_KNOCK_GLASS,
+    CLIP_SNEEZE,
+    CLIP_STARTLE,
+    CLIP_SULK_TURN,
+    CLIP_THINK,
     CLIP_WAKE_STRETCH,
+    CLIP_YAWN,
     CLIP_COUNT,
 } clip_id_t;
 
@@ -29,7 +40,10 @@ typedef struct {
     const char *name;
     const clip_frame_t *frames;
     uint16_t n;
+    bool loop; // plays until stopped
 } clip_t;
 
 /** The clip, or NULL for CLIP_NONE or an unknown one. */
 const clip_t *clips_get(clip_id_t id);
+/** The clip called `name` ("sneeze"), or CLIP_NONE. */
+clip_id_t clips_find(const char *name);
