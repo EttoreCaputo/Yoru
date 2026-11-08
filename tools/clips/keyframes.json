@@ -51157,6 +51157,8431 @@
 "interpolation": "hold"
 }
 ],
+"meeting_done": [
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 30,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 40,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 120,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 18,
+"value": 108.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 34,
+"value": 94.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 50,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 56,
+"value": 106.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 66,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 180,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 18,
+"value": 92.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 34,
+"value": 108.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 50,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 56,
+"value": 95.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 66,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 180,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 18,
+"value": 6.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 34,
+"value": -16.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 50,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 56,
+"value": 3.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 64,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "r",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "r",
+"frame": 36,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "r",
+"frame": 48,
+"value": -15.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "r",
+"frame": 58,
+"value": 15.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "r",
+"frame": 68,
+"value": -15.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "r",
+"frame": 78,
+"value": 15.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "r",
+"frame": 88,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "r",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 16,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 36,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 140,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 166,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 16,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 36,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 140,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 166,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 0,
+"value": -112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 16,
+"value": -112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 36,
+"value": -110.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 140,
+"value": -110.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 166,
+"value": -112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 180,
+"value": -112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 0,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 16,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 36,
+"value": -50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 48,
+"value": -42.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 58,
+"value": -56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 68,
+"value": -42.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 78,
+"value": -56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 88,
+"value": -42.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 98,
+"value": -56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 108,
+"value": -42.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 118,
+"value": -56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 128,
+"value": -42.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 138,
+"value": -56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 140,
+"value": -50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 166,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 180,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "r",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "r",
+"frame": 36,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "r",
+"frame": 48,
+"value": 15.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "r",
+"frame": 58,
+"value": -15.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "r",
+"frame": 68,
+"value": 15.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "r",
+"frame": 78,
+"value": -15.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "r",
+"frame": 88,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "r",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 16,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 36,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 140,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 166,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 16,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 36,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 140,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 166,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 0,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 16,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 36,
+"value": 110.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 140,
+"value": 110.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 166,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 180,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 0,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 16,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 36,
+"value": -50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 48,
+"value": -56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 58,
+"value": -42.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 68,
+"value": -56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 78,
+"value": -42.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 88,
+"value": -56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 98,
+"value": -42.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 108,
+"value": -56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 118,
+"value": -42.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 128,
+"value": -56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 138,
+"value": -42.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 140,
+"value": -50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 166,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 180,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 20,
+"value": 10.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 36,
+"value": -34.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 80,
+"value": -34.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 92,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 36,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 40,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 90,
+"value": 55.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 140,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 30,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 38,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 140,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 152,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 180,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 30,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 38,
+"value": 60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 140,
+"value": 60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 152,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 180,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "radius",
+"frame": 30,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "radius",
+"frame": 38,
+"value": 8.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "radius",
+"frame": 140,
+"value": 8.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "radius",
+"frame": 152,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "y",
+"frame": 30,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "y",
+"frame": 38,
+"value": -12.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "y",
+"frame": 140,
+"value": -12.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "y",
+"frame": 152,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 30,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 38,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 140,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 152,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 180,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 30,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 38,
+"value": 60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 140,
+"value": 60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 152,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 180,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "radius",
+"frame": 30,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "radius",
+"frame": 38,
+"value": 8.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "radius",
+"frame": 140,
+"value": 8.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "radius",
+"frame": 152,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "y",
+"frame": 30,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "y",
+"frame": 38,
+"value": -12.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "y",
+"frame": 140,
+"value": -12.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "y",
+"frame": 152,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 18,
+"value": 60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 40,
+"value": 135.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 48,
+"value": 135.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 56,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 64,
+"value": 135.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 140,
+"value": 135.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 170,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 18,
+"value": 60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 40,
+"value": 135.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 140,
+"value": 135.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 170,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "x",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "x",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 0,
+"value": 96.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 18,
+"value": 96.0,
+"interpolation": "cubic",
+"cubic": [
+0.2,
+0.55,
+0.45,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 40,
+"value": -120.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 80,
+"value": -112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 110,
+"value": -120.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 140,
+"value": -112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 170,
+"value": -60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 180,
+"value": -60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+}
+],
+"meeting_listen": [
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 30,
+"value": 22.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 140,
+"value": 22.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 24,
+"value": 9.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 140,
+"value": 9.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 170,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 60,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 72,
+"value": 6.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 84,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 100,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 112,
+"value": 6.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 124,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 24,
+"value": 90.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 150,
+"value": 90.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 172,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 24,
+"value": 90.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 150,
+"value": 90.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 172,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 0,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 24,
+"value": 150.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 150,
+"value": 150.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 172,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 180,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 0,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 24,
+"value": -30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 150,
+"value": -30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 172,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 180,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 24,
+"value": -24.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 128,
+"value": -24.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 140,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 24,
+"value": -6.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 128,
+"value": -6.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 140,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 180,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 180,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 24,
+"value": 82.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 94,
+"value": 82.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 98,
+"value": 8.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 102,
+"value": 82.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 128,
+"value": 82.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 138,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 180,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 180,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 24,
+"value": 82.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 94,
+"value": 82.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 98,
+"value": 8.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 102,
+"value": 82.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 128,
+"value": 82.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 138,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 180,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+}
+],
+"meeting_squeeze_loop": [
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 0,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 32,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 44,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 92,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 104,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 120,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 22,
+"value": 106.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 32,
+"value": 106.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 42,
+"value": 96.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 52,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 60,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 82,
+"value": 106.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 92,
+"value": 106.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 102,
+"value": 96.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 112,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sx",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 22,
+"value": 94.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 32,
+"value": 94.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 42,
+"value": 104.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 52,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 60,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 82,
+"value": 94.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 92,
+"value": 94.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 102,
+"value": 104.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 112,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "sy",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 22,
+"value": 3.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 32,
+"value": 3.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 42,
+"value": -3.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 52,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 82,
+"value": 3.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 92,
+"value": 3.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 102,
+"value": -3.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 112,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 120,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 0,
+"value": -80.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 22,
+"value": -40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 32,
+"value": -40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 42,
+"value": -88.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 52,
+"value": -80.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 60,
+"value": -80.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 82,
+"value": -40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 92,
+"value": -40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 102,
+"value": -88.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 112,
+"value": -80.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 120,
+"value": -80.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 0,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 120,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 0,
+"value": 80.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 22,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 32,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 42,
+"value": 88.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 52,
+"value": 80.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 60,
+"value": 80.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 82,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 92,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 102,
+"value": 88.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 112,
+"value": 80.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 120,
+"value": 80.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 0,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 120,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 120,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 0,
+"value": 14.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 120,
+"value": 14.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 40,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 44,
+"value": 50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 58,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 100,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 104,
+"value": 50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 118,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 120,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 18,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 22,
+"value": 50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 32,
+"value": 50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 38,
+"value": 105.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 52,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 60,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 78,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 82,
+"value": 50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 92,
+"value": 50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 98,
+"value": 105.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 112,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 18,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 22,
+"value": 50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 32,
+"value": 50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 38,
+"value": 105.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 52,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 60,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 78,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 82,
+"value": 50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 92,
+"value": 50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 98,
+"value": 105.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 112,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 0,
+"value": 118.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 22,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 32,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 42,
+"value": 128.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 52,
+"value": 118.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 60,
+"value": 118.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 82,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 92,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 102,
+"value": 128.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 112,
+"value": 118.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 120,
+"value": 118.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 0,
+"value": 118.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 22,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 32,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 42,
+"value": 128.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 52,
+"value": 118.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 60,
+"value": 118.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 82,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 92,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 102,
+"value": 128.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 112,
+"value": 118.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 120,
+"value": 118.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "x",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "x",
+"frame": 120,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 0,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 120,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+}
+],
+"meeting_start": [
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 40,
+"value": 25.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 52,
+"value": 25.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 56,
+"value": 90.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 80,
+"value": 35.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 120,
+"value": 35.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 80,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 88,
+"value": -4.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 96,
+"value": 4.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 104,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "r",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 52,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 56,
+"value": 4.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 62,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 72,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 80,
+"value": 7.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 88,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 96,
+"value": 6.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 104,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 18,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 110,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 128,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 18,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 110,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 128,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 0,
+"value": -112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 18,
+"value": -60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 40,
+"value": -50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 100,
+"value": -50.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 128,
+"value": -112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 150,
+"value": -112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 0,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 18,
+"value": 96.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 40,
+"value": 72.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 100,
+"value": 72.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 128,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 150,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 28,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 42,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 110,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 128,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 28,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 42,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 110,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 128,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 0,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 28,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 42,
+"value": 62.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 50,
+"value": 62.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 54,
+"value": 14.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 60,
+"value": 62.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 100,
+"value": 62.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 128,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 150,
+"value": 112.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 0,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 28,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 42,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 50,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 54,
+"value": 56.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 60,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 100,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 128,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 150,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 12,
+"value": -20.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 36,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 12,
+"value": 20.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 36,
+"value": 24.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 62,
+"value": 24.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 70,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 104,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 118,
+"value": -36.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 134,
+"value": -36.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 52,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 56,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 76,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 118,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 126,
+"value": 40.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 140,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 66,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 74,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 98,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 110,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sx",
+"frame": 150,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 66,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 74,
+"value": 60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 98,
+"value": 60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 110,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-79",
+"property": "sy",
+"frame": 150,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "radius",
+"frame": 66,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "radius",
+"frame": 74,
+"value": 8.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "radius",
+"frame": 98,
+"value": 8.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "radius",
+"frame": 110,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "y",
+"frame": 66,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "y",
+"frame": 74,
+"value": -12.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "y",
+"frame": 98,
+"value": -12.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-84",
+"property": "y",
+"frame": 110,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 66,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 74,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 98,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 110,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sx",
+"frame": 150,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 66,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 74,
+"value": 60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 98,
+"value": 60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 110,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-88",
+"property": "sy",
+"frame": 150,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "radius",
+"frame": 66,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "radius",
+"frame": 74,
+"value": 8.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "radius",
+"frame": 98,
+"value": 8.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "radius",
+"frame": 110,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "y",
+"frame": 66,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "y",
+"frame": 74,
+"value": -12.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "y",
+"frame": 98,
+"value": -12.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-93",
+"property": "y",
+"frame": 110,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 18,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 40,
+"value": 125.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 52,
+"value": 125.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 54,
+"value": 110.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 60,
+"value": 132.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 68,
+"value": 125.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 108,
+"value": 125.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 130,
+"value": 35.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 136,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 18,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 40,
+"value": 125.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 52,
+"value": 125.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 54,
+"value": 110.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 60,
+"value": 132.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 68,
+"value": 125.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 108,
+"value": 125.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 130,
+"value": 35.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 136,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "x",
+"frame": 0,
+"value": -60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "x",
+"frame": 18,
+"value": -60.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "x",
+"frame": 40,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "x",
+"frame": 150,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 0,
+"value": 96.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 18,
+"value": 92.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 40,
+"value": 64.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 100,
+"value": 64.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 108,
+"value": 70.0,
+"interpolation": "cubic",
+"cubic": [
+0.2,
+0.55,
+0.45,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 136,
+"value": -230.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 150,
+"value": -230.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+}
+],
+"meeting_write_loop": [
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 0,
+"value": 22.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 60,
+"value": 32.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-18",
+"property": "opacity",
+"frame": 120,
+"value": 22.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 30,
+"value": 2.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 60,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 90,
+"value": 2.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-19",
+"property": "y",
+"frame": 120,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sx",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "sy",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 0,
+"value": -48.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "x",
+"frame": 120,
+"value": -48.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 0,
+"value": 104.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 56,
+"value": 104.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 60,
+"value": 110.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 64,
+"value": 104.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-20",
+"property": "y",
+"frame": 120,
+"value": 104.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sx",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 0,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "sy",
+"frame": 120,
+"value": 100.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 0,
+"value": 30.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 6,
+"value": 50.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 12,
+"value": 42.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 18,
+"value": 62.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 24,
+"value": 54.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 30,
+"value": 74.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 36,
+"value": 66.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 42,
+"value": 86.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 54,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 60,
+"value": 30.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 66,
+"value": 50.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 72,
+"value": 42.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 78,
+"value": 62.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 84,
+"value": 54.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 90,
+"value": 74.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 96,
+"value": 66.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 102,
+"value": 86.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 114,
+"value": 30.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "x",
+"frame": 120,
+"value": 30.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 0,
+"value": 70.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 6,
+"value": 78.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 12,
+"value": 70.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 18,
+"value": 78.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 24,
+"value": 84.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 30,
+"value": 92.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 36,
+"value": 84.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 42,
+"value": 92.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 54,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 60,
+"value": 70.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 66,
+"value": 78.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 72,
+"value": 70.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 78,
+"value": 78.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 84,
+"value": 84.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 90,
+"value": 92.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 96,
+"value": 84.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 102,
+"value": 92.0,
+"interpolation": "linear"
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 114,
+"value": 66.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-21",
+"property": "y",
+"frame": 120,
+"value": 70.0,
+"interpolation": "linear"
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 0,
+"value": -4.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 24,
+"value": 4.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 48,
+"value": 6.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 54,
+"value": -4.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 84,
+"value": 4.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 108,
+"value": 6.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "x",
+"frame": 120,
+"value": -4.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 0,
+"value": 22.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5637",
+"property": "y",
+"frame": 120,
+"value": 22.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 52,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 56,
+"value": 35.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 66,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 112,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 116,
+"value": 35.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "0-5788",
+"property": "opacity",
+"frame": 120,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 0,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 54,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 58,
+"value": 104.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 64,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 114,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 118,
+"value": 104.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sx",
+"frame": 120,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 0,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 54,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 58,
+"value": 104.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 64,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 114,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 118,
+"value": 104.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "sy",
+"frame": 120,
+"value": 115.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "x",
+"frame": 0,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "x",
+"frame": 120,
+"value": 0.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 0,
+"value": 98.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 56,
+"value": 98.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 60,
+"value": 102.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 64,
+"value": 98.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+},
+{
+"object": "3-7167",
+"property": "y",
+"frame": 120,
+"value": 98.0,
+"interpolation": "cubic",
+"cubic": [
+0.45,
+0.0,
+0.55,
+1.0
+]
+}
+],
 "melt": [
 {
 "object": "0-17",

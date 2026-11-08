@@ -33,7 +33,7 @@ Offsets are screen pixels at the resting distance; the sphere's radius is 98 px 
 
 ## The clips
 
-All thirty-two are animated in `yoru.riv` and played on the board: the first ten since 0.20.7 (`celebrate` and `wake_stretch` since 0.20.6), clips 11 to 22 since 0.20.8, 23 to 30 (with colour) since 0.20.9, 31 and 32 since 0.20.14. `debug/clip` plays any of them by name (`docs/protocol.md`).
+All thirty-seven are animated in `yoru.riv` and played on the board: the first ten since 0.20.7 (`celebrate` and `wake_stretch` since 0.20.6), clips 11 to 22 since 0.20.8, 23 to 30 (with colour) since 0.20.9, 31 and 32 since 0.20.14, 33 to 37 since 0.20.15. `debug/clip` plays any of them by name (`docs/protocol.md`).
 
 ### 1. `celebrate` — a build passed, a task is done
 Joy. 84 frames (2.8 s), once. Ends in the rest pose. **Animated** in `yoru.riv` (`clip_celebrate`).
@@ -244,6 +244,25 @@ The right hand up with the card balanced on it, spinning (it turns edge-on and b
 Fun under pressure. 73 frames (2.4 s), a loop, while two or more searches are out (they started together; Yoru Hub runs them at once). The web's cyan.
 
 Juggling the card from hand to hand over its head: each throw a dip and a flick, the card spinning in a high arc, the eyes following it up and across, the body bobbing and squashing on every catch, glow and sparkles peaking at the top of each arc; a blink between throws. It keeps juggling until the last search is back, then one `search_found` (or `tool_failed` if none found anything).
+
+## Meetings (0.20.15)
+
+While the host records a meeting (`set_meeting`, `docs/protocol.md`): the app's icon, when the host sent it, is on the card in Yoru's hands and on the recording mark. Silent while recording.
+
+### 33. `meeting_start` — a recording starts
+Getting to work. 2.5 s, once. Yoru holds up the app's card, taps it (record!), nods to you, and the card floats up to where the recording mark appears.
+
+### 34. `meeting_listen` — still recording
+Paying attention. 3 s, once, every 150 s while recording. It leans in with a hand cupped by its side and nods twice, slowly.
+
+### 35. `meeting_write_loop` — transcribing
+Busy. 2 s, a loop, until the transcript is made. Scribbling the meeting down on the card, line after line, zig-zagging left to right and back for the next line, the eyes on the pen.
+
+### 36. `meeting_squeeze_loop` — summarizing
+Effort. 2 s, a loop, until the summary is made. The long transcript squeezed between its hands, twice, a squash on each squeeze.
+
+### 37. `meeting_done` — the summary is ready
+Pride. 3 s, once. A hop, the card thrown up over its head, jazz hands, happy eyes. A failure plays `tool_failed` instead.
 
 ## Production
 

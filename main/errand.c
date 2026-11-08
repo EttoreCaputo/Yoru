@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "eyes.h"
+#include "icons.h"
 #include "playback.h"
 
 static const char *TAG = "errand";
@@ -70,6 +71,11 @@ static const look_t LOOKS[] = {
     {"task", 0x34C759, LV_SYMBOL_OK},       {"timer", 0xFF9F0A, LV_SYMBOL_BELL},
     {"remind", 0xFF9F0A, LV_SYMBOL_BELL},   {"inbox", 0x0A84FF, LV_SYMBOL_BELL},
     {"notif", 0x0A84FF, LV_SYMBOL_BELL},
+    // The apps a meeting is recorded from.
+    {"zoom", 0x0B5CFF, LV_SYMBOL_VIDEO},    {"teams", 0x6264A7, LV_SYMBOL_VIDEO},
+    {"meet", 0x00AC47, LV_SYMBOL_VIDEO},    {"facetime", 0x34C759, LV_SYMBOL_VIDEO},
+    {"whatsapp", 0x25D366, LV_SYMBOL_CALL}, {"skype", 0x00AFF0, LV_SYMBOL_CALL},
+    {"webex", 0x07C3F2, LV_SYMBOL_VIDEO},   {"computer", 0xFF453A, LV_SYMBOL_AUDIO},
 };
 #define LOOKS_N ((int) (sizeof(LOOKS) / sizeof(LOOKS[0])))
 #define DEFAULT_RGB 0xBF5AF2
@@ -90,6 +96,8 @@ static struct {
     float px, py;
     uint32_t rgb;
     char glyph[8];
+    /* The service's name, for its icon when the host sent one. */
+    char source[ICON_NAME_MAX + 1];
     float open, gulp;
     /* The calls still out, and how the ended ones went. */
     char out[MAX_OUT][24];
@@ -155,6 +163,7 @@ void errand_look(const char *source, uint32_t *rgb, const char **glyph)
 
 static void pick_look(const char *source)
 {
+    snprintf(e.source, sizeof(e.source), "%s", source);
     e.rgb = DEFAULT_RGB;
     e.glyph[0] = '\0';
     for (int i = 0; i < LOOKS_N; i++) {
@@ -311,6 +320,11 @@ static void draw_portal(lv_layer_t *layer)
     }
     // What it leads to, until Yoru has gone in.
     if (e.phase == E_OPEN || e.phase == E_DIVE) {
+        const lv_image_dsc_t *icon = icons_find(e.source);
+        if (icon != NULL) {
+            icons_draw(layer, icon, x, y, 2 * (r - 12) * e.open, (lv_opa_t) (255 * e.open));
+            return;
+        }
         lv_draw_label_dsc_t dsc;
         lv_draw_label_dsc_init(&dsc);
         dsc.font = &lv_font_montserrat_24;
@@ -493,6 +507,7 @@ static void inside_step(void)
     if (found) {
         // The parcel in its hands, in the service's colour and glyph.
         eyes_play_fx(CLIP_PORTAL_CARRY, false, e.rgb, e.glyph);
+        eyes_fx_icon(icons_find(e.source));
         eyes_set_mood(EYES_MOOD_HAPPY);
         playback_sound(SOUND_BOING);
     } else if (empty) {

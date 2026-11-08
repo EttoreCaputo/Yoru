@@ -19,6 +19,8 @@ Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main
 - `tasks` (0.16.0 and later): the menu's Tasks app (see Tasks): the `set_tasks` tool and the `task_run` notification. `habits` (0.11.0 to 0.15.1) was the Habits app, with `set_habits` and `habit_check`.
 - `fetch` (0.11.0 and later): Yoru's errands (see Fetch): the `show_fetch` tool.
 - `cloud` (0.14.0 and later): talking without the host (see Cloud voice): the `cloud/set` and `cloud/get` methods.
+- `icons` (0.20.15 and later): the apps' icons (see Icons): the `set_icon` tool.
+- `meetings` (0.20.15 and later): the meeting recordings on the board (see Meetings): the `set_meeting` tool.
 - `ota` (0.19.0 and later, once flashed over USB with the two-slot partition table): updates over the link (see OTA).
 - There is no `media` or `music` capability: Yoru has no image or music face, so `media/...` and `music/...` answer `-32601`.
 - `eyes/gaze` turns Yoru's eyes towards the host's pointer for 6 s after the last one, unless a finger is on the screen, a conversation is on or it is asleep.
@@ -80,7 +82,7 @@ Settings are kept in NVS and survive a reboot.
 | `play_sound` | `name` | As on DualEye: the same sounds, plus Yoru's own: `unplug` and, an earcon played with pet sounds off too, `battery_low` (0.12.1) |
 | `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it), `power_saver` (on battery, the Saver profile instead of Balanced; 0.12.0, see Power), `hibernate` (on battery, minutes of dark screen before hibernating, 0 never; 0.12.0). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
 | `set_setting` | `name`, `value`: integer | Change one setting within its range (switches are 0 or 1); it applies at once |
-| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0; since 0.15.0 also its state, `watch`, `explore`, `play`, `dream`, `bored`, `seek`, `sulk`, `drowsy`, and `greet`), `cheer` (0..1), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`; since 0.20.3 `run`, the last stretch on battery, see Power) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`; replaced in 0.16.0 by `tasks`: `count`, `failed`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time); since 0.15.0 `life`: `activity`, `state`, `act`, `since_s`, `left_s` and `emotions` (`happy`, `energy`, `social`, `stim`, `trust`, -1..1), see `docs/life.md`. `eyes` may also be `delighted`, `smitten`, `starry` or `dreamy` since 0.15.0; `friends` (the other Yorus in range, 0.18.0 to 0.20.9) is gone since 0.20.10 |
+| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0; since 0.15.0 also its state, `watch`, `explore`, `play`, `dream`, `bored`, `seek`, `sulk`, `drowsy`, and `greet`), `cheer` (0..1), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`; since 0.20.3 `run`, the last stretch on battery, see Power) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`; replaced in 0.16.0 by `tasks`: `count`, `failed`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time); since 0.20.15 `meeting` (`idle`, `recording`, `transcribing`, `summarizing`) and `icons` (how many icons it keeps); since 0.15.0 `life`: `activity`, `state`, `act`, `since_s`, `left_s` and `emotions` (`happy`, `energy`, `social`, `stim`, `trust`, -1..1), see `docs/life.md`. `eyes` may also be `delighted`, `smitten`, `starry` or `dreamy` since 0.15.0; `friends` (the other Yorus in range, 0.18.0 to 0.20.9) is gone since 0.20.10 |
 | `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `tasks` (0.16.0 and later; `habits` before) · `games` (0.11.8 and later) · `settings` · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it. Since 0.11.0; before, the menu was a ring and `inbox` one of its pages |
 | `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Yoru asks before it acts for you, over the eyes, with Allow and Deny (see Confirmations). A second call replaces it |
 | `hide_approval` | `id`: string | Take that card away: it was answered in the app, or gave up. An `id` that isn't shown is fine |
@@ -91,8 +93,10 @@ Settings are kept in NVS and survive a reboot.
 | `set_timers` | `timers`: array | Since 0.11.0. Every timer and reminder (see Timers) |
 | `set_tasks` | `tasks`: array | Since 0.16.0. The tasks the user gave the host (see Tasks); `set_habits` (0.11.0 to 0.15.1) is gone |
 | `show_fetch` | `state`, `source`?, `id`? | Since 0.11.0. A connector call starts or ends: Yoru's errand (see Fetch) |
+| `set_icon` | `name`, `at`?, `data`? | Since 0.20.15. An app's icon, in parts (see Icons) |
+| `set_meeting` | `state`, `source`? | Since 0.20.15. A meeting is recorded, transcribed, summarized (see Meetings) |
 
-The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `show_fetch`, and since 0.16.0 `set_tasks`) are for the host only: Yoru Hub keeps them out of its MCP server.
+The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `show_fetch`, and since 0.16.0 `set_tasks`, and since 0.20.15 `set_icon` and `set_meeting`) are for the host only: Yoru Hub keeps them out of its MCP server.
 
 ## Confirmations
 
@@ -353,3 +357,30 @@ Since 0.11.0, with the `fetch` capability (Yoru Hub: `core/src/bridge/errands.rs
 - `done` for at least one call: Yoru comes back with a parcel and opens it in sparkles. Only `failed`: empty-handed and sad. Nothing after 20 s: it just comes back.
 - Opening the menu, a view or a card, or talking to it, calls Yoru back at once.
 - `kind` (since 0.20.9; none is `fetch`) is how Yoru shows the call, with the clips of `docs/animations.md` in the service's colour and glyph: `fetch` the portal above; `send` (a tool that acts: sends, creates, deletes) writes on the service's card and throws it, and a `failed` end shows the card sputtering and dropping; `search` holds the card and scans until the end with the same `id` (a `Web` search, or one with no source, spins a globe on a finger instead, since 0.20.14), then lifts it up in sparkles (`done`) or drops it (`failed`). Since 0.20.14 searches at once are juggled: a second `search` start before the first has ended switches to juggling, each end takes out its `id`, and the ending plays once, when the last is back: found if any found something, dropped if all failed; `remember` and `forget` (Yoru's memory) and `note` (a task, a timer, a notification) are over at once and shown on `start`, their end ignored. They follow the same rules for when a start shows. Yoru Hub sends `remember` and `forget` for its memory tools, `note` for a change to the tasks or the timers, `search` for each web search (source `Web`, one `start` and one end per search, with its own `id`) and `send` for a connector's tool that acts. A board before 0.20.9 shows every kind as `fetch`.
+
+## Icons
+
+Since 0.20.15, with the `icons` capability (Yoru Hub: `core/src/icons.rs`). The host sends the icon of a service or an app, and Yoru draws it on the card of a search or a sent note, in the errand's portal and on the recording mark of a meeting, instead of its glyph. Without one Yoru draws the glyph and the colour, as before.
+
+| Tool | Arguments | Effect |
+|------|-----------|--------|
+| `set_icon` | `name`: the service's name, as `show_fetch` and `set_meeting` give it as `source` (at most 24 bytes, any case), `at`?: the offset of this part, `data`?: the part in base64, at most 2048 bytes before encoding | Without `data`: `{"have": bool, "side": 48}`, whether Yoru has the whole icon. With it: that part is kept |
+
+- An icon is 48 × 48 pixels in LVGL's RGB565A8: 4608 bytes of RGB565 little endian, row by row, then 2304 bytes of alpha, 6912 bytes in all, sent in four parts.
+- Parts come in order; a part at 0 starts the icon over (a new picture under the same name). The icon is used once it is whole.
+- Yoru keeps 12 in PSRAM until it restarts; a 13th replaces the one used longest ago. A host asks before it sends, and sends before the `show_fetch` or `set_meeting` that shows it.
+
+## Meetings
+
+Since 0.20.15, with the `meetings` capability (Yoru Hub: `core/src/meetings.rs`, `BoardMeeting`). While the host records a meeting Yoru shows it, and it shows the transcript and the summary being made.
+
+| Tool | Arguments | Effect |
+|------|-----------|--------|
+| `set_meeting` | `state`: `recording` · `transcribing` · `summarizing` · `done` · `failed` · `idle`, `source`?: the app recorded (`Zoom`, `WhatsApp`...; `Computer` for all its sound) | What the host does with the meeting now |
+
+- `recording`: a small red pill at the top of the screen with a breathing dot and the app's icon (or its glyph), over everything but the menu, the inbox and a confirmation; Yoru plays `meeting_start` (holds up the app's card, taps it, nods), and every 150 s `meeting_listen` (leans in and nods). Silent, not to be heard in the meeting.
+- `transcribing`: the pill goes, `meeting_write_loop` (Yoru scribbles it down) until the next state, 20 min at most. `summarizing`: `meeting_squeeze_loop` (squeezes the long transcript between its hands).
+- `done`: `meeting_done` (throws the card up, jazz hands) with the `tada` sound; `failed`: `tool_failed` with the `whimper` sound. Both then go back to `idle`.
+- `idle`: nothing shown. Without a host for 30 s Yoru goes back to idle by itself.
+- Clips show only while Yoru is awake on the screen, as for `show_fetch`; the state is kept either way and the loops start again when they can.
+

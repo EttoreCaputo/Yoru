@@ -15,12 +15,14 @@
 #include "esp_timer.h"
 #include "errand.h"
 #include "eyes.h"
+#include "icons.h"
 #include "tasks.h"
 #include "inbox.h"
 #include "inbox_ui.h"
 #include "life.h"
 #include "link.h"
 #include "lvgl_port.h"
+#include "mbedtls/base64.h"
 #include "menu.h"
 #include "metrics_model.h"
 #include "motion.h"
@@ -418,6 +420,8 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
     cJSON_AddNumberToObject(tk, "count", tasks_count());
     cJSON_AddNumberToObject(tk, "failed", tasks_failed());
     cJSON_AddBoolToObject(st, "errand", errand_busy());
+    cJSON_AddStringToObject(st, "meeting", behaviour_meeting_state());
+    cJSON_AddNumberToObject(st, "icons", icons_count());
     lvgl_port_unlock();
     *structured = st;
     // The text is filled in by the caller from `structured`.
@@ -671,6 +675,71 @@ static bool tool_show_fetch(const cJSON *args, char *text, cJSON **structured)
     return true;
 }
 
+static bool tool_set_icon(const cJSON *args, char *text, cJSON **structured)
+{
+    const char *name, *data;
+    if (!get_str(args, "name", true, ICON_NAME_MAX, &name, text) || !get_str(args, "data", false, 0, &data, text)) {
+        return false;
+    }
+    const cJSON *at = cJSON_GetObjectItemCaseSensitive(args, "at");
+    if (data[0] == '\0') {
+        // Only asking whether it's here.
+        lvgl_port_lock();
+        const bool have = icons_find(name) != NULL;
+        lvgl_port_unlock();
+        *structured = cJSON_CreateObject();
+        cJSON_AddBoolToObject(*structured, "have", have);
+        cJSON_AddNumberToObject(*structured, "side", ICON_SIDE);
+        snprintf(text, TEXT_MAX, have ? "have it" : "don't have it");
+        return true;
+    }
+    if (!cJSON_IsNumber(at) || at->valuedouble < 0 || at->valuedouble >= ICON_BYTES) {
+        snprintf(text, TEXT_MAX, "at must be a byte offset below %d", ICON_BYTES);
+        return false;
+    }
+    static uint8_t buf[ICON_PART_MAX];
+    size_t n = 0;
+    if (mbedtls_base64_decode(buf, sizeof(buf), &n, (const unsigned char *) data, strlen(data)) != 0 || n == 0) {
+        snprintf(text, TEXT_MAX, "data must be base64, at most %d bytes", ICON_PART_MAX);
+        return false;
+    }
+    const char *err = NULL;
+    lvgl_port_lock();
+    const bool ok = icons_put(name, (uint32_t) at->valuedouble, buf, n, &err);
+    const bool whole = icons_find(name) != NULL;
+    lvgl_port_unlock();
+    if (!ok) {
+        snprintf(text, TEXT_MAX, "%s", err);
+        return false;
+    }
+    *structured = cJSON_CreateObject();
+    cJSON_AddBoolToObject(*structured, "have", whole);
+    snprintf(text, TEXT_MAX, whole ? "icon kept" : "part kept");
+    return true;
+}
+
+static bool tool_set_meeting(const cJSON *args, char *text, cJSON **structured)
+{
+    const char *state, *source;
+    if (!get_str(args, "state", true, 0, &state, text) || !get_str(args, "source", false, ICON_NAME_MAX, &source, text)) {
+        return false;
+    }
+    static const char *const STATES[] = {"idle", "recording", "transcribing", "summarizing", "done", "failed"};
+    bool known = false;
+    for (size_t i = 0; i < sizeof(STATES) / sizeof(STATES[0]) && !known; i++) {
+        known = strcmp(state, STATES[i]) == 0;
+    }
+    if (!known) {
+        snprintf(text, TEXT_MAX, "state must be idle, recording, transcribing, summarizing, done or failed");
+        return false;
+    }
+    lvgl_port_lock();
+    const bool shown = behaviour_meeting(state, source);
+    lvgl_port_unlock();
+    snprintf(text, TEXT_MAX, shown ? "Yoru shows it" : "noted");
+    return true;
+}
+
 static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
@@ -785,6 +854,29 @@ static const tool_t TOOLS[] = {
                   "\"state\":{\"type\":\"string\",\"enum\":[\"start\",\"done\",\"failed\"]}},"
                   "\"required\":[\"state\"]}",
         .fn = tool_show_fetch,
+    },
+    {
+        .name = "set_icon",
+        .description = "An app's icon for Yoru to show with that service (on the clips' card, in the errand's "
+                       "portal, on the recording mark): 48 by 48 pixels as LVGL's RGB565A8 (RGB565 little "
+                       "endian, then the alpha plane), 6912 bytes, sent in parts of at most 2048 bytes, base64 "
+                       "in `data`, at byte offset `at`, from 0 and in order. Without `data`, says whether the "
+                       "board has it (`have`). The host sends it itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"maxLength\":24},"
+                  "\"at\":{\"type\":\"integer\",\"minimum\":0},\"data\":{\"type\":\"string\"}},"
+                  "\"required\":[\"name\"]}",
+        .fn = tool_set_icon,
+    },
+    {
+        .name = "set_meeting",
+        .description = "The meeting the host records: `recording` (Yoru shows a recording mark with the app's "
+                       "icon and nods now and then), `transcribing` and `summarizing` (Yoru writes, then squeezes "
+                       "it into a summary), `done` (holds the summary up), `failed`, or `idle`. `source` is the "
+                       "app recorded. The host sends it itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"state\":{\"type\":\"string\",\"enum\":[\"idle\","
+                  "\"recording\",\"transcribing\",\"summarizing\",\"done\",\"failed\"]},"
+                  "\"source\":{\"type\":\"string\",\"maxLength\":24}},\"required\":[\"state\"]}",
+        .fn = tool_set_meeting,
     },
     {
         .name = "set_brightness",

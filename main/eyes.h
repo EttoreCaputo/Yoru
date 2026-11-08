@@ -163,6 +163,8 @@ void eyes_play(clip_id_t clip, bool mirror);
  * the prop a card showing `glyph` (an LV_SYMBOL or a few letters, kept by
  * the caller), or a glowing orb when NULL. eyes_play() uses gold and the orb. */
 void eyes_play_fx(clip_id_t clip, bool mirror, uint32_t rgb, const char *glyph);
+/* The service's icon on the card of the clip just started (NULL: its glyph). */
+void eyes_fx_icon(const lv_image_dsc_t *icon);
 bool eyes_playing(void);
 /** The clip playing, or CLIP_NONE. */
 clip_id_t eyes_clip(void);

@@ -7,6 +7,7 @@
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "esp_random.h"
+#include "icons.h"
 #include "look.h"
 
 /* The easing's unit: its rates are per 33 ms, whatever the frame rate.
@@ -343,6 +344,8 @@ static struct {
      * and the box they were last drawn in. */
     uint32_t fx_rgb;
     const char *fx_glyph;
+    /* The service's own icon on the card, when the host sent one. */
+    const lv_image_dsc_t *fx_icon;
     fx_part_t fx[FX_PARTS];
     float fx_due;
     bool fx_shown;
@@ -1356,6 +1359,12 @@ static void draw_fx_prop(lv_layer_t *layer)
     fx_prop_at(&x, &y, &h);
     const lv_color_t c = lv_color_hex(s.fx_rgb);
     const lv_opa_t opa = (lv_opa_t) (255 * s.body.fog);
+    if (s.fx_icon != NULL) {
+        // The app's icon has its own shape: only a glow behind it.
+        draw_disc(layer, x, y, h * 1.45f, c, (lv_opa_t) (opa / 5));
+        icons_draw(layer, s.fx_icon, x, y, h * 2.1f, opa);
+        return;
+    }
     if (s.fx_glyph == NULL) {
         draw_disc(layer, x, y, h * 1.5f, c, (lv_opa_t) (opa / 4));
         draw_disc(layer, x, y, h, c, opa);
@@ -2307,6 +2316,7 @@ void eyes_play_fx(clip_id_t clip, bool mirror, uint32_t rgb, const char *glyph)
     bridge_from_screen(s.clip != NULL ? BRIDGE_CUT_MS : BRIDGE_IN_MS);
     s.fx_rgb = rgb;
     s.fx_glyph = glyph;
+    s.fx_icon = NULL;
     s.clip_mirror = mirror;
     // The clip has the hands from its first frame, and its own blinks.
     s.clutch = false;
@@ -2318,6 +2328,11 @@ void eyes_play_fx(clip_id_t clip, bool mirror, uint32_t rgb, const char *glyph)
     if (mirror) {
         clip_mirror(&s.cf);
     }
+}
+
+void eyes_fx_icon(const lv_image_dsc_t *icon)
+{
+    s.fx_icon = icon;
 }
 
 bool eyes_playing(void)

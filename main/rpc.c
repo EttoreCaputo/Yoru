@@ -123,6 +123,9 @@ static cJSON *identity(void)
     cJSON_AddItemToArray(caps, cJSON_CreateString("timers"));
     cJSON_AddItemToArray(caps, cJSON_CreateString("tasks"));
     cJSON_AddItemToArray(caps, cJSON_CreateString("fetch"));
+    // The apps' icons and the meeting being recorded (docs/protocol.md, Icons, Meetings).
+    cJSON_AddItemToArray(caps, cJSON_CreateString("icons"));
+    cJSON_AddItemToArray(caps, cJSON_CreateString("meetings"));
     if (ota_available()) {
         // Updates over the link: ota/begin, ota/write, ota/end.
         cJSON_AddItemToArray(caps, cJSON_CreateString("ota"));

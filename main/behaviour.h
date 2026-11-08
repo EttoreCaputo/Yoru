@@ -83,6 +83,14 @@ void behaviour_boot_key(bool long_press);
  * LVGL lock held. */
 bool behaviour_fetch(const char *id, const char *source, const char *state, const char *kind);
 
+/* The host's meeting (`set_meeting`): `state` recording, transcribing,
+ * summarizing, done, failed or idle; `source` the app recorded. True if
+ * Yoru shows it now. */
+bool behaviour_meeting(const char *state, const char *source);
+
+/* idle, recording, transcribing or summarizing. */
+const char *behaviour_meeting_state(void);
+
 /** Where the host's pointer is, -1..1 each way (rpc.c's eyes/gaze). Safe
  * from any task. */
 void behaviour_gaze(float x, float y);

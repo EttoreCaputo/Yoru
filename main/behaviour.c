@@ -19,6 +19,7 @@
 #include "esp_random.h"
 #include "errand.h"
 #include "eyes.h"
+#include "icons.h"
 #include "inbox.h"
 #include "inbox_ui.h"
 #include "life.h"
@@ -27,6 +28,7 @@
 #include "motion.h"
 #include "metrics_model.h"
 #include "playback.h"
+#include "recmark.h"
 #include "power.h"
 #include "timers.h"
 #include "toast.h"
@@ -200,6 +202,7 @@ static struct {
 
 static void show_voice(voice_state_t state);
 static void apply_rotation(void);
+static void meeting_tick(uint32_t now);
 static bool card_up(void);
 static void wait_for_answer(uint32_t now);
 static void hold_gaze(float x, float y, uint32_t ms);
@@ -845,6 +848,7 @@ static void tick_cb(lv_timer_t *timer)
     if (!playing) {
         s.until_ms = 0;
     }
+    meeting_tick(now);
     const life_ctx_t ctx = life_context(now, playing);
     if (life_step(&ctx) == LIFE_SLEEP) {
         fall_asleep();
@@ -1481,7 +1485,13 @@ bool behaviour_fetch(const char *id, const char *source, const char *state, cons
 {
     if (kind[0] != '\0' && strcmp(kind, "fetch") != 0) {
         s.last_touch_ms = lv_tick_get();
-        return tool_clip(id, source, state, kind);
+        const bool shown = tool_clip(id, source, state, kind);
+        // The service's own icon on the card, when the host sent it; not on
+        // Yoru's memory's orb.
+        if (shown && strcmp(kind, "remember") != 0 && strcmp(kind, "forget") != 0) {
+            eyes_fx_icon(icons_find(source));
+        }
+        return shown;
     }
     if (strcmp(state, "start") != 0) {
         errand_end(id, strcmp(state, "done") == 0);
@@ -1492,6 +1502,135 @@ bool behaviour_fetch(const char *id, const char *source, const char *state, cons
     }
     errand_start(id, source);
     return true;
+}
+
+/* A meeting the host records (`set_meeting`): the recording mark while it
+ * records, a nod now and then that Yoru is listening, then Yoru writing the
+ * transcript and squeezing it into a summary, and the summary held up. */
+#define MEET_LISTEN_EVERY_MS (150 * 1000)
+#define MEET_WORK_MAX_MS (20 * 60 * 1000)
+#define MEET_HOST_GONE_MS (30 * 1000)
+typedef enum { MEET_IDLE, MEET_REC, MEET_WRITE, MEET_SQUEEZE } meet_t;
+static struct {
+    meet_t state;
+    char source[ICON_NAME_MAX + 1];
+    uint32_t rgb;
+    const char *glyph;
+    uint32_t since_ms, listen_ms, host_seen_ms;
+} s_meet;
+
+static clip_id_t meet_loop(void)
+{
+    return s_meet.state == MEET_WRITE ? CLIP_MEETING_WRITE_LOOP : CLIP_MEETING_SQUEEZE_LOOP;
+}
+
+static void meet_play(clip_id_t clip)
+{
+    eyes_play_fx(clip, false, s_meet.rgb, s_meet.glyph);
+    eyes_fx_icon(icons_find(s_meet.source));
+}
+
+/* Stop the work loop if it's the one playing. */
+static void meet_stop_loop(void)
+{
+    const clip_id_t c = eyes_clip();
+    if (c == CLIP_MEETING_WRITE_LOOP || c == CLIP_MEETING_SQUEEZE_LOOP) {
+        eyes_stop_clip();
+    }
+}
+
+static void meet_go_idle(void)
+{
+    meet_stop_loop();
+    s_meet.state = MEET_IDLE;
+    recmark_set(NULL, 0, NULL);
+}
+
+bool behaviour_meeting(const char *state, const char *source)
+{
+    const uint32_t now = lv_tick_get();
+    s_meet.host_seen_ms = now;
+    if (source[0] != '\0' || strcmp(state, "recording") == 0) {
+        snprintf(s_meet.source, sizeof(s_meet.source), "%s", source[0] != '\0' ? source : "Computer");
+        errand_look(s_meet.source, &s_meet.rgb, &s_meet.glyph);
+    }
+    const meet_t was = s_meet.state;
+    if (strcmp(state, "recording") == 0) {
+        s_meet.state = MEET_REC;
+        recmark_set(s_meet.source, s_meet.rgb, s_meet.glyph);
+        if (was == MEET_REC) {
+            return true;
+        }
+        meet_stop_loop();
+        s_meet.since_ms = now;
+        s_meet.listen_ms = now + MEET_LISTEN_EVERY_MS;
+        if (!can_show_work()) {
+            return false;
+        }
+        // No sound: the microphone is recording the meeting.
+        s.last_touch_ms = now;
+        meet_play(CLIP_MEETING_START);
+        return true;
+    }
+    if (strcmp(state, "transcribing") == 0 || strcmp(state, "summarizing") == 0) {
+        recmark_set(NULL, 0, NULL);
+        s_meet.state = state[0] == 't' ? MEET_WRITE : MEET_SQUEEZE;
+        if (was != s_meet.state) {
+            s_meet.since_ms = now;
+        }
+        if (eyes_clip() == meet_loop() || !can_show_work()) {
+            return eyes_clip() == meet_loop();
+        }
+        meet_play(meet_loop());
+        return true;
+    }
+    const bool done = strcmp(state, "done") == 0, failed = strcmp(state, "failed") == 0;
+    meet_go_idle();
+    if ((!done && !failed) || was == MEET_IDLE || !can_show_work()) {
+        return false;
+    }
+    s.last_touch_ms = now;
+    meet_play(done ? CLIP_MEETING_DONE : CLIP_TOOL_FAILED);
+    if (s.voice == VOICE_IDLE) {
+        playback_sound(done ? SOUND_TADA : SOUND_WHIMPER);
+    }
+    return true;
+}
+
+/* While a meeting goes on: the work loop back after something cut it short,
+ * a nod now and then while it records, and nothing left over if the host
+ * went away. */
+static void meeting_tick(uint32_t now)
+{
+    if (s_meet.state == MEET_IDLE) {
+        return;
+    }
+    if (metrics_model_live()) {
+        s_meet.host_seen_ms = now;
+    } else if (now - s_meet.host_seen_ms >= MEET_HOST_GONE_MS) {
+        meet_go_idle();
+        return;
+    }
+    if (s_meet.state != MEET_REC) {
+        if (now - s_meet.since_ms >= MEET_WORK_MAX_MS) {
+            meet_go_idle();
+        } else if (!eyes_playing() && can_show_work() && s.until_ms == 0) {
+            meet_play(meet_loop());
+        }
+        return;
+    }
+    if ((int32_t) (now - s_meet.listen_ms) >= 0) {
+        s_meet.listen_ms = now + MEET_LISTEN_EVERY_MS;
+        if (!eyes_playing() && can_show_work()) {
+            meet_play(CLIP_MEETING_LISTEN);
+        }
+    }
+}
+
+const char *behaviour_meeting_state(void)
+{
+    static const char *const NAMES[] = {"idle", "recording", "transcribing", "summarizing"};
+    return NAMES[s_meet.state];
 }
 
 void behaviour_start(lv_obj_t *face)
@@ -1515,6 +1654,7 @@ void behaviour_start(lv_obj_t *face)
     menu_init(face, on_menu);
     approval_init(on_approval);
     toast_init();
+    recmark_init();
     inbox_ui_init(face, on_view);
     board_button_init(behaviour_boot_key);
 }

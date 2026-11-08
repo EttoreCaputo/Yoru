@@ -1,5 +1,12 @@
 # Firmware changelog
 
+## 0.20.15
+
+- **Yoru shows your meeting recordings.** While Yoru Hub records a meeting a small red pill sits at the top of the screen, with a breathing dot and the icon of the app recorded (Zoom, Teams, WhatsApp...). When the recording starts Yoru holds up the app's card and taps it; every couple of minutes he leans in and listens. All silent, not to be heard in the call.
+- **Then he works on it**: he scribbles the transcript down line after line, squeezes it into a summary, and when the summary is ready throws the card up with jazz hands (with a little fanfare). If something goes wrong he drops it, sad.
+- **Real app icons.** The cards of searches and sent messages, the errand's portal and the recording mark now show the service's real icon (Spotify, ClickUp, Gmail...) when Yoru Hub has one, instead of a letter or a glyph.
+- New tools for the host: `set_icon` and `set_meeting`; `get_state` also says `meeting` and `icons`.
+
 ## 0.20.14
 
 - New: when Yoru looks something up on the web he shows off, balancing a spinning globe on one finger, tossing it up and catching it while his eyes follow it.
