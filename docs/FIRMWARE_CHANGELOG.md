@@ -1,5 +1,10 @@
 # Firmware changelog
 
+## 0.20.14
+
+- New: when Yoru looks something up on the web he shows off, balancing a spinning globe on one finger, tossing it up and catching it while his eyes follow it.
+- New: when he looks up several things at once he juggles the globe from hand to hand over his head, bobbing at every catch, until the last answer is back; then one happy ending (or a sad one only if nothing was found).
+
 ## 0.20.13
 
 - **Yoru moves at up to 60 frames a second on USB**, twice as smooth as before: at rest 45-60, while he talks about 50. On battery he stays at 30, so the battery lasts as long as before.

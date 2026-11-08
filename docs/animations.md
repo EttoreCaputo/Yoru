@@ -33,7 +33,7 @@ Offsets are screen pixels at the resting distance; the sphere's radius is 98 px 
 
 ## The clips
 
-All thirty are animated in `yoru.riv` and played on the board: the first ten since 0.20.7 (`celebrate` and `wake_stretch` since 0.20.6), clips 11 to 22 since 0.20.8, 23 to 30 (with colour) since 0.20.9. `debug/clip` plays any of them by name (`docs/protocol.md`).
+All thirty-two are animated in `yoru.riv` and played on the board: the first ten since 0.20.7 (`celebrate` and `wake_stretch` since 0.20.6), clips 11 to 22 since 0.20.8, 23 to 30 (with colour) since 0.20.9, 31 and 32 since 0.20.14. `debug/clip` plays any of them by name (`docs/protocol.md`).
 
 ### 1. `celebrate` — a build passed, a task is done
 Joy. 84 frames (2.8 s), once. Ends in the rest pose. **Animated** in `yoru.riv` (`clip_celebrate`).
@@ -210,13 +210,13 @@ Letting go. 57 frames (1.9 s), once, either way round. Purple orb.
 
 Squinting, it reaches to its head and pulls an orb out, holds it up, flicks it away to the side, where it swells and pops in sparkles; a shake of the head and a blink.
 
-### 26. `search_loop` — searching the web
-Focus. 61 frames (2 s), a loop, until the search ends. In the service's colour (the web's cyan, a globe).
+### 26. `search_loop` — searching a service
+Focus. 61 frames (2 s), a loop, until the search ends. In the service's colour. A web search plays `web_search_loop` instead, and searches at once `search_juggle_loop`.
 
 Holding the card low in front with both hands, scanning left and right with a tilt and a hop each way, a blink; the glow breathing and sparkles off the card.
 
 ### 27. `search_found` — found
-Triumph. 48 frames (1.6 s), once; after `search_loop`, from its pose.
+Triumph. 48 frames (1.6 s), once; after a search loop (26, 31, 32), when the last search out has come back with something.
 
 A crouch and a hop with the card lifted high in both hands, glow and sparkles at full, happy eyes; the card shrinks away up there and the hands come down.
 
@@ -231,9 +231,19 @@ Tidiness. 65 frames (2.2 s), once. In the service's colour (a check for tasks, a
 The card in its hands, two stamps on it with the right hand (each a pulse of glow and sparkles), then the card shrinks into its body with a flash; happy eyes, a nod.
 
 ### 30. `tool_failed` — it didn't work
-Disappointment. 53 frames (1.8 s), once; after `search_loop` or for a send that failed, the card back in its hands.
+Disappointment. 53 frames (1.8 s), once; after a search loop when every search failed, or for a send that failed, the card back in its hands.
 
 The card trembles and sputters (the glow flickering, a few sparkles), then drops out of its hands and falls away; Yoru sinks a little with sad lids, looks down, and lets it go.
+
+### 31. `web_search_loop` — searching the web
+Showing off. 73 frames (2.4 s), a loop, until the search ends. The web's cyan, a globe.
+
+The right hand up with the card balanced on it, spinning (it turns edge-on and back), the left hand out for balance; Yoru leans and wobbles under it. Halfway, a squash and a flick: the card flies up spinning faster, the eyes go wide and follow it, and it lands back on the hand with a little give. A glance at you and a blink while it spins on.
+
+### 32. `search_juggle_loop` — searching several things at once
+Fun under pressure. 73 frames (2.4 s), a loop, while two or more searches are out (they started together; Yoru Hub runs them at once). The web's cyan.
+
+Juggling the card from hand to hand over its head: each throw a dip and a flick, the card spinning in a high arc, the eyes following it up and across, the body bobbing and squashing on every catch, glow and sparkles peaking at the top of each arc; a blink between throws. It keeps juggling until the last search is back, then one `search_found` (or `tool_failed` if none found anything).
 
 ## Production
 

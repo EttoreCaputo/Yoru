@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "approval.h"
 #include "battery.h"
@@ -1369,33 +1370,77 @@ static bool can_show_work(void)
            && (s.voice == VOICE_IDLE || s.voice == VOICE_THINKING);
 }
 
+/* The searches out now. A web search spins a globe; two or more at once are
+ * juggled; when the last comes back, one ending for all of them. */
+#define SEARCHES_MAX 6
+static struct {
+    char id[SEARCHES_MAX][24];
+    int n, ok;
+} s_search;
+
+static bool search_showing(void)
+{
+    const clip_id_t c = eyes_clip();
+    return c == CLIP_SEARCH_LOOP || c == CLIP_WEB_SEARCH_LOOP || c == CLIP_SEARCH_JUGGLE_LOOP;
+}
+
+static bool search_start(const char *id, const char *source, uint32_t rgb, const char *glyph)
+{
+    if (!search_showing()) {
+        s_search.n = s_search.ok = 0; // the last ones were cut short
+        if (!can_show_work()) {
+            return false;
+        }
+    }
+    if (s_search.n < SEARCHES_MAX) {
+        snprintf(s_search.id[s_search.n++], sizeof(s_search.id[0]), "%s", id);
+    }
+    clip_id_t clip = CLIP_SEARCH_LOOP;
+    if (s_search.n > 1) {
+        clip = CLIP_SEARCH_JUGGLE_LOOP;
+    } else if (source[0] == '\0' || strcasecmp(source, "web") == 0) {
+        clip = CLIP_WEB_SEARCH_LOOP;
+    }
+    if (eyes_clip() != clip) {
+        eyes_play_fx(clip, false, rgb, glyph);
+    }
+    return true;
+}
+
+static bool search_end(const char *id, bool ok, uint32_t rgb, const char *glyph)
+{
+    int i = 0;
+    while (i < s_search.n && strcmp(s_search.id[i], id) != 0) {
+        i++;
+    }
+    if (i == s_search.n) {
+        return false;
+    }
+    memmove(s_search.id[i], s_search.id[i + 1], (size_t) (s_search.n - i - 1) * sizeof(s_search.id[0]));
+    s_search.n--;
+    s_search.ok += ok;
+    if (s_search.n > 0 || !search_showing()) {
+        return false; // still juggling the others, or the clip was cut short
+    }
+    const bool found = s_search.ok > 0;
+    s_search.ok = 0;
+    eyes_play_fx(found ? CLIP_SEARCH_FOUND : CLIP_TOOL_FAILED, false, rgb, glyph);
+    if (s.voice == VOICE_IDLE) {
+        playback_sound(found ? SOUND_TADA : SOUND_WHIMPER);
+    }
+    return true;
+}
+
 /* A tool that isn't an errand: a clip in the service's colour. A search
- * scans until its end comes; the rest are over in a moment. */
+ * plays until its end comes; the rest are over in a moment. */
 static bool tool_clip(const char *id, const char *source, const char *state, const char *kind)
 {
-    static char search_id[24];
     const bool start = strcmp(state, "start") == 0;
     uint32_t rgb;
     const char *glyph;
     if (strcmp(kind, "search") == 0) {
         errand_look(source[0] != '\0' ? source : "web", &rgb, &glyph);
-        if (start) {
-            if (!can_show_work()) {
-                return false;
-            }
-            snprintf(search_id, sizeof(search_id), "%s", id);
-            eyes_play_fx(CLIP_SEARCH_LOOP, false, rgb, glyph);
-            return true;
-        }
-        if (eyes_clip() != CLIP_SEARCH_LOOP || strcmp(id, search_id) != 0) {
-            return false;
-        }
-        const bool ok = strcmp(state, "done") == 0;
-        eyes_play_fx(ok ? CLIP_SEARCH_FOUND : CLIP_TOOL_FAILED, false, rgb, glyph);
-        if (s.voice == VOICE_IDLE) {
-            playback_sound(ok ? SOUND_TADA : SOUND_WHIMPER);
-        }
-        return true;
+        return start ? search_start(id, source, rgb, glyph) : search_end(id, strcmp(state, "done") == 0, rgb, glyph);
     }
     if (strcmp(kind, "send") == 0) {
         errand_look(source, &rgb, &glyph);

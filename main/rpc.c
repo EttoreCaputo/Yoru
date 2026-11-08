@@ -304,6 +304,15 @@ void rpc_handle(uint8_t *payload, size_t len)
             cJSON_AddBoolToObject(item, "loop", c->loop);
             cJSON_AddItemToArray(list, item);
         }
+        // And the one playing now, so a test can tell what a call showed.
+        lvgl_port_lock();
+        const clip_t *now = clips_get(eyes_clip());
+        lvgl_port_unlock();
+        if (now != NULL) {
+            cJSON_AddStringToObject(result, "playing", now->name);
+        } else {
+            cJSON_AddNullToObject(result, "playing");
+        }
     } else if (strcmp(name, "debug/clip") == 0 && cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(params, "stop"))) {
         lvgl_port_lock();
         eyes_stop_clip();
