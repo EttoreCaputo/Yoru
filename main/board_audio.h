@@ -40,6 +40,12 @@ esp_err_t board_audio_write(const int16_t *samples, size_t count);
 
 /** Blocking read of `frames` frames of BOARD_AUDIO_IN_CHANNELS interleaved samples. */
 esp_err_t board_audio_read(int16_t *frames_out, size_t frames);
+/** Count the speaker's DMA running dry only while something is meant to play
+ *  (playback.c), not the silence between sounds. */
+void board_audio_watch_tx(bool on);
+/** Since boot: DMA buffers the speaker played with nothing new in them, and
+ *  buffers of the mics lost because they weren't read in time (perf.c). */
+void board_audio_gaps(uint32_t *tx_gaps, uint32_t *rx_lost);
 
 /** 0..100. */
 esp_err_t board_audio_set_volume(int volume);

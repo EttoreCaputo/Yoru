@@ -1,5 +1,10 @@
 # Firmware changelog
 
+## 0.20.11
+
+- **Yoru's voice no longer breaks up while he talks.** Every tenth of a second the sound waited for the face to finish drawing, to make his eyes swell with his voice; while he talks the face can take more than a tenth of a second to draw, and the speaker ran out of sound meanwhile: small holes in the speech (62 in one answer, measured). Now the sound never waits for the face: 1 left, at the start. The mics while he listens are spared the same wait.
+- **Yoru can now tell when his sound breaks up.** He counts every moment the speaker ran out of sound and every bit of the mics he didn't listen to in time, and measures how busy each part of him is (the face, the voice, the WiFi...). A host asks for it with `debug/perf`.
+
 ## 0.20.10
 
 - **Everything Yoru does is now a hand-made animation.** The old drawn-in-code gestures are gone; 29 new animations replace them and fill the gaps:

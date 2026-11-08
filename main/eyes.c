@@ -228,8 +228,10 @@ static struct {
     int32_t blink_ms;     // > 0 while closing
     int32_t next_blink_ms;
     float squash;
-    /* The voice's level, eased, and where it is going. */
-    float level, tlevel;
+    /* The voice's level, eased, and where it is going (set by the audio
+     * tasks without the LVGL lock). */
+    float level;
+    volatile float tlevel;
     uint32_t t_ms;        // animation clock
     uint32_t last_tick;   // when the last frame ran
     int32_t dt_ms;        // how long since, for this frame's step

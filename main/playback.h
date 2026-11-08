@@ -48,6 +48,9 @@ bool playback_pet_sounds(void);
 
 /** A stream is playing (or buffering to start). */
 bool playback_active(void);
+/** Since boot: times the speech ran out before its end came (the host or
+ *  the network late), and its frames that never arrived. */
+void playback_totals(uint32_t *underruns, uint32_t *lost);
 
 #ifdef __cplusplus
 }

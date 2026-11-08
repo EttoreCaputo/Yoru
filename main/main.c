@@ -29,6 +29,7 @@
 #include "motion.h"
 #include "net.h"
 #include "ota.h"
+#include "perf.h"
 #include "nvs.h"
 #include "playback.h"
 #include "power.h"
@@ -133,23 +134,6 @@ static void on_setting(setting_t id, int32_t value)
 }
 
 /* M1 measurement: how much of the CPU drawing the eyes takes. */
-static void stats_task(void *arg)
-{
-    while (true) {
-        vTaskDelay(pdMS_TO_TICKS(LVGL_PORT_STATS_WINDOW_MS));
-        lvgl_port_stats_t st;
-        lvgl_port_get_stats(&st);
-        lvgl_port_lock();
-        const char *eyes = eyes_mood_name(eyes_get_mood());
-        lvgl_port_unlock();
-        // PSRAM runs short with ESP-SR, the sprites and the cloud's buffers.
-        ESP_LOGI(TAG, "lvgl %.1f%% busy, longest %lu us, eyes %s, %s; PSRAM %u KB free, %u KB largest",
-                 st.busy_pct, (unsigned long) st.max_us, eyes, life_activity(),
-                 (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024),
-                 (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));
-    }
-}
-
 static void start_audio(void)
 {
     if (board_audio_init() != ESP_OK) {
@@ -212,8 +196,7 @@ void app_main(void)
 
     // The voice runs on core 1, as in DualEye; the UI on core 0.
     start_audio();
-    // Its stack can live in PSRAM: it never writes the flash (0.3.1).
-    xTaskCreatePinnedToCoreWithCaps(stats_task, "stats", 3072, NULL, 2, NULL, 0, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    perf_start();
 
     rpc_init();
     // A firmware just updated starts its probation (ota.c).

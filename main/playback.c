@@ -14,7 +14,6 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#include "lvgl_port.h"
 #include "rpc.h"
 #include "ui_voice.h"
 #include "voice.h"
@@ -329,8 +328,20 @@ static void synth_feed_locked(void)
     }
 }
 
+/* Every stream's, since boot (perf.c). Only the playback task reports. */
+static uint32_t s_total_underruns;
+static uint32_t s_total_lost;
+
+void playback_totals(uint32_t *underruns, uint32_t *lost)
+{
+    *underruns = s_total_underruns;
+    *lost = s_total_lost;
+}
+
 static void report(const stream_t *st, end_reason_t reason)
 {
+    s_total_underruns += st->underruns;
+    s_total_lost += st->lost;
     if (st->local) {
         return;
     }
@@ -347,11 +358,11 @@ static void report(const stream_t *st, end_reason_t reason)
     rpc_notify("playback_end", params);
 }
 
+/* Without the LVGL lock: a frame can take longer to draw than the DMA holds
+ * (90 ms), and waiting for it was heard as holes in the speech (0.20.11). */
 static void set_level(float level)
 {
-    lvgl_port_lock();
     ui_voice_set_level(level < 0 ? 0 : level > 1 ? 1 : level);
-    lvgl_port_unlock();
 }
 
 /** Speaker on, eyes speaking (not for the board's sounds), the wake word ignored
@@ -363,11 +374,15 @@ static void begin(bool local)
     if (!local) {
         voice_set_state(VOICE_SPEAKING);
     }
+    // From the first chunk: the wait for the UI above isn't a hole.
+    board_audio_watch_tx(true);
 }
 
 static void finish(void)
 {
     int16_t silence[CHUNK_SAMPLES] = {0};
+    // Past the last chunk the DMA runs dry on purpose.
+    board_audio_watch_tx(false);
     for (int i = 0; i < FLUSH_CHUNKS; i++) {
         board_audio_write(silence, CHUNK_SAMPLES);
     }

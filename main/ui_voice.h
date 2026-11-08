@@ -14,8 +14,8 @@ extern "C" {
 /** With the LVGL lock held. */
 void ui_voice_show(voice_state_t state);
 
-/** Mic level while listening, speaker level while speaking, 0..1. With the
- * LVGL lock held. */
+/** Mic level while listening, speaker level while speaking, 0..1. Without
+ * the LVGL lock: the audio tasks call it and must never wait for a frame. */
 void ui_voice_set_level(float level);
 
 /** A ring running out over `ms`: how long the board still listens without

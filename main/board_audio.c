@@ -9,7 +9,9 @@
 #include "esp_check.h"
 #include "esp_codec_dev.h"
 #include "esp_codec_dev_defaults.h"
+#include "esp_attr.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
@@ -28,6 +30,19 @@ static i2c_master_bus_handle_t s_i2c;
 static i2s_chan_handle_t s_tx;
 static i2s_chan_handle_t s_rx;
 static esp_codec_dev_handle_t s_out;
+
+/* The DMA's own word on audio that came out wrong (perf.c): a TX buffer sent
+ * with nothing new in it is a gap the speaker plays, an RX buffer nobody
+ * read in time is sound the mics lost. */
+static volatile bool s_tx_watch;
+static volatile uint32_t s_tx_gaps;
+static volatile uint32_t s_rx_ovf;
+static uint32_t s_rx_ovf_seen;
+static uint32_t s_rx_lost;
+static int64_t s_rx_last_us;
+/* A reader back after this long had stopped on purpose (mic off, muted):
+ * what overflowed meanwhile wasn't wanted. */
+#define RX_PAUSE_US (500 * 1000)
 static esp_codec_dev_handle_t s_in;
 static esp_codec_dev_sample_info_t s_out_fs, s_in_fs;
 /* Closing a device powers its codec down (and the speaker's amplifier with
@@ -38,6 +53,20 @@ static bool s_out_muted = true;
 static bool s_lazy;
 static int s_volume = AUDIO_DEFAULT_VOLUME;
 static float s_in_gain_db = AUDIO_REF_GAIN_DB;
+
+static bool IRAM_ATTR tx_starved(i2s_chan_handle_t handle, i2s_event_data_t *event, void *ctx)
+{
+    if (s_tx_watch) {
+        s_tx_gaps++;
+    }
+    return false;
+}
+
+static bool IRAM_ATTR rx_overflowed(i2s_chan_handle_t handle, i2s_event_data_t *event, void *ctx)
+{
+    s_rx_ovf++;
+    return false;
+}
 
 /* TX in standard stereo mode for the ES8311, RX in 4-slot TDM for the ES7210,
  * both on I2S0 so they share MCLK/BCLK/WS. */
@@ -91,6 +120,11 @@ static esp_err_t i2s_start(void)
 
     ESP_RETURN_ON_ERROR(i2s_channel_init_std_mode(s_tx, &std_cfg), TAG, "i2s tx");
     ESP_RETURN_ON_ERROR(i2s_channel_init_tdm_mode(s_rx, &tdm_cfg), TAG, "i2s rx");
+    // Before enabling: the driver won't change them on a running channel.
+    const i2s_event_callbacks_t tx_cbs = {.on_send_q_ovf = tx_starved};
+    const i2s_event_callbacks_t rx_cbs = {.on_recv_q_ovf = rx_overflowed};
+    ESP_RETURN_ON_ERROR(i2s_channel_register_event_callback(s_tx, &tx_cbs, NULL), TAG, "i2s tx callbacks");
+    ESP_RETURN_ON_ERROR(i2s_channel_register_event_callback(s_rx, &rx_cbs, NULL), TAG, "i2s rx callbacks");
     ESP_RETURN_ON_ERROR(i2s_channel_enable(s_tx), TAG, "i2s tx enable");
     ESP_RETURN_ON_ERROR(i2s_channel_enable(s_rx), TAG, "i2s rx enable");
     return ESP_OK;
@@ -207,7 +241,28 @@ esp_err_t board_audio_write(const int16_t *samples, size_t count)
 esp_err_t board_audio_read(int16_t *frames_out, size_t frames)
 {
     int bytes = (int) (frames * BOARD_AUDIO_IN_CHANNELS * sizeof(int16_t));
-    return esp_codec_dev_read(s_in, frames_out, bytes) == ESP_CODEC_DEV_OK ? ESP_OK : ESP_FAIL;
+    esp_err_t err = esp_codec_dev_read(s_in, frames_out, bytes) == ESP_CODEC_DEV_OK ? ESP_OK : ESP_FAIL;
+    // Only one task reads: the overflows since its last read were its own
+    // lateness, unless it had stopped reading.
+    const int64_t now = esp_timer_get_time();
+    const uint32_t ovf = s_rx_ovf;
+    if (ovf != s_rx_ovf_seen && now - s_rx_last_us < RX_PAUSE_US) {
+        s_rx_lost += ovf - s_rx_ovf_seen;
+    }
+    s_rx_ovf_seen = ovf;
+    s_rx_last_us = now;
+    return err;
+}
+
+void board_audio_watch_tx(bool on)
+{
+    s_tx_watch = on;
+}
+
+void board_audio_gaps(uint32_t *tx_gaps, uint32_t *rx_lost)
+{
+    *tx_gaps = s_tx_gaps;
+    *rx_lost = s_rx_lost;
 }
 
 /* With s_lock held. */

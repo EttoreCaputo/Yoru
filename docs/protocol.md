@@ -318,6 +318,7 @@ The brain's answer may carry tags, which are taken out before it is said and act
 - `debug/cloud` `{"text": "..."}` answers a text as if it had been heard, for tests.
 - `debug/clip` `{"name": "sneeze", "mirror"?: bool, "source"?: string}` (since 0.20.7) plays one of the clips in `docs/animations.md` now, left for right with `mirror`, and answers `{"playing": name}`; an unknown name is an invalid params error. Since 0.20.9 `source` (a service, as `show_fetch` takes it) puts its effects in that service's colour and glyph, and `{"stop": true}` stops the clip playing (a `_loop` one plays until then), answering `{"stopped": true}`.
 - `debug/clips` (since 0.20.9) lists the clips this firmware has: `{"clips": [{"name", "seconds", "loop"}]}`.
+- `debug/perf` (since 0.20.11), with `{"reset": true}` optionally, answers how hard the board works, measured every 5 s: `idle_pct` and `idle_min_pct` per core, `lvgl` (`busy_pct`, `longest_us` and their peaks), each task above 0.5% (`name`, `core`, `pct` of one core in the last window, `peak_pct`), the free internal RAM and PSRAM, and `audio`: `speaker_gaps` (I2S buffers the speaker played with nothing new, while something was playing: heard as a click or a hole), `mic_lost` (mic buffers not read in time), `speech_underruns` and `speech_frames_lost` (speech that ran out or never arrived from the host or the network), `voice_frames_dropped` (what was said that the link had no room for). Peaks and counts are since boot or the last `reset`.
 
 ## Debugging Yoru's life
 

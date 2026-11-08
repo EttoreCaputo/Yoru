@@ -10,6 +10,7 @@
 #include "cloud.h"
 #include "cJSON.h"
 #include "esp_app_desc.h"
+#include "perf.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "errand.h"
@@ -346,6 +347,13 @@ void rpc_handle(uint8_t *payload, size_t len)
             result = life_status();
             lvgl_port_unlock();
         }
+    } else if (strcmp(name, "debug/perf") == 0) {
+        // How hard the board works and the audio's gaps; {"reset": true}
+        // starts the worst-of afresh, to measure one thing at a time.
+        if (cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(params, "reset"))) {
+            perf_reset();
+        }
+        result = perf_report();
     } else if (strcmp(name, "debug/audio") == 0) {
         const cJSON *cmd = cJSON_GetObjectItemCaseSensitive(params, "cmd");
         if (!cJSON_IsString(cmd)) {

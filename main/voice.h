@@ -105,6 +105,8 @@ const char *voice_wake_word_id(void);
 /** The wake-word ids the `model` partition has models for ("alexa",
  * "hiesp"), at most `max`; returns how many. */
 int voice_wake_words(const char **ids, int max);
+/** Since boot: frames of what was said that the link had no room for. */
+uint32_t voice_dropped_total(void);
 
 /* MultiNet's longest phrase, in bytes. */
 #define VOICE_PHRASE_MAX 63

@@ -8,6 +8,7 @@ idf_component_register(SRCS "approval.c" "toast.c" "inbox_ui.c" "inbox.c" "main.
                             "battery.c"
                             "board_tools.c"
                             "lvgl_port.c"
+                            "perf.c"
                             "eyes.c"
                             "clips.c"
                             "look.c"

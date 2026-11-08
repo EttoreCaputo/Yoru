@@ -106,7 +106,8 @@ void eyes_look_at(float x, float y);
 void eyes_look_around(void);
 
 /** The voice's level, 0..1 (the mic while listening, the speaker while
- * speaking): the eyes swell a little with it. 0 when nobody talks. */
+ * speaking): the eyes swell a little with it. 0 when nobody talks. Safe
+ * without the LVGL lock: one float, read every frame. */
 void eyes_set_level(float level);
 
 /** A ring round the body running out over `ms`: how long it still listens

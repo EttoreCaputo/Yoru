@@ -518,6 +518,14 @@ static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms, i
     }
 }
 
+/* Every utterance's, since boot (perf.c). */
+static uint32_t s_total_dropped;
+
+uint32_t voice_dropped_total(void)
+{
+    return s_total_dropped;
+}
+
 static void stream_end(end_reason_t reason)
 {
     stream_t *st = &s_stream;
@@ -529,6 +537,7 @@ static void stream_end(end_reason_t reason)
         s_afe->enable_wakenet(s_afe_data);
         s_wakenet_on = true;
     }
+    s_total_dropped += st->dropped;
     int ms = (int) (st->samples / 16);
     ESP_LOGI(TAG, "utterance %d: %d ms, %s%s", st->id, ms, END_NAMES[reason],
              st->dropped ? " (frames dropped)" : "");
@@ -628,9 +637,8 @@ static void stream_frame(const afe_fetch_result_t *res)
     if (now - st->level_us >= LEVEL_EVERY_MS * 1000) {
         st->level_us = now;
         float level = (res->data_volume - LEVEL_FLOOR_DB) / (LEVEL_CEIL_DB - LEVEL_FLOOR_DB);
-        lvgl_port_lock();
+        // No LVGL lock: a long frame would hold up the fetch, and the mics.
         ui_voice_set_level(level < 0 ? 0 : level > 1 ? 1 : level);
-        lvgl_port_unlock();
     }
 
     int64_t elapsed_ms = (now - st->start_us) / 1000;
@@ -682,9 +690,7 @@ static void local_end(int command)
         s_afe->enable_wakenet(s_afe_data);
         s_wakenet_on = true;
     }
-    lvgl_port_lock();
     ui_voice_set_level(0);
-    lvgl_port_unlock();
     voice_set_state(VOICE_IDLE);
     const voice_command_cb_t cb = s_on_command;
     if (cb != NULL) {
@@ -698,9 +704,8 @@ static void local_frame(const afe_fetch_result_t *res)
     if (now - s_local.level_us >= LEVEL_EVERY_MS * 1000) {
         s_local.level_us = now;
         float level = (res->data_volume - LEVEL_FLOOR_DB) / (LEVEL_CEIL_DB - LEVEL_FLOOR_DB);
-        lvgl_port_lock();
+        // No LVGL lock: a long frame would hold up the fetch, and the mics.
         ui_voice_set_level(level < 0 ? 0 : level > 1 ? 1 : level);
-        lvgl_port_unlock();
     }
     const esp_mn_state_t state = s_mn->detect(s_mn_data, res->data);
     if (state == ESP_MN_STATE_DETECTED) {
