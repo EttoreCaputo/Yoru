@@ -1,5 +1,9 @@
 # Firmware changelog
 
+## 0.20.16
+
+- **Smooth face while charging.** The green charging ring around Yoru used to halve the frame rate whenever the board was on USB and charging. It is now drawn from a picture prepared once, and only where the ring is: it looks the same, and the face runs as smoothly as off the charger.
+
 ## 0.20.15
 
 - **Yoru shows your meeting recordings.** While Yoru Hub records a meeting a small red pill sits at the top of the screen, with a breathing dot and the icon of the app recorded (Zoom, Teams, WhatsApp...). When the recording starts Yoru holds up the app's card and taps it; every couple of minutes he leans in and listens. All silent, not to be heard in the call.

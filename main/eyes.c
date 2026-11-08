@@ -9,6 +9,7 @@
 #include "esp_random.h"
 #include "icons.h"
 #include "look.h"
+#include "src/draw/lv_draw_private.h" // a draw task's state, for ring_blend()
 
 /* The easing's unit: its rates are per 33 ms, whatever the frame rate.
  * Motion follows the clock, not the frame count, so a slow frame doesn't
@@ -875,15 +876,234 @@ static void draw_countdown(lv_layer_t *layer, const body_vis_t *v)
 
 static lv_area_t box(float x, float y, float l, float t, float r, float b);
 
-/* The charge ring: a faint track all round, the charge from the top round
- * clockwise, and the spark running along it into Yoru. */
-static void draw_charge(lv_layer_t *layer, const body_vis_t *v)
+/* The charge ring. LVGL's arc tests every pixel of the whole circle's box,
+ * the empty inside too, and cost over 250 ms a second; even as a sprite an
+ * LVGL image costs about 45 us a draw and 80 ns a pixel here. So the ring's
+ * band (the track faint, the charge brighter) is rendered once into a mask
+ * that holds the band's pixels alone, row after row, and blended straight
+ * into the layer's buffer. The sphere's radius steps back and forth by a
+ * pixel as it breathes, so the last few rings are kept. */
+#define RING_SLOTS 4
+#define RING_TRACK_A 0.2f // the track's alpha, as the old arc's opa / 5
+#define RING_FILL_A 0.75f // the charge's, as opa * 3 / 4
+
+typedef struct {
+    uint8_t *mask;  // the band's coverage, row by row (PSRAM)
+    uint16_t *row;  // where each row starts in it, 2 * radius + 1 rows
+    uint32_t cap;   // radius it has room for
+    int32_t radius; // outer radius rendered, 0: none
+    int32_t deg;
+    uint32_t used;  // frame it was last drawn
+} ring_slot_t;
+
+static ring_slot_t s_rings[RING_SLOTS];
+
+/* The band's middle radius and half width for an arc of outer `radius`
+ * and CHARGE_W, as LVGL places it (its outer edge on `radius`); and how far
+ * in and out a pixel can be partly covered. */
+static void ring_band(int32_t radius, float *mid, float *half, float *ri, float *ro)
 {
-    if (v->charge <= 0 || v->charge_opa <= 0) {
+    *half = CHARGE_W / 2.0f;
+    *mid = (float) radius - *half + 0.5f;
+    *ro = *mid + *half + 0.5f;
+    *ri = fmaxf(0, *mid - *half - 0.5f);
+}
+
+/* Row `dy` (from the centre) of a ring: the band's x (from the centre) in
+ * a left piece [*l0, *l1] and a right piece [*r0, *r1], which never
+ * overlap; at the top and bottom the right piece may be empty. False:
+ * nothing on this row. */
+static bool ring_row(int32_t radius, int32_t dy, int32_t *l0, int32_t *l1, int32_t *r0, int32_t *r1)
+{
+    float mid, half, ri, ro;
+    ring_band(radius, &mid, &half, &ri, &ro);
+    const float dy2 = (float) (dy * dy);
+    if (dy2 >= ro * ro) {
+        return false;
+    }
+    const int32_t xo = (int32_t) sqrtf(ro * ro - dy2);
+    const int32_t xi = dy2 < ri * ri ? (int32_t) ceilf(sqrtf(ri * ri - dy2)) : 0;
+    *l0 = -xo;
+    *l1 = xi > 0 ? -xi : xo;
+    *r0 = xi > 0 ? xi : xo + 1;
+    *r1 = xo;
+    return true;
+}
+
+/* How far a pixel at (dx, dy) from the centre is from the charge arc: from
+ * the top round clockwise `deg` degrees (end direction (ex, ey)), with
+ * round ends. Between the two ends' radii it is the distance to the
+ * circle; elsewhere to the nearer end. */
+static float ring_arc_dist(float dx, float dy, float d, float mid, int32_t deg, float ex, float ey)
+{
+    // Clockwise past the top, and not yet past the end.
+    const bool past_top = dx >= 0, before_end = dx * (-ey) + dy * ex <= 0;
+    const bool on = deg <= 180 ? past_top && before_end : past_top || before_end;
+    if (on) {
+        return fabsf(d - mid);
+    }
+    return fminf(hypotf(dx, dy + mid), hypotf(dx - mid * ex, dy - mid * ey));
+}
+
+/* The band of a ring of outer radius r holds fewer pixels than this. */
+static uint32_t ring_mask_size(int32_t radius)
+{
+    return (uint32_t) (2 * (float) M_PI * (float) (radius + 1) * (CHARGE_W + 3) + 8 * (radius + 1));
+}
+
+static void ring_render(ring_slot_t *r, int32_t radius, int32_t deg)
+{
+    float mid, half, ri, ro;
+    ring_band(radius, &mid, &half, &ri, &ro);
+    const float e = ((float) deg - 90) * (float) M_PI / 180.0f, ex = cosf(e), ey = sinf(e);
+    const uint32_t size = ring_mask_size((int32_t) r->cap);
+    uint32_t at = 0;
+    for (int32_t dy = -radius; dy <= radius; dy++) {
+        r->row[dy + radius] = (uint16_t) at;
+        int32_t sp[4];
+        if (!ring_row(radius, dy, &sp[0], &sp[1], &sp[2], &sp[3])) {
+            continue;
+        }
+        for (int k = 0; k < 4; k += 2) {
+            for (int32_t x = sp[k]; x <= sp[k + 1] && at < size; x++) {
+                const float dx = (float) x, fy = (float) dy, d = sqrtf(dx * dx + fy * fy);
+                const float track = clampf(half + 0.5f - fabsf(d - mid), 0, 1) * RING_TRACK_A;
+                const float fill = clampf(half + 0.5f - ring_arc_dist(dx, fy, d, mid, deg, ex, ey), 0, 1) * RING_FILL_A;
+                r->mask[at++] = (uint8_t) ((1 - (1 - track) * (1 - fill)) * 255.0f + 0.5f);
+            }
+        }
+    }
+    r->radius = radius;
+    r->deg = deg;
+}
+
+/* The ring of outer `radius` with `deg` of charge: a kept one, or the least
+ * recently drawn slot rendered again. NULL if memory runs out. */
+static ring_slot_t *ring_get(int32_t radius, int32_t deg, uint32_t frame)
+{
+    ring_slot_t *pick = NULL;
+    for (int i = 0; i < RING_SLOTS; i++) {
+        ring_slot_t *r = &s_rings[i];
+        if (r->radius == radius && r->deg == deg) {
+            r->used = frame;
+            return r;
+        }
+        // An empty slot first, else the one drawn longest ago.
+        if (pick == NULL || (pick->radius != 0 && (r->radius == 0 || frame - r->used > frame - pick->used))) {
+            pick = r;
+        }
+    }
+    if ((uint32_t) radius > pick->cap) {
+        heap_caps_free(pick->mask);
+        heap_caps_free(pick->row);
+        // A little room to grow, so a sphere coming nearer reuses it.
+        const int32_t cap = radius + 16;
+        pick->mask = heap_caps_malloc(ring_mask_size(cap), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        pick->row = heap_caps_malloc((size_t) (2 * cap + 1) * sizeof(uint16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        pick->cap = pick->mask && pick->row ? (uint32_t) cap : 0;
+        pick->radius = 0;
+        if (pick->cap == 0) {
+            return NULL;
+        }
+    }
+    ring_render(pick, radius, deg);
+    pick->used = frame;
+    return pick;
+}
+
+/* Blending straight into the layer's buffer is safe because LVGL runs
+ * without an OS: every task drawn before has already been executed into it.
+ * False (draw through LVGL instead) if one is still pending or the buffer
+ * is not one these know. */
+static bool layer_direct(lv_layer_t *layer)
+{
+    for (const lv_draw_task_t *t = layer->draw_task_head; t != NULL; t = t->next) {
+        if (t->state != LV_DRAW_TASK_STATE_READY) {
+            return false;
+        }
+    }
+    const lv_color_format_t cf = layer->color_format;
+    return (cf == LV_COLOR_FORMAT_RGB565 || cf == LV_COLOR_FORMAT_RGB888) && lv_draw_layer_alloc_buf(layer) != NULL;
+}
+
+/* A run of `n` pixels of `layer` from (x, y), each blended with `color` at
+ * alpha a[i] * opa / 255. */
+static void blend_run(lv_layer_t *layer, int32_t x, int32_t y, int32_t n, const uint8_t *a, lv_opa_t opa,
+                      lv_color_t color)
+{
+    uint8_t *dst = lv_draw_layer_go_to_xy(layer, x - layer->buf_area.x1, y - layer->buf_area.y1);
+    if (layer->color_format == LV_COLOR_FORMAT_RGB565) {
+        // The usual RGB565 blend: green moved up out of the way, the three
+        // mixed at once with a 5-bit alpha.
+        const uint32_t c16 = lv_color_to_u16(color), fg = (c16 | (c16 << 16)) & 0x07E0F81F;
+        uint16_t *p = (uint16_t *) dst;
+        for (int32_t i = 0; i < n; i++) {
+            const uint32_t a5 = ((uint32_t) a[i] * opa + 1024) >> 11;
+            if (a5 == 0) {
+                continue;
+            }
+            const uint32_t bg = (p[i] | ((uint32_t) p[i] << 16)) & 0x07E0F81F;
+            const uint32_t m = ((((fg - bg) * a5) >> 5) + bg) & 0x07E0F81F;
+            p[i] = (uint16_t) (m | (m >> 16));
+        }
         return;
     }
-    const lv_color_t green = lv_color_hex(CHARGE_RGB);
-    const int32_t radius = LV_MAX(v->rx, v->ry) + COUNTDOWN_GAP;
+    for (int32_t i = 0; i < n; i++, dst += 3) { // LVGL's RGB888 is B, G, R
+        const uint32_t k = ((uint32_t) a[i] * opa + 127) / 255, nk = 255 - k;
+        if (k == 0) {
+            continue;
+        }
+        dst[0] = (uint8_t) ((color.blue * k + dst[0] * nk) / 255);
+        dst[1] = (uint8_t) ((color.green * k + dst[1] * nk) / 255);
+        dst[2] = (uint8_t) ((color.red * k + dst[2] * nk) / 255);
+    }
+}
+
+/* The ring centred on (cx, cy), what of it falls in the clip area. */
+static void ring_blend(lv_layer_t *layer, const ring_slot_t *r, int32_t cx, int32_t cy, lv_opa_t opa,
+                       lv_color_t color)
+{
+    const lv_area_t *clip = &layer->_clip_area;
+    const int32_t y0 = LV_MAX(clip->y1, cy - r->radius), y1 = LV_MIN(clip->y2, cy + r->radius);
+    for (int32_t y = y0; y <= y1; y++) {
+        int32_t sp[4];
+        if (!ring_row(r->radius, y - cy, &sp[0], &sp[1], &sp[2], &sp[3])) {
+            continue;
+        }
+        const uint8_t *a = r->mask + r->row[y - cy + r->radius];
+        for (int k = 0; k < 4; k += 2) {
+            const int32_t x0 = cx + sp[k], x1 = cx + sp[k + 1];
+            const int32_t c0 = LV_MAX(clip->x1, x0), c1 = LV_MIN(clip->x2, x1);
+            if (c0 <= c1) {
+                blend_run(layer, c0, y, c1 - c0 + 1, a + (c0 - x0), opa, color);
+            }
+            a += LV_MAX(0, x1 - x0 + 1);
+        }
+    }
+}
+
+/* A small antialiased disc of radius `rad` at (x, y), blended as above. */
+static void disc_blend(lv_layer_t *layer, float x, float y, float rad, lv_color_t color, lv_opa_t opa)
+{
+    const lv_area_t *clip = &layer->_clip_area;
+    const int32_t y0 = LV_MAX(clip->y1, (int32_t) floorf(y - rad - 1)), y1 = LV_MIN(clip->y2, (int32_t) ceilf(y + rad + 1));
+    const int32_t x0 = LV_MAX(clip->x1, (int32_t) floorf(x - rad - 1)), x1 = LV_MIN(clip->x2, (int32_t) ceilf(x + rad + 1));
+    uint8_t a[32];
+    if (x1 < x0 || x1 - x0 + 1 > (int32_t) sizeof(a)) {
+        return;
+    }
+    for (int32_t py = y0; py <= y1; py++) {
+        for (int32_t px = x0; px <= x1; px++) {
+            const float d = hypotf((float) px - x, (float) py - y);
+            a[px - x0] = (uint8_t) (clampf(rad + 0.5f - d, 0, 1) * 255.0f);
+        }
+        blend_run(layer, x0, py, x1 - x0 + 1, a, opa, color);
+    }
+}
+
+/* The ring through LVGL, when the buffer can't be written: slow, but rare. */
+static void ring_lvgl(lv_layer_t *layer, const body_vis_t *v, int32_t radius, int32_t deg, lv_color_t green)
+{
     lv_draw_arc_dsc_t dsc;
     lv_draw_arc_dsc_init(&dsc);
     dsc.color = green;
@@ -898,13 +1118,50 @@ static void draw_charge(lv_layer_t *layer, const body_vis_t *v)
     lv_draw_arc(layer, &dsc);
     dsc.opa = (lv_opa_t) (v->charge_opa * 3 / 4);
     dsc.start_angle = 270;
-    dsc.end_angle = (270 + LV_MIN(v->charge, 359)) % 360;
+    dsc.end_angle = (270 + deg) % 360;
     lv_draw_arc(layer, &dsc);
-    if (v->spark >= 0) {
-        const float a = (float) (v->spark - 90) * (float) M_PI / 180.0f;
-        const float x = (float) v->bx + (float) radius * cosf(a), y = (float) v->by + (float) radius * sinf(a);
-        draw_disc(layer, x, y, 6, green, (lv_opa_t) (v->charge_opa / 3));
-        draw_disc(layer, x, y, 3, lv_color_hex(0xE8FFF0), (lv_opa_t) v->charge_opa);
+}
+
+/* Where the charge's spark is: on the ring, `spark` degrees from the top.
+ * False while it rests. */
+static bool spark_pos(const body_vis_t *v, float *x, float *y)
+{
+    if (v->charge <= 0 || v->spark < 0) {
+        return false;
+    }
+    const float r = (float) (LV_MAX(v->rx, v->ry) + COUNTDOWN_GAP);
+    const float a = (float) (v->spark - 90) * (float) M_PI / 180.0f;
+    *x = (float) v->bx + r * cosf(a);
+    *y = (float) v->by + r * sinf(a);
+    return true;
+}
+
+/* The charge ring: a faint track all round, the charge from the top round
+ * clockwise, and the spark running along it into Yoru. */
+static void draw_charge(lv_layer_t *layer, const body_vis_t *v)
+{
+    if (v->charge <= 0 || v->charge_opa <= 0) {
+        return;
+    }
+    const lv_color_t green = lv_color_hex(CHARGE_RGB), white = lv_color_hex(0xE8FFF0);
+    const int32_t radius = LV_MAX(v->rx, v->ry) + COUNTDOWN_GAP;
+    const int32_t deg = LV_MIN(v->charge, 359);
+    const lv_opa_t opa = (lv_opa_t) LV_MIN(v->charge_opa, 255);
+    float x = 0, y = 0;
+    const bool spark = spark_pos(v, &x, &y);
+    const ring_slot_t *ring = layer_direct(layer) ? ring_get(radius, deg, s.frame) : NULL;
+    if (ring == NULL) {
+        ring_lvgl(layer, v, radius, deg, green);
+        if (spark) {
+            draw_disc(layer, x, y, 6, green, (lv_opa_t) (opa / 3));
+            draw_disc(layer, x, y, 3, white, opa);
+        }
+        return;
+    }
+    ring_blend(layer, ring, v->bx, v->by, opa, green);
+    if (spark) {
+        disc_blend(layer, x, y, 6, green, (lv_opa_t) (opa / 3));
+        disc_blend(layer, x, y, 3, white, opa);
     }
 }
 
@@ -1595,6 +1852,17 @@ static bool areas_equal(const lv_area_t *a, const lv_area_t *b)
 
 /* Redraws where something was and where it is now: one box if the two touch
  * (a small step), two if it jumped (a z starting over at the bottom). */
+/* The spark's box, its glow and antialiasing in. False while it rests. */
+static bool spark_area(const body_vis_t *v, lv_area_t *out)
+{
+    float x, y;
+    if (!spark_pos(v, &x, &y)) {
+        return false;
+    }
+    *out = box(x, y, 9, 9, 9, 9);
+    return true;
+}
+
 static void invalidate_move(const lv_area_t *was, const lv_area_t *now)
 {
     bool touch = was->x1 <= now->x2 && now->x1 <= was->x2 && was->y1 <= now->y2 && now->y1 <= was->y2;
@@ -2002,8 +2270,20 @@ static void frame_cb(lv_timer_t *timer)
     PROF(PROF_BALL, s.ball = lv_obj_has_flag(s.obj, LV_OBJ_FLAG_HIDDEN) ? NULL
                                                                          : look_ball(s.body.rx, s.body.ry, s.frame));
 
-    // The body: the sphere, the tint, the halo.
-    const bool body_changed = !s.body_valid || memcmp(&was, &s.body, sizeof(was)) != 0;
+    // The body: the sphere, the tint, the halo, the rings. The charge's
+    // spark moves every few frames: only its own box, not the whole body.
+    body_vis_t was_still = was, now_still = s.body;
+    was_still.spark = now_still.spark = 0;
+    const bool body_changed = !s.body_valid || memcmp(&was_still, &now_still, sizeof(was)) != 0;
+    if (!body_changed && was.spark != s.body.spark) {
+        lv_area_t a, b;
+        const bool had = spark_area(&was, &a), has = spark_area(&s.body, &b);
+        if (had && has) {
+            invalidate_move(&a, &b);
+        } else if (had || has) {
+            lv_obj_invalidate_area(s.obj, had ? &a : &b);
+        }
+    }
     if (body_changed) {
         lv_area_t now = body_area(&s.body);
         if (s.body_valid) {
