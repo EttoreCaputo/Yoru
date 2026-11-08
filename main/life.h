@@ -60,9 +60,6 @@ typedef enum {
     LIFE_FEEL_FUN,     // it had fun on its own
     LIFE_FEEL_SOUND,   // a sudden noise
     LIFE_FEEL_PLUGGED,
-    LIFE_FEEL_FRIEND,  // another Yoru came by
-    LIFE_FEEL_FRIEND_ASLEEP, // the other Yoru fell asleep
-    LIFE_FEEL_JEALOUS, // you stroke the other Yoru
     LIFE_FEEL_COUNT,
 } life_feel_t;
 
@@ -85,15 +82,6 @@ void life_woke(void);
 bool life_call(void);
 /** It is at the glass for you right now: a touch means "I'm coming". */
 bool life_calling(void);
-/** Join in with another Yoru (behaviour.c): an act (`yawn`, `dance`...)
- * now, over what it was doing on its own, without telling the friends
- * again. False if it isn't living its own life now (a call, a nap...) or
- * the name is unknown. */
-bool life_join(const char *act);
-/** The other Yoru's firefly flew off towards it: one comes in from the edge
- * at (x, y), a unit vector in the picture's axes, `along` (-1..1) along
- * that edge. False as life_join(). */
-bool life_firefly_from(float x, float y, float along);
 
 /** Something happened to it: its emotions move. */
 void life_feel(life_feel_t feel);

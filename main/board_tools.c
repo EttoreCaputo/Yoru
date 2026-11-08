@@ -15,7 +15,6 @@
 #include "esp_timer.h"
 #include "errand.h"
 #include "eyes.h"
-#include "friends.h"
 #include "tasks.h"
 #include "inbox.h"
 #include "inbox_ui.h"
@@ -362,7 +361,6 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
     cJSON_AddNumberToObject(l, "rx_ignored", link.rx_ignored);
     cJSON_AddStringToObject(l, "transport", link_transport_name(link_active()));
     cJSON_AddItemToObject(st, "wifi", net_status());
-    cJSON_AddItemToObject(st, "friends", friends_status());
     board_pmu_state_t bat;
     board_pmu_get(&bat);
     cJSON *b = cJSON_AddObjectToObject(st, "battery");

@@ -483,21 +483,6 @@ bool mind_force_act(const char *name)
     return true;
 }
 
-bool mind_act_now(act_id_t act)
-{
-    if (act >= ACT_COUNT) {
-        return false;
-    }
-    if (D.running) {
-        eyes_firefly(false, 0, 0);
-        eyes_cross(0);
-    }
-    D.running = false;
-    D.forced = act;
-    D.gap_until = LT.now;
-    return true;
-}
-
 void mind_status(cJSON *out)
 {
     cJSON_AddStringToObject(out, "state", STATES[D.st].name);

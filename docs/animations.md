@@ -136,7 +136,7 @@ Comedy. 83 frames (2.8 s), once, either way round. **Animated**; played by the h
 
 A crouch and a jolt up (stretch 0.91 / 1.12, eyes wide), a land with a squash; again, bigger and tilted. Then happy eyes and little bobs, the right hand over his "mouth".
 
-### 12. `dance` — music, or dancing with a friend
+### 12. `dance` — music
 Joy. 94 frames (3.1 s), once, either way round. **Animated**; played by the dance Yoru does on his own and `react` `dance`.
 
 A beat every 12 frames (150 bpm): squash on the beat, up between, swaying 30 left and right with the tilt following; the arm on the side he sways to goes up. Then two hops in place with both arms up and out (not over the head: there they read as ears), and settle. Happy eyes throughout.
@@ -147,7 +147,7 @@ Mischief. 129 frames (4.3 s), once, either way round. **Animated**; played inste
 Looks right and crouches, dashes out right (accelerating, stretched), and at frame 25 jumps to the far left off screen (the player holds across a jump this big instead of sweeping across). Waits, then peeks in from the left edge (half the body showing, eyes wide, a blink, a tilt), backs off a little and pops back to the middle on an arc, landing with a squash, hands out "ta-da", happy eyes.
 
 ### 14. `melt` — stroked
-Contentment. 91 frames (3 s), once. **Animated**; played when a stroke is felt (not when jealousy is won back: that is `love`).
+Contentment. 91 frames (3 s), once. **Animated**; played when a stroke is felt.
 
 Happy eyes at once; the body flattens (1.15 / 0.86) and sinks 16, a little nearer, the hands flopped out low; it sways with the finger, then pulls itself together with a wobble.
 

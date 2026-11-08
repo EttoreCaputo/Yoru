@@ -14,7 +14,6 @@
 #include "esp_log.h"
 #include "errand.h"
 #include "eyes.h"
-#include "friends.h"
 #include "life.h"
 #include "link.h"
 #include "lvgl_port.h"
@@ -291,35 +290,6 @@ void rpc_handle(uint8_t *payload, size_t len)
             message = cloud_ready() ? "expected {\"text\": string}" : "no services or no WiFi";
         } else {
             result = cJSON_CreateObject();
-        }
-    } else if (strcmp(name, "debug/friends") == 0) {
-        // The hello to other Yorus, on at boot (docs/FRIENDS.md): switched
-        // until the next restart, to test it or should a router mind it.
-        const cJSON *on = cJSON_GetObjectItemCaseSensitive(params, "on");
-        const cJSON *tell = cJSON_GetObjectItemCaseSensitive(params, "tell");
-        const cJSON *side = cJSON_GetObjectItemCaseSensitive(params, "side_deg");
-        if ((on != NULL && !cJSON_IsBool(on)) || (tell != NULL && !cJSON_IsString(tell))
-            || (side != NULL && !cJSON_IsNumber(side))) {
-            code = RPC_INVALID_PARAMS;
-            message = "expected {\"on\"?: bool, \"tell\"?: event, \"side_deg\"?: degrees}";
-        } else if (tell != NULL && !friends_tell(tell->valuestring)) {
-            code = RPC_INVALID_PARAMS;
-            message = "unknown event: yawn, sneeze, hiccup, dance, asleep, woke, stroked, talk, chat, firefly";
-        } else if (side != NULL && !friends_set_side(side->valueint)) {
-            code = RPC_INVALID_PARAMS;
-            message = "no friend in range";
-        } else {
-            if (on != NULL) {
-                friends_enable(cJSON_IsTrue(on));
-            }
-            const cJSON *every = cJSON_GetObjectItemCaseSensitive(params, "hello_ms");
-            if (cJSON_IsNumber(every)) {
-                friends_hello_every(every->valueint);
-            }
-            result = cJSON_CreateObject();
-            cJSON_AddBoolToObject(result, "on", friends_enabled());
-            friends_bump_stats(result);
-            cJSON_AddItemToObject(result, "friends", friends_status());
         }
     } else if (strcmp(name, "debug/clips") == 0) {
         // The clips this firmware has, for a host to list them.

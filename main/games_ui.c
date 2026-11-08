@@ -7,7 +7,6 @@
 
 #include "card.h"
 #include "game_kit.h"
-#include "game_pass.h"
 #include "game_sling.h"
 #include "game_stars.h"
 #include "game_tilt.h"
@@ -40,7 +39,6 @@ static const game_def_t GAMES[] = {
     {"Tilt ball", "Rotola a casa", 0x3C4A78, 0x161C36, game_tilt_start, game_tilt_icon},
     {"Slingshot", "Fionda", 0x2A2440, 0x0E0B1C, game_sling_start, game_sling_icon},
     {"Constellations", "Costellazioni", 0x1C2A44, 0x080E1E, game_stars_start, game_stars_icon},
-    {"Pass the ball", "Passa la palla", 0x3A3420, 0x16130A, game_pass_start, game_pass_icon},
 };
 #define GAME_COUNT ((int) (sizeof(GAMES) / sizeof(GAMES[0])))
 

@@ -76,9 +76,6 @@ void motion_touched(void);
  * for get_state and for checking the axes on a new board. */
 void motion_raw(float g[3], float w[3]);
 
-/** The case is being moved (not still for half a second). From any task. */
-bool motion_moving(void);
-
 const char *motion_event_name(motion_event_t event);
 
 #ifdef __cplusplus

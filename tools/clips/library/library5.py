@@ -220,37 +220,6 @@ def bored():
     return still(c)
 
 
-def jealous():
-    """Jealous: it turns away with a pout (narrowed face, lids slanting down
-    to the nose), hands crossed low in front, a "hmph" bob with its chin up,
-    then a sidelong glance back, a flick away again, and back to rest.
-    Plays when the user strokes the other Yoru."""
-    c = Clip("jealous", 72)
-    c.k(BODY, "x", (0, 0, "h"), (3, 0), (16, 22, "h"), (54, 22), (64, 0, "h"))
-    c.k(BODY, "y", (0, 0, "h"), (3, 0), (6, 4, "i"), (10, -2, "o"), (16, 0, "h"), (24, 0), (27, -12, "i"),
-        (30, 5, "o"), (35, 0, "h"), (54, 0), (60, -3), (64, 0, "h"))
-    c.k(BODY, "sx", (0, 100, "h"), (3, 100), (6, 104, "i"), (10, 97, "o"), (16, 100, "h"), (24, 100), (27, 95, "i"),
-        (30, 107, "o"), (35, 100, "h"))
-    c.k(BODY, "sy", (0, 100, "h"), (3, 100), (6, 96, "i"), (10, 103, "o"), (16, 100, "h"), (24, 100), (27, 106, "i"),
-        (30, 93, "o"), (35, 100, "h"))
-    c.k(BODY, "r", (0, 0, "h"), (3, 0), (16, 5, "h"), (24, 5), (28, 9), (34, 5, "h"), (54, 5), (64, 0, "h"))
-    c.k(LOOK, "x", (0, 0, "h"), (5, 0), (16, 82, "h"), (36, 82), (42, 30, "h"), (48, 30, "i"), (51, 88, "o"),
-        (54, 84, "h"), (56, 84), (66, 0, "h"))
-    c.k(LOOK, "sx", (0, 100, "h"), (5, 100), (16, 56, "h"), (36, 56), (42, 72, "h"), (48, 72, "i"), (51, 54, "o"),
-        (54, 56, "h"), (56, 56), (66, 100, "h"))
-    c.k(LOOK, "y", (0, 0, "h"), (24, 0), (28, -8, "h"), (36, -8), (42, 2, "h"), (54, 2), (64, 0, "h"))
-    for v in INNER:
-        c.k(v, "vy", (0, -30, "h"), (5, -30), (14, lid(0.32), "h"), (36, lid(0.32)), (42, lid(0.45), "h"),
-            (48, lid(0.45)), (51, lid(0.32), "h"), (56, lid(0.32)), (64, -30, "h"))
-    for v in OUTER:
-        c.k(v, "vy", (0, -30, "h"), (36, -30), (42, lid(0.15), "h"), (48, lid(0.15)), (51, -30, "h"))
-    c.eyes("sy", (0, 100, "h"), (5, 100), (14, 90, "h"), (36, 90), (42, 80, "h"), (48, 80), (51, 90, "h"), (56, 90),
-           (64, 100, "h"))
-    c.hand(HL, (0, TUCK_L, "h"), (6, TUCK_L, "o"), (16, (104, 84, 1.05)), (20, (100, 88, 1), "h"), (26, (100, 88, 1)),
-           (30, (100, 96, 1), "o"), (35, (100, 88, 1), "h"), (54, (100, 88, 1), "i"), (64, TUCK_L, "h"))
-    c.hand(HR, (0, TUCK_R, "h"), (8, TUCK_R, "o"), (18, (52, 104, 1.05)), (22, (56, 100, 1), "h"), (27, (56, 100, 1)),
-           (31, (56, 108, 1), "o"), (36, (56, 100, 1), "h"), (55, (56, 100, 1), "i"), (65, TUCK_R, "h"))
-    return still(c)
 
 
 def shoo():
@@ -298,5 +267,5 @@ def think_loop():
     return c
 
 
-NEW = {f.__name__: f for f in (focus, angry_huff, hot_fan, sleepy_sway, sigh, scared_cover, bored, jealous, shoo,
+NEW = {f.__name__: f for f in (focus, angry_huff, hot_fan, sleepy_sway, sigh, scared_cover, bored, shoo,
                                think_loop)}

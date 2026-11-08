@@ -105,12 +105,6 @@ typedef struct {
 } act_style_t;
 
 void acts_start(act_id_t id, const act_style_t *style);
-/* The next act starts as a guest's: joining another Yoru, so the friends
- * aren't told about it. */
-void acts_as_guest(void);
-/* The next firefly comes in from the edge at (x, y) (a unit vector), `along`
- * that edge, instead of out of nowhere. */
-void acts_firefly_from(float x, float y, float along);
 /* True when it's done. */
 bool acts_step(void);
 act_id_t acts_by_name(const char *name);
@@ -133,6 +127,4 @@ const char *mind_state(void);
 const char *mind_act(void);
 bool mind_force_state(const char *name);
 bool mind_force_act(const char *name);
-/* That act now, dropping the one in hand. */
-bool mind_act_now(act_id_t act);
 void mind_status(cJSON *out);

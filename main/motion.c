@@ -99,8 +99,6 @@ static const char *TAG = "motion";
 #define LEAN_FULL_G 0.40f
 #define UPRIGHT_FLAT_G 0.55f
 #define UPRIGHT_MS 800
-/* Still for less than this: it's being moved. */
-#define MOVING_MS 500
 /* After a landing the case still rings: nothing else for a moment. */
 #define LAND_QUIET_MS 1000
 
@@ -130,8 +128,6 @@ static volatile int s_zsign = 1;
 static volatile bool s_zsign_known;
 static volatile bool s_zsign_dirty;
 static float s_raw_z;
-/* Moved within the last moment (friends.c says hello faster then). */
-static volatile bool s_moving;
 static TaskHandle_t s_task;
 /* What the task does (motion_set_mode()); it only reads it. */
 static volatile motion_mode_t s_mode = MOTION_FULL;
@@ -393,7 +389,6 @@ static void step(const float a[3], const float w[3])
     }
     const int64_t prev_still = m.still_ms;
     m.still_ms = (dyn < STILL_G && wmag < STILL_DPS) ? m.still_ms + PERIOD_MS : 0;
-    s_moving = m.still_ms < MOVING_MS;
 
     if (m.now < m.quiet_until || m.falling) {
         return;
@@ -669,11 +664,6 @@ void motion_raw(float g[3], float w[3])
     memcpy(g, s_g_out, sizeof(s_g_out));
     memcpy(w, s_w_out, sizeof(s_w_out));
     portEXIT_CRITICAL(&s_mux);
-}
-
-bool motion_moving(void)
-{
-    return s_moving;
 }
 
 const char *motion_event_name(motion_event_t event)

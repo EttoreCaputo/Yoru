@@ -1,5 +1,4 @@
-"""The fourth batch: joy and company (happy, excited, love, a high five and a
-chat with another Yoru on its right). 30 fps; Rive units."""
+"""The fourth batch: joy (happy, excited, love). 30 fps; Rive units."""
 from author import (BODY, HL, HR, LBM, LOOK, LTL, LTR, RBM, RTL, RTR, TUCK_L, TUCK_R, Clip, lid)
 from library import happy, near
 
@@ -225,89 +224,10 @@ def giggle():
     return tucked_at_end(c)
 
 
-def high_five():
-    """A high five with the other Yoru on its right (mirrored for the left).
-
-    0-10 anticipation: eyes to the right, a lean back left and a crouch;
-    10-17 it reaches up-right, the right hand grows and swings up; 18 the
-    slap: the hand flattens big, the body squashes, a burst of sparkles and
-    a flash of glow, a squint; 20-34 recoil, ^ ^, the hand comes back;
-    34-48 settle with a small overshoot. Ends at rest. Colour: gold.
-    """
-    c = Clip("high_five", 54)
-    c.k(BODY, "x", (0, 0), (10, -12, "i"), (17, 26, "o"), (19, 22), (26, 8), (36, -3), (42, 0, "h"), (54, 0, "h"))
-    c.k(BODY, "y", (0, 0), (10, 6, "i"), (17, -14, "o"), (19, -10), (26, -4), (34, 2), (40, 0, "h"))
-    c.k(BODY, "sx", (0, 100), (10, 106, "i"), (16, 94, "o"), (18, 94, "l"), (19, 108, "o"), (26, 97), (32, 102),
-        (38, 100, "h"))
-    c.k(BODY, "sy", (0, 100), (10, 94, "i"), (16, 107, "o"), (18, 107, "l"), (19, 92, "o"), (26, 103), (32, 98),
-        (38, 100, "h"))
-    c.k(BODY, "r", (0, 0), (10, -5, "i"), (17, 9, "o"), (19, 11), (28, 2), (36, -2), (42, 0, "h"))
-    c.k(LOOK, "x", (0, 0, "o"), (4, 34, "h"), (30, 34), (42, 0, "h"))
-    c.k(LOOK, "y", (0, 0, "h"), (4, 0), (12, -14, "h"), (28, -14), (40, 0, "h"))
-    sx, sy = happy(c, 19, 23, 38, 44)
-    c.eyes("sx", (0, 100, "h"), (2, 100), (8, 108, "h"), (17, 108), *sx)
-    c.eyes("sy", (0, 100, "h"), (2, 100), (8, 114, "h"), (17, 114), *sy)
-    c.hand(HR, (0, TUCK_R, "h"), (6, TUCK_R, "o"), (11, (150, 10, 1)), (16, (196, -112, 1.15), "i"),
-           (18, (206, -120, 1.15), "o"), (19, (200, -116, 1.4), "o"), (22, (190, -108, 1.1)), (28, (170, -80, 1.05)),
-           (34, (150, -20, 1), "i"), (40, TUCK_R, "h"))
-    c.hand(HL, (0, TUCK_L, "h"), (8, TUCK_L, "o"), (13, (-150, 40, 0.95)), (19, (-158, 20, 0.95)), (30, TUCK_L, "h"))
-    c.glow((0, 0, "h"), (17, 0, "l"), (19, 0.8, "o"), (36, 0, "h"))
-    c.spark((0, 0, "h"), (17, 0, "l"), (19, 1, "o"), (38, 0, "h"))
-    return tucked_at_end(c)
 
 
-def chat():
-    """Chatting with the other Yoru on its right (mirrored for the left).
-
-    0-6 it turns its face that way and leans a touch; 6-28 little "talking"
-    bobs with the lids lifting and dropping like eyebrows and the right hand
-    making a small gesture; 28-33 back to the front. Ends at rest.
-    """
-    c = Clip("chat", 39)
-    c.k(BODY, "y", (0, 0), (3, 2, "i"), (8, -4), (11, 0), (14, -5), (17, 0), (21, -4), (24, 0), (27, -3), (32, 0, "h"),
-        (39, 0, "h"))
-    c.k(BODY, "sy", (0, 100), (3, 98, "i"), (8, 103), (11, 99), (14, 104), (17, 99), (21, 103), (24, 99), (27, 102),
-        (32, 100, "h"))
-    c.k(BODY, "sx", (0, 100), (3, 102, "i"), (8, 98), (11, 101), (14, 97), (17, 101), (21, 98), (24, 101), (27, 99),
-        (32, 100, "h"))
-    c.k(BODY, "r", (0, 0), (6, 5, "h"), (26, 5), (33, 0, "h"))
-    c.k(LOOK, "x", (0, 0, "o"), (6, 36, "h"), (26, 36), (33, 0, "h"))
-    c.k(LOOK, "sx", (0, 100, "o"), (6, 88, "h"), (26, 88), (33, 100, "h"))
-    c.k(LOOK, "y", (0, 0), (6, -4, "h"), (26, -4), (33, 0, "h"))
-    # Eyebrows: the lids drop between words and lift on them.
-    for v in LIDS:
-        c.k(v, "vy", (0, -30, "h"), (6, -30), (9, lid(0.2)), (13, -30), (16, lid(0.25)), (20, -30), (23, lid(0.2)),
-            (27, -30, "h"))
-    c.eyes("sy", (0, 100, "h"), (6, 100), (8, 108), (13, 100), (15, 110), (20, 100), (22, 106), (27, 100, "h"))
-    c.hand(HR, (0, TUCK_R, "h"), (4, TUCK_R, "o"), (10, (150, 24, 0.95)), (15, (164, -18, 1)), (19, (152, 10, 0.95)),
-           (23, (160, -8, 0.95), "i"), (31, TUCK_R, "h"))
-    return tucked_at_end(c)
 
 
-def chat_reply():
-    """The reply in a chat with the other Yoru on its right (mirrored for
-    the left).
-
-    0-6 it turns to listen, eyes wide, a slight tilt; 8-22 two nods (the
-    face dips, the body follows); 22-31 a small happy bounce with ^ ^;
-    31-34 back to the front. Ends at rest.
-    """
-    c = Clip("chat_reply", 39)
-    c.k(BODY, "y", (0, 0, "h"), (8, 0), (11, 7), (14, 0), (17, 7), (20, 0), (23, 4, "i"), (27, -10, "o"),
-        (31, 2), (34, 0, "h"), (39, 0, "h"))
-    c.k(BODY, "sx", (0, 100, "h"), (8, 100), (11, 103), (14, 100), (17, 103), (20, 100), (23, 105, "i"),
-        (27, 95, "o"), (31, 103), (34, 100, "h"))
-    c.k(BODY, "sy", (0, 100, "h"), (8, 100), (11, 97), (14, 100), (17, 97), (20, 100), (23, 95, "i"),
-        (27, 105, "o"), (31, 97), (34, 100, "h"))
-    c.k(BODY, "r", (0, 0), (6, 4, "h"), (24, 4), (32, 0, "h"))
-    c.k(LOOK, "x", (0, 0, "o"), (5, 34, "h"), (26, 34), (33, 0, "h"))
-    c.k(LOOK, "sx", (0, 100, "o"), (5, 90, "h"), (26, 90), (33, 100, "h"))
-    c.k(LOOK, "y", (0, 0, "h"), (8, 0), (11, 18), (14, 0), (17, 18), (20, 0, "h"), (33, 0, "h"))
-    sx, sy = happy(c, 22, 25, 30, 34)
-    c.eyes("sx", (0, 100, "o"), (5, 106, "h"), (20, 106), (22, 100), *sx[1:])
-    c.eyes("sy", (0, 100, "o"), (5, 112, "h"), (20, 112), (22, 100), *sy[1:])
-    return tucked_at_end(c)
 
 
-NEW = {f.__name__: f for f in (happy_hop, excited_clap, wink, relieved, charged, love, giggle, high_five, chat,
-                               chat_reply)}
+NEW = {f.__name__: f for f in (happy_hop, excited_clap, wink, relieved, charged, love, giggle)}

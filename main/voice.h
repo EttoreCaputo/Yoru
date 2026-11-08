@@ -80,10 +80,6 @@ void voice_talk_end(void);
 
 /** End the utterance being streamed, if any. */
 void voice_stop_listening(void);
-/** Another Yoru heard the same wake word louder and answers it: this one
- * stops listening, and the host drops what it heard (`yielded`). Not after
- * PWR was pressed. */
-void voice_yield(void);
 
 /** The speaker is playing (playback.c). With barge-in
  * (CONFIG_YORU_VOICE_BARGE_IN) the wake word stops it and starts a new
