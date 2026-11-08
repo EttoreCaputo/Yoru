@@ -67,6 +67,11 @@ FIELDS = ["bx", "by", "bsx", "bsy", "rot", "near",
           "lex", "lew", "leh", "ltl", "ltr", "lbot",
           "rex", "rew", "reh", "rtl", "rtr", "rbot",
           "px", "py", "ps", "glow", "spark"]
+# Frames are stored as int16, each field times its scale: lengths (Rive
+# units, up to +-2047) to 1/16, ratios (scales, lids, opacities, up to +-7.9)
+# to 1/4096. Half the flash of floats, and finer than a pixel either way.
+LENGTHS = {"bx", "by", "rot", "lx", "ly", "rx", "ry", "fx", "fy", "lex", "rex", "px", "py"}
+SCALE = [16 if f in LENGTHS else 4096 for f in FIELDS]
 
 
 def bezier_ease(x1, y1, x2, y2, t):
@@ -139,9 +144,14 @@ def sample(rows):
     return frames
 
 
-def fmt(x):
-    s = f"{x:.3f}".rstrip("0").rstrip(".")
-    return (s if s not in ("-0", "") else "0") + ("f" if "." in s else "")
+def quantize(frame, name):
+    out = []
+    for f, x, k in zip(FIELDS, frame, SCALE):
+        q = round(x * k)
+        if not -32768 <= q <= 32767:
+            sys.exit(f"{name}: {f} = {x} doesn't fit in an int16 at 1/{k}")
+        out.append(str(q))
+    return out
 
 
 def main():
@@ -175,15 +185,24 @@ def main():
         "    float px, py, ps, glow, spark;",
         "} clip_frame_t;",
         "",
+        "_Static_assert(sizeof(clip_frame_t) == " + str(len(FIELDS)) + " * sizeof(float), \"one float per field\");",
+        "",
         "typedef enum {",
         "    CLIP_NONE,",
     ] + [f"    CLIP_{n.upper()}," for n in names] + [
         "    CLIP_COUNT,",
         "} clip_id_t;",
         "",
+        f"#define CLIP_FIELDS {len(FIELDS)}",
+        "",
+        "/* A frame as stored: each field of clip_frame_t times its scale. */",
+        "typedef struct {",
+        "    int16_t v[CLIP_FIELDS];",
+        "} clip_raw_t;",
+        "",
         "typedef struct {",
         "    const char *name;",
-        "    const clip_frame_t *frames;",
+        "    const clip_raw_t *frames;",
         "    uint16_t n;",
         "    bool loop; // plays until stopped",
         "} clip_t;",
@@ -192,6 +211,8 @@ def main():
         "const clip_t *clips_get(clip_id_t id);",
         "/** The clip called `name` (\"sneeze\"), or CLIP_NONE. */",
         "clip_id_t clips_find(const char *name);",
+        "/** Frame `i` of `clip`, decoded. */",
+        "void clips_frame(const clip_t *clip, int i, clip_frame_t *out);",
         "",
     ]
     src = [
@@ -205,9 +226,9 @@ def main():
     ]
     for n in names:
         frames = sample(clips[n])
-        src.append(f"static const clip_frame_t {n.upper()}[] = {{")
+        src.append(f"static const clip_raw_t {n.upper()}[] = {{")
         for fr in frames:
-            src.append("    {" + ", ".join(fmt(x) for x in fr) + "},")
+            src.append("    {{" + ", ".join(quantize(fr, n)) + "}},")
         src.append("};")
         src.append("")
         print(f"{n}: {len(frames)} frames, {len(frames) / CLIP_FPS:.2f} s", file=sys.stderr)
@@ -223,6 +244,16 @@ def main():
         "        return NULL;",
         "    }",
         "    return &CLIPS[id];",
+        "}",
+        "",
+        "static const float SCALE[CLIP_FIELDS] = {" + ", ".join(f"1.0f / {k}" for k in SCALE) + "};",
+        "",
+        "void clips_frame(const clip_t *clip, int i, clip_frame_t *out)",
+        "{",
+        "    float *o = (float *) out;",
+        "    for (int j = 0; j < CLIP_FIELDS; j++) {",
+        "        o[j] = (float) clip->frames[i].v[j] * SCALE[j];",
+        "    }",
         "}",
         "",
         "clip_id_t clips_find(const char *name)",

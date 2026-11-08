@@ -434,7 +434,7 @@ static void open_step(void)
         return;
     }
     e.open = 1;
-    eyes_gesture(EYES_GESTURE_DIVE);
+    eyes_play(CLIP_PORTAL_DIVE, false); // hands together over its head
     go(E_DIVE);
 }
 
@@ -491,8 +491,8 @@ static void inside_step(void)
     eyes_move(pts, 3, BACK_MS, EYES_PATH_HOP);
     eyes_look_around();
     if (found) {
-        eyes_carry(e.rgb);
-        eyes_gesture(EYES_GESTURE_CARRY);
+        // The parcel in its hands, in the service's colour and glyph.
+        eyes_play_fx(CLIP_PORTAL_CARRY, false, e.rgb, e.glyph);
         eyes_set_mood(EYES_MOOD_HAPPY);
         playback_sound(SOUND_BOING);
     } else if (empty) {
@@ -512,9 +512,7 @@ static void back_step(void)
         e.open = fmaxf(0, 1 - (float) (t - CLOSE_AT_MS) / CLOSE_MS);
     }
     if (e.ok > 0 && t >= UNWRAP_AT_MS) {
-        // Ta-da: the parcel bursts open in its hands.
-        eyes_carry(0);
-        eyes_poke();
+        // Ta-da: the parcel, put away, bursts into sparkles.
         eyes_set_mood(EYES_MOOD_HAPPY);
         burst(0, PARCEL_DY);
         playback_sound(SOUND_TADA);
@@ -628,7 +626,10 @@ void errand_abort(void)
         return;
     }
     ESP_LOGI(TAG, "called back");
-    eyes_carry(0);
+    const clip_id_t clip = eyes_clip();
+    if (clip == CLIP_PORTAL_DIVE || clip == CLIP_PORTAL_CARRY) {
+        eyes_stop_clip();
+    }
     memset(e.parts, 0, sizeof(e.parts));
     e.phase = E_IDLE;
     e.open = 0;

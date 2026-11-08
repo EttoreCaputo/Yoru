@@ -143,154 +143,11 @@ typedef struct {
     float x, y, s;
 } hand_pose_t;
 
-typedef struct {
-    uint16_t ms;
-    hand_pose_t l, r;
-} hand_key_t;
 
 #define TUCK_L {-112, HAND_Y, 0}
 #define TUCK_R {112, HAND_Y, 0}
-#define OUT_L {-168, HAND_Y, 1}
-#define OUT_R {168, HAND_Y, 1}
-#define WAVE_A {150, -70, 1.05f}
-#define WAVE_B {156, -74, 1.05f}
-
-/* The gestures, as in the Rive file: short paths for the two hands that
- * start and end tucked away. */
-static const hand_key_t WAVE[] = {
-    {0, TUCK_L, TUCK_R},       {250, OUT_L, WAVE_A},  {450, OUT_L, WAVE_B}, {650, OUT_L, WAVE_A},
-    {850, OUT_L, WAVE_B},      {1050, OUT_L, WAVE_A}, {1250, OUT_L, WAVE_B}, {1450, OUT_L, WAVE_A},
-    {1750, TUCK_L, TUCK_R},
-};
-static const hand_key_t POINT[] = {
-    {0, TUCK_L, TUCK_R},
-    {250, OUT_L, {180, -24, 1.1f}},
-    {420, OUT_L, {194, -30, 1.1f}},
-    {600, OUT_L, {180, -24, 1.1f}},
-    {1500, OUT_L, {180, -24, 1.1f}},
-    {1800, TUCK_L, TUCK_R},
-};
-static const hand_key_t COVER[] = {
-    {0, TUCK_L, TUCK_R},
-    {280, {-36, 20, 1.25f}, {36, 20, 1.25f}},
-    {1300, {-36, 20, 1.25f}, {36, 20, 1.25f}},
-    {1650, {-36, 20, 1.25f}, {46, 84, 1.15f}},
-    {2700, {-36, 20, 1.25f}, {46, 84, 1.15f}},
-    {3000, TUCK_L, TUCK_R},
-};
-static const hand_key_t THINK[] = {
-    {0, TUCK_L, TUCK_R},
-    {300, TUCK_L, {36, 136, 0.95f}},
-    {420, TUCK_L, {36, 130, 0.95f}},
-    {540, TUCK_L, {36, 136, 0.95f}},
-    {1700, TUCK_L, {36, 136, 0.95f}},
-    {1820, TUCK_L, {36, 130, 0.95f}},
-    {1940, TUCK_L, {36, 136, 0.95f}},
-    {3000, TUCK_L, {36, 136, 0.95f}},
-    {3300, TUCK_L, TUCK_R},
-};
-static const hand_key_t CLAP[] = {
-    {0, TUCK_L, TUCK_R},
-    {250, {-72, 92, 1}, {72, 92, 1}},
-    {380, {-25, 92, 1}, {25, 92, 1}},
-    {500, {-72, 92, 1}, {72, 92, 1}},
-    {630, {-25, 92, 1}, {25, 92, 1}},
-    {750, {-72, 92, 1}, {72, 92, 1}},
-    {880, {-25, 92, 1}, {25, 92, 1}},
-    {1000, {-72, 92, 1}, {72, 92, 1}},
-    {1300, TUCK_L, TUCK_R},
-};
-/* Holding its head while the world spins: the hands at its temples, swaying. */
-static const hand_key_t HOLD[] = {
-    {0, TUCK_L, TUCK_R},
-    {300, {-118, -30, 1.1f}, {118, -30, 1.1f}},
-    {600, {-112, -40, 1.1f}, {124, -20, 1.1f}},
-    {900, {-124, -20, 1.1f}, {112, -40, 1.1f}},
-    {1200, {-112, -40, 1.1f}, {124, -20, 1.1f}},
-    {1500, {-124, -20, 1.1f}, {112, -40, 1.1f}},
-    {1800, {-118, -30, 1.1f}, {118, -30, 1.1f}},
-    {2100, TUCK_L, TUCK_R},
-};
-/* Go away: the right hand pushes out at you, twice. */
-static const hand_key_t SHOO[] = {
-    {0, TUCK_L, TUCK_R},
-    {200, TUCK_L, {120, 60, 1.0f}},
-    {330, TUCK_L, {70, 50, 1.4f}},
-    {480, TUCK_L, {120, 60, 1.0f}},
-    {610, TUCK_L, {70, 50, 1.4f}},
-    {900, TUCK_L, {120, 60, 1.0f}},
-    {1100, TUCK_L, TUCK_R},
-};
-/* Falling: both hands up, flapping. */
-static const hand_key_t FLAIL[] = {
-    {0, TUCK_L, TUCK_R},
-    {150, {-160, -120, 1}, {160, -110, 1}},
-    {270, {-150, -96, 1}, {170, -128, 1}},
-    {390, {-170, -128, 1}, {150, -96, 1}},
-    {510, {-150, -96, 1}, {170, -128, 1}},
-    {630, {-170, -128, 1}, {150, -96, 1}},
-    {750, {-150, -96, 1}, {170, -128, 1}},
-    {870, {-160, -120, 1}, {160, -110, 1}},
-    {1150, TUCK_L, TUCK_R},
-};
-/* Ready to jump in: the hands meet over its head, and stay there a moment. */
-static const hand_key_t DIVE[] = {
-    {0, TUCK_L, TUCK_R},
-    {220, {-70, -110, 1}, {70, -110, 1}},
-    {420, {-20, -166, 1.05f}, {20, -166, 1.05f}},
-    {800, {-20, -172, 1.05f}, {20, -172, 1.05f}},
-    {1000, TUCK_L, TUCK_R},
-};
-/* Bringing something back: both hands low in front, as if holding a box. */
-#define CARRY_HOLD_MS 2300
-static const hand_key_t CARRY[] = {
-    {0, TUCK_L, TUCK_R},
-    {260, {-46, 112, 1}, {46, 112, 1}},
-    {CARRY_HOLD_MS, {-46, 112, 1}, {46, 112, 1}},
-    {CARRY_HOLD_MS + 300, TUCK_L, TUCK_R},
-};
-/* Letting go of a finger: from wherever they held it, back behind the body. */
-static const hand_key_t LET_GO[] = {
-    {0, TUCK_L, TUCK_R},
-    {350, TUCK_L, TUCK_R},
-};
-static const hand_key_t STRETCH[] = {
-    {0, TUCK_L, TUCK_R},
-    {500, {-206, -34, 1.1f}, {206, -34, 1.1f}},
-    {1100, {-206, -34, 1.1f}, {206, -34, 1.1f}},
-    {1500, OUT_L, OUT_R},
-    {1800, TUCK_L, TUCK_R},
-};
-
-typedef struct {
-    const char *name;
-    const hand_key_t *keys;
-    int n;
-    bool front; // in front of the body (over the eyes, under the chin)
-} gesture_t;
-
-/* The engine's own, past the public ones. */
-#define GESTURE_LET_GO EYES_GESTURE_COUNT
-
-#define GESTURE(name, keys, front) {name, keys, sizeof(keys) / sizeof(keys[0]), front}
-static const gesture_t s_gestures[EYES_GESTURE_COUNT + 1] = {
-    [EYES_GESTURE_NONE] = {"none", NULL, 0, false},
-    [EYES_GESTURE_WAVE] = GESTURE("wave", WAVE, false),
-    [EYES_GESTURE_POINT] = GESTURE("point", POINT, false),
-    [EYES_GESTURE_COVER] = GESTURE("cover", COVER, true),
-    [EYES_GESTURE_THINK] = GESTURE("think", THINK, true),
-    [EYES_GESTURE_CLAP] = GESTURE("clap", CLAP, true),
-    [EYES_GESTURE_STRETCH] = GESTURE("stretch", STRETCH, false),
-    [EYES_GESTURE_HOLD] = GESTURE("hold", HOLD, false),
-    [EYES_GESTURE_SHOO] = GESTURE("shoo", SHOO, true),
-    [EYES_GESTURE_FLAIL] = GESTURE("flail", FLAIL, false),
-    [EYES_GESTURE_DIVE] = GESTURE("dive", DIVE, false),
-    [EYES_GESTURE_CARRY] = GESTURE("carry", CARRY, true),
-    [GESTURE_LET_GO] = GESTURE("let_go", LET_GO, true),
-};
-
 /* Holding a finger: the hands a little apart round it, never further out
- * than this from the body (hand units, like the gestures). */
+ * than this from the body (Rive units, like the clips' hands). */
 #define CLUTCH_GAP 26
 #define CLUTCH_REACH 200
 
@@ -384,14 +241,9 @@ static struct {
     uint32_t cd_ms, cd_from_ms;
     float tint;
     float tint_rgb[3];
-    /* The gesture playing, how far in, and where the hands were when it
-     * started (so a new one picks up from there). */
-    int gesture; // an eyes_gesture_t, or one of the engine's own
-    int32_t gesture_ms;
     /* A finger held (eyes_clutch()), on screen. */
     bool clutch;
     int32_t clutch_x, clutch_y;
-    hand_pose_t hand_from[2];
     hand_pose_t hand[2];
     bool hands_front;
     /* A knock: where the body is pushed to and how fast it moves, in pixels;
@@ -414,10 +266,6 @@ static struct {
     float badge_scale;
     lv_area_t over_drawn[MAX_OVERLAY_RECTS];
     int over_count;
-    /* The parcel in its hands (0: none), and where it was drawn. */
-    uint32_t carry_rgb;
-    lv_area_t carry_drawn;
-    bool carry_shown;
     /* The battery: what shows and the charge; the ring's fade (0..1) and how
      * far it has filled, in degrees; the bolt, how far in, and where it was
      * drawn; the low battery's look last drawn (-1 hidden) and where. */
@@ -429,11 +277,6 @@ static struct {
     lv_area_t zap_drawn;
     int32_t lowbat_key;
     lv_area_t lowbat_drawn;
-    /* A wink: which eye (0 left, 1 right, -1 none), how long it stays shut,
-     * and each eye's own lid (1 open). */
-    int wink;
-    int32_t wink_ms;
-    float wlid[2];
     /* Cross-eyed, 0..1, eased, and where it is going. */
     float cross, tcross;
     /* The firefly (eyes_firefly()): shown, where (screen pixels from the
@@ -456,6 +299,12 @@ static struct {
     float fx_due;
     bool fx_shown;
     lv_area_t fx_drawn;
+    /* A bridge: what was on screen when a clip started, stopped or gave way
+     * to another, eased into what comes next so nothing jumps. */
+    int32_t br_ms, br_len; // how far in and how long; br_ms >= br_len: none
+    body_vis_t br_body;
+    eye_box_t br_eye[2];
+    hand_pose_t br_hand[2];
 } s;
 
 static float lerp(float a, float b, float k)
@@ -509,6 +358,31 @@ static bool has_overlay(eyes_mood_t mood)
 #define CLIP_FRAME_MS (1000.0f / 30.0f)
 /* A jump this big between two frames is a cut, not a move (Rive units). */
 #define CLIP_CUT 300.0f
+/* Bridges between what was showing and what comes next: into a clip (from
+ * a mood's face, a lean, a held finger), out of one (into the mood it leaves)
+ * and from one clip cut short into the next. Short enough to keep a clip's
+ * anticipation, long enough that nothing pops. */
+#define BRIDGE_IN_MS 160
+#define BRIDGE_OUT_MS 260
+#define BRIDGE_CUT_MS 200
+
+/* Start easing from what is on screen now into whatever comes next. */
+static void bridge_from_screen(int32_t ms)
+{
+    if (!s.body_valid) {
+        return; // nothing drawn yet
+    }
+    s.br_body = s.body;
+    memcpy(s.br_eye, s.eye, sizeof(s.br_eye));
+    memcpy(s.br_hand, s.hand, sizeof(s.br_hand));
+    s.br_ms = 0;
+    s.br_len = ms;
+}
+
+static bool bridging(void)
+{
+    return s.br_ms < s.br_len;
+}
 
 /* The same frame the other way round: left for right. */
 static void clip_mirror(clip_frame_t *f)
@@ -528,7 +402,8 @@ static void clip_mirror(clip_frame_t *f)
  * leaves Yoru there: its last offset becomes where it is. */
 static void clip_end(void)
 {
-    clip_frame_t last = s.clip->frames[s.clip->n - 1];
+    clip_frame_t last;
+    clips_frame(s.clip, s.clip->n - 1, &last);
     if (s.clip_mirror) {
         clip_mirror(&last);
     }
@@ -549,6 +424,7 @@ static bool clip_step(void)
     float at = (float) s.clip_ms / CLIP_FRAME_MS;
     if (at >= (float) (s.clip->n - 1)) {
         if (!s.clip->loop) {
+            bridge_from_screen(BRIDGE_OUT_MS);
             clip_end();
             return false;
         }
@@ -557,9 +433,12 @@ static bool clip_step(void)
         at = (float) s.clip_ms / CLIP_FRAME_MS;
     }
     const int i = LV_MIN((int) at, s.clip->n - 2);
-    const float *a = (const float *) &s.clip->frames[i], *b = (const float *) &s.clip->frames[i + 1];
+    clip_frame_t fa, fb;
+    clips_frame(s.clip, i, &fa);
+    clips_frame(s.clip, i + 1, &fb);
+    const float *a = (const float *) &fa, *b = (const float *) &fb;
     // A cut (off one edge, back in at the other) holds instead of sweeping across.
-    const float k = fabsf(s.clip->frames[i + 1].bx - s.clip->frames[i].bx) > CLIP_CUT ? 0 : at - (float) i;
+    const float k = fabsf(fb.bx - fa.bx) > CLIP_CUT ? 0 : at - (float) i;
     float *o = (float *) &s.cf;
     for (size_t j = 0; j < sizeof(clip_frame_t) / sizeof(float); j++) {
         o[j] = lerp(a[j], b[j], k);
@@ -595,7 +474,8 @@ static void clutch_step(void)
     s.hands_front = true;
 }
 
-/* Where the hands are `ms` into the gesture playing. */
+/* Where the hands are: round a held finger, where the clip puts them, or
+ * tucked away behind the body. */
 static void hands_step(void)
 {
     if (s.clutch) {
@@ -608,45 +488,9 @@ static void hands_step(void)
         s.hands_front = s.cf.front > 0.5f;
         return;
     }
-    const gesture_t *g = &s_gestures[s.gesture];
-    if (g->n == 0) {
-        s.hand[0] = (hand_pose_t) TUCK_L;
-        s.hand[1] = (hand_pose_t) TUCK_R;
-        return;
-    }
-    const int32_t was_ms = s.gesture_ms;
-    s.gesture_ms += s.dt_ms;
-    if (s.gesture_ms >= g->keys[g->n - 1].ms) {
-        s.gesture = EYES_GESTURE_NONE;
-        s.hand[0] = (hand_pose_t) TUCK_L;
-        s.hand[1] = (hand_pose_t) TUCK_R;
-        return;
-    }
-    int i = 0;
-    while (i < g->n - 2 && s.gesture_ms >= g->keys[i + 1].ms) {
-        i++;
-    }
-    const hand_key_t *a = &g->keys[i], *b = &g->keys[i + 1];
-    float k = smooth(seg((float) s.gesture_ms, a->ms, b->ms));
-    // The first stretch starts from wherever the hands were.
-    hand_pose_t al = i == 0 ? s.hand_from[0] : a->l;
-    hand_pose_t ar = i == 0 ? s.hand_from[1] : a->r;
-    s.hand[0] = pose_lerp(al, b->l, k);
-    s.hand[1] = pose_lerp(ar, b->r, k);
-    s.hands_front = g->front;
-    // The end of a stretch: a big blink.
-    if (s.gesture == EYES_GESTURE_STRETCH && was_ms < 1500 && s.gesture_ms >= 1500) {
-        eyes_blink();
-    }
-}
-
-/* The body stretches tall while the hands reach out. */
-static float stretch_amount(void)
-{
-    if (s.gesture != EYES_GESTURE_STRETCH) {
-        return 0;
-    }
-    return -0.9f * sinf((float) M_PI * seg((float) s.gesture_ms, 250, 1500));
+    s.hand[0] = (hand_pose_t) TUCK_L;
+    s.hand[1] = (hand_pose_t) TUCK_R;
+    s.hands_front = false;
 }
 
 /* ---- One frame's layout --------------------------------------------------- */
@@ -696,7 +540,7 @@ static void body_layout(body_vis_t *v)
         v->rx = ball_radius(R * s.cf.bsx * v->dist);
         v->ry = ball_radius(R * s.cf.bsy * v->dist);
     } else {
-        const float sq = clampf(s.squash + stretch_amount() + s.vsq, -1, 1);
+        const float sq = clampf(s.squash + s.vsq, -1, 1);
         v->rx = ball_radius(R * (1 + LOOK_SQUASH * sq) * v->dist);
         v->ry = ball_radius(R * (1 - LOOK_SQUASH * sq) * v->dist);
     }
@@ -769,7 +613,7 @@ static void eye_layout(void)
         const int inner = -side; // the left eye's inner side is to the right
         eye_box_t *e = &s.eye[i];
         e->w = w;
-        e->h = h * (i == 0 ? s.cur.left : s.cur.right) * s.wlid[i];
+        e->h = h * (i == 0 ? s.cur.left : s.cur.right);
         e->x = (float) s.body.bx + ((float) side * (EYE_SPACING * nx - 0.45f * GAZE_X * s.cross) + ox) * s.body.sx;
         e->y = (float) s.body.by + (FACE_Y + oy) * s.body.sy - (float) side * lift * s.body.dist;
         const float hh = e->h < 2 ? 2 : e->h;
@@ -1132,47 +976,6 @@ static void draw_heart(lv_layer_t *layer, float x, float y, lv_color_t color, lv
     fill_triangle(layer, x - 13, y + 1, x + 13, y + 1, x, y + 16, color, opa);
 }
 
-/* The parcel: in the hands while they carry it, once they are out. */
-#define PARCEL_Y 112
-#define PARCEL_HALF 30
-
-static bool parcel_up(void)
-{
-    return s.carry_rgb != 0 && s.gesture == EYES_GESTURE_CARRY && s.gesture_ms >= 200 && s.gesture_ms < CARRY_HOLD_MS;
-}
-
-static void parcel_box(float *x, float *y, float *half)
-{
-    const float d = s.body.dist;
-    *x = (float) s.body.bx;
-    *y = (float) s.body.by + PARCEL_Y * K * d;
-    *half = PARCEL_HALF * K * d;
-}
-
-/* A little box in the errand's colour, a pale ribbon across it and a bow. */
-static void draw_parcel(lv_layer_t *layer)
-{
-    if (!parcel_up()) {
-        return;
-    }
-    float x, y, h;
-    parcel_box(&x, &y, &h);
-    const lv_opa_t opa = (lv_opa_t) (255 * s.near * s.body.fog);
-    const lv_color_t ribbon = lv_color_hex(0xFFF4E0);
-    fill_rect(layer, x - h, y - h * 0.8f, x + h, y + h, lv_color_hex(s.carry_rgb), (int32_t) (h * 0.3f), opa);
-    fill_rect(layer, x - h * 0.16f, y - h * 0.8f, x + h * 0.16f, y + h, ribbon, 0, opa);
-    fill_rect(layer, x - h, y - h * 0.05f, x + h, y + h * 0.27f, ribbon, 0, opa);
-    draw_disc(layer, x - h * 0.32f, y - h * 0.95f, h * 0.3f, ribbon, opa);
-    draw_disc(layer, x + h * 0.32f, y - h * 0.95f, h * 0.3f, ribbon, opa);
-}
-
-static lv_area_t parcel_area(void)
-{
-    float x, y, h;
-    parcel_box(&x, &y, &h);
-    return box(x, y, h + 3, h * 1.3f + 3, h + 3, h + 3);
-}
-
 /* Where the overlays sit: next to the sphere, never over the eyes, following
  * it wherever it floats. Offsets at the resting distance. */
 #define DOTS_DY (176 * K)
@@ -1517,7 +1320,6 @@ static void draw_cb(lv_event_t *e)
         look_draw(layer, &s.eye_sp[i].sp, (int32_t) lroundf(s.eye[i].x), (int32_t) lroundf(s.eye[i].y), 1, 1, 0,
                   LV_OPA_COVER, black);
     }
-    draw_parcel(layer);
     draw_fx_prop(layer);
     if (s.hands_front) {
         draw_hands(layer);
@@ -1884,19 +1686,8 @@ static bool step(void)
     } else {
         lid = lerp(s.lid, 1.0f, ease(0.35f));
     }
-    // A wink shuts one eye a moment; the other stays as it is.
-    bool winked = false;
-    if (s.wink_ms > 0) {
-        s.wink_ms -= s.dt_ms;
-    }
-    for (int i = 0; i < 2; i++) {
-        const float to = s.wink_ms > 0 && s.wink == i ? 0.06f : 1.0f;
-        const float wl = lerp(s.wlid[i], to, ease(to < s.wlid[i] ? 0.45f : 0.25f));
-        winked = winked || fabsf(wl - s.wlid[i]) > 0.002f;
-        s.wlid[i] = fabsf(wl - to) < 0.002f ? to : wl;
-    }
     const float cross = lerp(s.cross, s.tcross, ease(0.2f));
-    winked = winked || fabsf(cross - s.cross) > 0.002f;
+    const bool crossed = fabsf(cross - s.cross) > 0.002f;
     s.cross = fabsf(cross - s.tcross) < 0.002f ? s.tcross : cross;
 
     float squash = s.squash * powf(0.85f, s.frames);
@@ -1908,7 +1699,7 @@ static bool step(void)
 
     bool moved = fabsf(gx - s.gx) > 0.002f || fabsf(gy - s.gy) > 0.002f || fabsf(lid - s.lid) > 0.002f
                  || fabsf(squash) > 0.002f || fabsf(level - s.level) > 0.002f || memcmp(&before, &s.cur, sizeof(before)) != 0
-                 || winked || clipping;
+                 || crossed || clipping;
     s.level = level;
     s.gx = gx;
     s.gy = gy;
@@ -1973,6 +1764,43 @@ static bool step(void)
     return moved;
 }
 
+/* Ease this frame's layout from the snapshot the bridge started with; true
+ * while it does. The sphere's radius snaps like any other size. */
+static bool bridge_step(void)
+{
+    if (!bridging()) {
+        return false;
+    }
+    s.br_ms += s.dt_ms;
+    const float k = smooth(fminf(1, (float) s.br_ms / (float) s.br_len));
+    body_vis_t *b = &s.body;
+    const body_vis_t *f = &s.br_body;
+    b->bx = (int32_t) lroundf(lerp((float) f->bx, (float) b->bx, k));
+    b->by = (int32_t) lroundf(lerp((float) f->by, (float) b->by, k));
+    b->rx = ball_radius(lerp((float) f->rx, (float) b->rx, k));
+    b->ry = ball_radius(lerp((float) f->ry, (float) b->ry, k));
+    b->sx = (float) b->rx / R;
+    b->sy = (float) b->ry / R;
+    for (int i = 0; i < 2; i++) {
+        eye_box_t *e = &s.eye[i];
+        const eye_box_t *g = &s.br_eye[i];
+        e->x = lerp(g->x, e->x, k);
+        e->y = lerp(g->y, e->y, k);
+        e->w = lerp(g->w, e->w, k);
+        e->h = lerp(g->h, e->h, k);
+        e->top_l = lerp(g->top_l, e->top_l, k);
+        e->top_r = lerp(g->top_r, e->top_r, k);
+        e->bottom = lerp(g->bottom, e->bottom, k);
+        // A spiral can't be half a pill: it turns into one halfway.
+        if (k < 0.5f) {
+            e->spiral = g->spiral;
+            e->phase = g->phase;
+        }
+        s.hand[i] = pose_lerp(s.br_hand[i], s.hand[i], k);
+    }
+    return true;
+}
+
 static void frame_cb(lv_timer_t *timer)
 {
     const uint32_t elapsed = lv_tick_elaps(s.last_tick);
@@ -1985,6 +1813,7 @@ static void frame_cb(lv_timer_t *timer)
     const body_vis_t was = s.body;
     body_layout(&s.body);
     eye_layout();
+    const bool bridged = bridge_step();
     s.frame++;
     // The firefly flickers and flies: its box, where it was and where it is.
     if (s.fly || s.fly_shown) {
@@ -2025,7 +1854,7 @@ static void frame_cb(lv_timer_t *timer)
             eye_render(es, &s.eye[i]);
         }
         lv_area_t now = eye_area(i);
-        if (!es->valid || reshaped || eyes_moved || !areas_equal(&now, &es->drawn)) {
+        if (!es->valid || reshaped || eyes_moved || bridged || !areas_equal(&now, &es->drawn)) {
             if (es->valid) {
                 invalidate_move(&es->drawn, &now);
             } else {
@@ -2039,24 +1868,12 @@ static void frame_cb(lv_timer_t *timer)
     // The hands, each on its own.
     for (int i = 0; i < 2; i++) {
         lv_area_t now = hand_area(i);
-        if (!areas_equal(&now, &s.hand_drawn[i]) || s.gesture != EYES_GESTURE_NONE || s.clip != NULL) {
+        if (!areas_equal(&now, &s.hand_drawn[i]) || s.clip != NULL || bridged) {
             invalidate_move(&s.hand_drawn[i], &now);
             s.hand_drawn[i] = now;
         }
     }
 
-    // The parcel goes where the body goes, and once more as it disappears.
-    const bool parcel = parcel_up();
-    if (parcel || s.carry_shown) {
-        lv_area_t now = parcel_area();
-        if (s.carry_shown) {
-            invalidate_move(&s.carry_drawn, &now);
-        } else {
-            lv_obj_invalidate_area(s.obj, &now);
-        }
-        s.carry_drawn = now;
-        s.carry_shown = parcel;
-    }
 
     // The clip's effects, as one box, and once more as they go.
     lv_area_t fx_now;
@@ -2143,8 +1960,6 @@ lv_obj_t *eyes_create(lv_obj_t *parent)
     s.mv.pos = (eyes_pos_t) {0, 0, 1};
     s.badge_scale = 1;
     s.lowbat_key = -1;
-    s.wink = -1;
-    s.wlid[0] = s.wlid[1] = 1;
     s.last_tick = lv_tick_get();
     s.hand[0] = (hand_pose_t) TUCK_L;
     s.hand[1] = (hand_pose_t) TUCK_R;
@@ -2249,18 +2064,6 @@ void eyes_set_level(float level)
     s.tlevel = fmaxf(0, fminf(1, level));
 }
 
-void eyes_poke(void)
-{
-    s.squash = 1;
-}
-
-void eyes_knock(float dx, float dy)
-{
-    // Pushed off by up to half its size: a quick jolt that springs back.
-    s.kvx += dx * R * 9;
-    s.kvy += dy * R * 9;
-}
-
 void eyes_lean(float x, float y)
 {
     s.tlx = clampf(x, -1, 1);
@@ -2303,17 +2106,18 @@ void eyes_play_fx(clip_id_t clip, bool mirror, uint32_t rgb, const char *glyph)
     if (c == NULL || c->n < 2) {
         return;
     }
+    // From another clip cut short, or from the engine's own pose.
+    bridge_from_screen(s.clip != NULL ? BRIDGE_CUT_MS : BRIDGE_IN_MS);
     s.fx_rgb = rgb;
     s.fx_glyph = glyph;
     s.clip_mirror = mirror;
     // The clip has the hands from its first frame, and its own blinks.
     s.clutch = false;
-    s.gesture = EYES_GESTURE_NONE;
     s.blink_ms = 0;
     s.lid = 1;
     s.clip = c;
     s.clip_ms = 0;
-    s.cf = c->frames[0];
+    clips_frame(c, 0, &s.cf);
     if (mirror) {
         clip_mirror(&s.cf);
     }
@@ -2337,21 +2141,9 @@ clip_id_t eyes_clip(void)
 void eyes_stop_clip(void)
 {
     if (s.clip != NULL) {
+        bridge_from_screen(BRIDGE_OUT_MS);
         clip_end();
     }
-}
-
-void eyes_gesture(eyes_gesture_t gesture)
-{
-    if (gesture >= EYES_GESTURE_COUNT) {
-        return;
-    }
-    s.clutch = false; // a gesture needs the hands
-    s.clip = NULL;    // and the body back
-    s.hand_from[0] = s.hand[0];
-    s.hand_from[1] = s.hand[1];
-    s.gesture = gesture;
-    s.gesture_ms = 0;
 }
 
 void eyes_clutch(int32_t x, int32_t y)
@@ -2359,7 +2151,6 @@ void eyes_clutch(int32_t x, int32_t y)
     s.clutch = true;
     s.clutch_x = x;
     s.clutch_y = y;
-    s.gesture = EYES_GESTURE_NONE;
 }
 
 void eyes_let_go(void)
@@ -2368,20 +2159,8 @@ void eyes_let_go(void)
         return;
     }
     s.clutch = false;
-    s.hand_from[0] = s.hand[0];
-    s.hand_from[1] = s.hand[1];
-    s.gesture = GESTURE_LET_GO;
-    s.gesture_ms = 0;
-}
-
-void eyes_carry(uint32_t rgb)
-{
-    s.carry_rgb = rgb;
-}
-
-const char *eyes_gesture_name(eyes_gesture_t gesture)
-{
-    return gesture < EYES_GESTURE_COUNT ? s_gestures[gesture].name : "?";
+    // From wherever they held it, the hands ease back behind the body.
+    bridge_from_screen(BRIDGE_OUT_MS);
 }
 
 /* ---- Moving through the space ---------------------------------------------- */
@@ -2426,12 +2205,6 @@ bool eyes_hit(int32_t x, int32_t y)
     return hypotf((float) (x - s.body.bx), (float) (y - s.body.by)) <= r;
 }
 
-
-void eyes_wink(int eye, uint32_t ms)
-{
-    s.wink = eye == 0 ? 0 : 1;
-    s.wink_ms = (int32_t) (ms ? ms : 380);
-}
 
 void eyes_cross(float amount)
 {

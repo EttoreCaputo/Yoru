@@ -128,6 +128,41 @@ static eyes_mood_t face(void)
 
 /* ---- The acts ---------------------------------------------------------------- */
 
+
+/* Most acts are a clip: home first if it has drifted off (the clip moves
+ * from where Yoru is, and some go to an edge and back), then the clip with
+ * its face and sound, and the face it eases into after. Done when it ends. */
+#define HOME_NEAR 30.0f
+#define HOME_MS 900
+
+static bool act_clip(clip_id_t clip, bool mirror, eyes_mood_t during, eyes_mood_t after, sound_t sound)
+{
+    switch (A.phase) {
+    case 0: {
+        eyes_set_mood(during);
+        const eyes_pos_t me = eyes_where();
+        if (fabsf(me.x) > HOME_NEAR || fabsf(me.y) > HOME_NEAR || fabsf(me.z - 1) > 0.1f) {
+            eyes_move_to(0, 0, 1, HOME_MS, EYES_PATH_GLIDE);
+        }
+        next(1);
+        return false;
+    }
+    case 1:
+        if (busy()) {
+            return false;
+        }
+        eyes_play(clip, mirror);
+        if (sound != SOUND_COUNT) {
+            life_sound(sound);
+        }
+        eyes_set_mood(after);
+        next(2);
+        return false;
+    default:
+        return !busy();
+    }
+}
+
 /* Doing nothing in particular, where it is: the eyes look about and blink
  * by themselves. Longer the slower the state. */
 static bool rest(void)
@@ -161,20 +196,7 @@ static bool drift(void)
 /* A look round: left, right, up, and back to its own gaze. */
 static bool look(void)
 {
-    static const float GAZE[][2] = {{-0.85f, 0.05f}, {0.85f, 0.05f}, {0.1f, -0.7f}};
-    if (busy()) {
-        return false;
-    }
-    if (A.phase < 3) {
-        // Left then right, or the other way round, then up.
-        const int i = A.phase == 2 ? 2 : A.side > 0 ? A.phase : 1 - A.phase;
-        eyes_look_at(GAZE[i][0], GAZE[i][1]);
-        wait_ms((uint32_t) life_frange(600, 1000));
-        next(A.phase + 1);
-        return false;
-    }
-    eyes_look_around();
-    return true;
+    return act_clip(CLIP_LOOK_AROUND, A.side < 0, face(), face(), SOUND_COUNT);
 }
 
 static bool tilt(void)
@@ -273,98 +295,29 @@ static bool hiccup(void)
  * its shoulder. */
 static bool peek(void)
 {
-    switch (A.phase) {
-    case 0:
-        A.side = coin();
+    if (A.phase == 0 && life_frange(0, 1) < 0.35f) {
+        // Hide and seek: out at one edge, back in at the other.
         eyes_set_mood(EYES_MOOD_CURIOUS);
-        if (life_frange(0, 1) < 0.35f) {
-            // Hide and seek: out at one edge, back in at the other.
-            eyes_play(CLIP_HIDE_SEEK, A.side < 0);
-            life_sound(SOUND_GIGGLE);
-            next(9);
-            return false;
-        }
-        eyes_move_to((float) A.side * 175, life_frange(-25, 30), 1.0f, 1400, EYES_PATH_GLIDE);
-        eyes_look_at((float) A.side, 0);
-        next(1);
+        eyes_play(CLIP_HIDE_SEEK, coin() < 0);
+        life_sound(SOUND_GIGGLE);
+        next(9);
         return false;
-    case 1:
-        if (busy()) {
-            return false;
-        }
-        eyes_lean((float) A.side, 0);
-        wait_ms((uint32_t) life_frange(1500, 2800));
-        next(2);
-        return false;
-    case 2:
-        if (waiting()) {
-            return false;
-        }
-        eyes_lean(0, 0);
-        life_sound(SOUND_HMM);
-        eyes_look_at((float) A.side * 0.6f, 0);
-        eyes_move_to(0, 0, 1, 1700, EYES_PATH_DRIFT);
-        next(3);
-        return false;
-    case 9:
+    }
+    if (A.phase == 9) {
         if (busy()) {
             return false;
         }
         eyes_set_mood(EYES_MOOD_DELIGHTED);
         mood_feel(LIFE_FEEL_FUN);
         return true;
-    default:
-        if (busy()) {
-            return false;
-        }
-        eyes_look_around();
-        return true;
     }
+    return act_clip(CLIP_PEEK_SIDE, coin() < 0, EYES_MOOD_CURIOUS, EYES_MOOD_CURIOUS, SOUND_HMM);
 }
 
 /* Down to a corner to sniff at something there: little hops, a look. */
 static bool sniff(void)
 {
-    switch (A.phase) {
-    case 0:
-        A.side = coin();
-        eyes_set_mood(EYES_MOOD_CURIOUS);
-        eyes_move_to((float) A.side * 115 * 1.05f, 75 * 1.05f, 1.05f, 1600, EYES_PATH_GLIDE);
-        eyes_look_at((float) A.side * 0.8f, 0.8f);
-        next(1);
-        return false;
-    case 1: {
-        if (busy()) {
-            return false;
-        }
-        const eyes_pos_t me = eyes_where();
-        const eyes_pos_t hops[] = {{me.x - (float) A.side * 12, me.y, me.z}, {me.x, me.y, me.z},
-                                   {me.x - (float) A.side * 8, me.y, me.z}, me};
-        eyes_move(hops, 4, 1500, EYES_PATH_HOP);
-        life_sound(SOUND_SCAN);
-        next(2);
-        return false;
-    }
-    case 2:
-        if (busy()) {
-            return false;
-        }
-        eyes_set_mood(life_frange(0, 1) < 0.5f ? EYES_MOOD_HAPPY : EYES_MOOD_CURIOUS);
-        eyes_look_at(0, -0.1f);
-        wait_ms(1100);
-        next(3);
-        return false;
-    case 3:
-        if (waiting()) {
-            return false;
-        }
-        eyes_look_around();
-        eyes_move_to(0, 0, 1, 1800, EYES_PATH_DRIFT);
-        next(4);
-        return false;
-    default:
-        return !busy();
-    }
+    return act_clip(CLIP_SNIFF, coin() < 0, EYES_MOOD_CURIOUS, EYES_MOOD_HAPPY, SOUND_SCAN);
 }
 
 /* Where the firefly is, `ms` into its flight: a wandering knot of sines. */
@@ -480,7 +433,7 @@ static bool firefly(void)
             const float along = (fx * -A.to_y + fy * A.to_x) / 150;
             friends_send(FRIEND_FIREFLY, (int16_t) lroundf(fmaxf(-1, fminf(1, along)) * 1000), 0);
             eyes_set_mood(EYES_MOOD_HAPPY);
-            eyes_gesture(EYES_GESTURE_WAVE);
+            eyes_play(CLIP_WAVE, A.to_x < 0); // bye, towards it
             life_sound(SOUND_HELLO);
             wait_ms(1600);
             next(5);
@@ -523,129 +476,37 @@ static bool dance(void)
 
 static bool loop_the_loop(void)
 {
-    if (A.phase == 0) {
-        eyes_set_mood(EYES_MOOD_HAPPY);
-        const float r = 55;
-        eyes_pos_t pts[EYES_PATH_POINTS];
-        for (int i = 0; i < EYES_PATH_POINTS - 1; i++) {
-            const float a = (float) M_PI / 2 + 2 * (float) M_PI * (float) (i + 1) / (EYES_PATH_POINTS - 1);
-            pts[i] = life_at(r * cosf(a), r - r * sinf(a), 1);
-        }
-        pts[EYES_PATH_POINTS - 1] = life_at(0, 0, 1);
-        eyes_move(pts, EYES_PATH_POINTS, 1900, EYES_PATH_GLIDE);
-        life_sound(SOUND_WHISTLE);
-        next(1);
-        return false;
+    if (A.phase == 2 && !busy()) {
+        mood_feel(LIFE_FEEL_FUN);
     }
-    if (busy()) {
-        return false;
-    }
-    eyes_blink();
-    mood_feel(LIFE_FEEL_FUN);
-    return true;
+    return act_clip(CLIP_LOOP_THE_LOOP, coin() < 0, EYES_MOOD_HAPPY, EYES_MOOD_HAPPY, SOUND_WHISTLE);
 }
 
 /* Bouncing off the walls of the screen, squashing at each. */
 static bool bounce(void)
 {
-    if (A.phase == 0) {
-        eyes_set_mood(EYES_MOOD_DELIGHTED);
-        const float s = (float) coin();
-        const eyes_pos_t hops[] = {life_at(s * 120, 40, 1), life_at(-s * 110, 10, 1), life_at(s * 70, -40, 1),
-                                   life_at(-s * 40, 30, 1), life_at(0, 0, 1)};
-        eyes_move(hops, 5, 2800, EYES_PATH_HOP);
-        life_sound(SOUND_BOING);
-        next(1);
-        return false;
-    }
-    if (A.phase == 1) {
-        if (busy()) {
-            return false;
-        }
-        eyes_set_mood(EYES_MOOD_HAPPY);
+    if (A.phase == 2 && !busy()) {
         mood_feel(LIFE_FEEL_FUN);
-        wait_ms(800);
-        next(2);
-        return false;
     }
-    return !waiting();
+    return act_clip(CLIP_BOUNCE_WALLS, coin() < 0, EYES_MOOD_DELIGHTED, EYES_MOOD_HAPPY, SOUND_BOING);
 }
 
 /* Up high, as near the sky as the glass lets it: the sky it came from. */
 static bool stars(void)
 {
-    switch (A.phase) {
-    case 0:
-        eyes_set_mood(EYES_MOOD_DREAMY);
-        eyes_move_to(life_frange(-30, 30) * 1.2f, -80 * 1.2f, 1.2f, 3200, EYES_PATH_DRIFT);
-        eyes_look_at(0, -1);
-        next(1);
-        return false;
-    case 1:
-        if (busy()) {
-            return false;
-        }
-        eyes_blink();
-        wait_ms((uint32_t) life_frange(3500, 6000));
-        next(2);
-        return false;
-    case 2:
-        if (waiting()) {
-            return false;
-        }
-        life_sound(SOUND_SIGH);
-        eyes_look_around();
-        eyes_move_to(0, 0, 1, 2600, EYES_PATH_DRIFT);
-        next(3);
-        return false;
-    default:
-        return !busy();
-    }
+    return act_clip(CLIP_STARGAZE, coin() < 0, EYES_MOOD_DREAMY, EYES_MOOD_DREAMY, SOUND_COUNT);
 }
 
 /* Humming to itself, swaying slowly, eyes up. */
 static bool hum(void)
 {
-    if (A.phase == 0) {
-        eyes_set_mood(EYES_MOOD_DREAMY);
-        eyes_look_at(0.2f, -0.6f);
-        const eyes_pos_t sway[] = {life_at(-26, -12, 1.05f), life_at(26, -12, 1.05f), life_at(-26, -12, 1.05f),
-                                   life_at(0, -8, 1.05f)};
-        eyes_move(sway, 4, 5200, EYES_PATH_DRIFT);
-        life_sound(SOUND_SING);
-        next(1);
-        return false;
-    }
-    if (busy()) {
-        return false;
-    }
-    eyes_look_around();
-    return true;
+    return act_clip(CLIP_HUM_SWAY, coin() < 0, EYES_MOOD_DREAMY, EYES_MOOD_DREAMY, SOUND_SING);
 }
 
 /* Bored: a sigh, sinking a little, a look away. */
 static bool sigh(void)
 {
-    switch (A.phase) {
-    case 0: {
-        eyes_set_mood(EYES_MOOD_BORED);
-        life_sound(SOUND_SIGH);
-        const eyes_pos_t me = eyes_where();
-        eyes_move_to(me.x, me.y + 25 * me.z, me.z, 1300, EYES_PATH_DRIFT);
-        eyes_look_at((float) coin() * 0.8f, 0.3f);
-        wait_ms((uint32_t) life_frange(2400, 3600));
-        next(1);
-        return false;
-    }
-    case 1:
-        if (busy()) {
-            return false;
-        }
-        eyes_look_around();
-        return true;
-    default:
-        return true;
-    }
+    return act_clip(CLIP_SIGH, coin() < 0, EYES_MOOD_BORED, EYES_MOOD_BORED, SOUND_SIGH);
 }
 
 static bool yawn(void)
@@ -734,74 +595,19 @@ static bool sulk(void)
 /* Looking at you: a little nearer, a slow blink (the cat's: I like you). */
 static bool gaze(void)
 {
-    switch (A.phase) {
-    case 0: {
-        eyes_set_mood(mood(EMO_HAPPY) > 0.35f ? EYES_MOOD_HAPPY : face());
-        eyes_look_at(0, -0.05f);
-        const eyes_pos_t me = eyes_where();
-        eyes_move_to(me.x * 0.5f, me.y * 0.5f, A.style.z_lo, 1800, EYES_PATH_DRIFT);
-        wait_ms((uint32_t) life_frange(2500, 4000));
-        next(1);
-        return false;
-    }
-    case 1:
-        if (busy()) {
-            return false;
-        }
-        eyes_blink();
-        wait_ms((uint32_t) life_frange(2000, 3500));
-        next(2);
-        return false;
-    default:
-        if (waiting()) {
-            return false;
-        }
-        eyes_look_around();
-        return true;
-    }
+    const eyes_mood_t after = mood(EMO_HAPPY) > 0.35f ? EYES_MOOD_HAPPY : face();
+    return act_clip(CLIP_GAZE_BLINK, false, after, after, SOUND_COUNT);
 }
 
 static bool wink(void)
 {
-    if (A.phase == 0) {
-        eyes_look_at(0, -0.05f);
-        eyes_set_mood(EYES_MOOD_HAPPY);
-        eyes_wink((esp_random() & 1) ? 0 : 1, 450);
-        life_sound(SOUND_WINK);
-        wait_ms(1500);
-        next(1);
-        return false;
-    }
-    if (waiting()) {
-        return false;
-    }
-    eyes_look_around();
-    return true;
+    return act_clip(CLIP_WINK, coin() < 0, EYES_MOOD_HAPPY, EYES_MOOD_HAPPY, SOUND_WINK);
 }
 
 /* Looking for you: left, right, and a small call. */
 static bool search(void)
 {
-    static const float GAZE[][2] = {{-1, 0}, {1, 0}, {-0.5f, -0.4f}, {0, 0}};
-    if (busy()) {
-        return false;
-    }
-    if (A.phase == 0) {
-        eyes_set_mood(EYES_MOOD_SAD);
-    }
-    if (A.phase < 4) {
-        eyes_look_at(GAZE[A.phase][0], GAZE[A.phase][1]);
-        wait_ms(A.phase == 3 ? 400 : 1300);
-        next(A.phase + 1);
-        return false;
-    }
-    if (A.phase == 4) {
-        life_sound(SOUND_WHIMPER);
-        wait_ms(2500);
-        next(5);
-        return false;
-    }
-    return true;
+    return act_clip(CLIP_SEARCH_YOU, coin() < 0, EYES_MOOD_SAD, EYES_MOOD_SAD, SOUND_WHIMPER);
 }
 
 static bool sad(void)

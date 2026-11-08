@@ -25,6 +25,8 @@ typedef struct {
     float px, py, ps, glow, spark;
 } clip_frame_t;
 
+_Static_assert(sizeof(clip_frame_t) == 33 * sizeof(float), "one float per field");
+
 typedef enum {
     CLIP_NONE,
     CLIP_CELEBRATE,
@@ -60,9 +62,16 @@ typedef enum {
     CLIP_COUNT,
 } clip_id_t;
 
+#define CLIP_FIELDS 33
+
+/* A frame as stored: each field of clip_frame_t times its scale. */
+typedef struct {
+    int16_t v[CLIP_FIELDS];
+} clip_raw_t;
+
 typedef struct {
     const char *name;
-    const clip_frame_t *frames;
+    const clip_raw_t *frames;
     uint16_t n;
     bool loop; // plays until stopped
 } clip_t;
@@ -71,3 +80,5 @@ typedef struct {
 const clip_t *clips_get(clip_id_t id);
 /** The clip called `name` ("sneeze"), or CLIP_NONE. */
 clip_id_t clips_find(const char *name);
+/** Frame `i` of `clip`, decoded. */
+void clips_frame(const clip_t *clip, int i, clip_frame_t *out);

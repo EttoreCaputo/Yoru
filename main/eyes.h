@@ -3,7 +3,7 @@
 /* Yoru on screen (docs/CONCEPT.md): a matte sphere with two small dark eyes
  * and two floating hands, floating in the black disc. A mood is a set of
  * targets (eye shape, lids, tilt) the eyes ease towards; blinks, saccades,
- * squash, gestures, the state tint, drifting away to sleep and the overlays
+ * squash, the clips (everything it acts out), the state tint, drifting away to sleep and the overlays
  * (thinking dots, z's, a sweat drop, hearts) run on top.
  *
  * Yoru lives in a space seen in perspective: x and y are pixels at the
@@ -64,24 +64,6 @@ typedef enum {
     EYES_STATUS_DONE,     // green
     EYES_STATUS_ERROR,    // red
 } eyes_status_t;
-
-/* The hands' gestures. Each plays once: the hands pop out, do it and tuck
- * back behind the body. */
-typedef enum {
-    EYES_GESTURE_NONE,
-    EYES_GESTURE_WAVE,
-    EYES_GESTURE_POINT,
-    EYES_GESTURE_COVER,   // both hands over the eyes, then one slides down to peek
-    EYES_GESTURE_THINK,   // a hand under the chin
-    EYES_GESTURE_CLAP,
-    EYES_GESTURE_STRETCH, // hands far out, the body stretched tall
-    EYES_GESTURE_HOLD,    // both hands at the sides of its head, wobbling (dizzy)
-    EYES_GESTURE_SHOO,    // one hand pushes you away, twice (annoyed)
-    EYES_GESTURE_FLAIL,   // both hands up, flapping (falling)
-    EYES_GESTURE_DIVE,    // both hands together over its head, a diver about to jump
-    EYES_GESTURE_CARRY,   // both hands low in front, holding what eyes_carry() gave it
-    EYES_GESTURE_COUNT,
-} eyes_gesture_t;
 
 /* How a move goes. */
 typedef enum {
@@ -152,12 +134,6 @@ void eyes_set_battery(eyes_battery_t state, int percent);
  * empty to the charge. */
 void eyes_zap(void);
 
-/** A poke: the body squashes and springs back. */
-void eyes_poke(void);
-/** A knock from the side (a slap, a knock on the case, a landing): the body
- * is pushed by (dx, dy), about -1..1 of its size, and springs back with a
- * wobble. */
-void eyes_knock(float dx, float dy);
 /** How the case leans, -1..1 each way (motion.c): the eyes roll towards the
  * low side, as if they had weight, and the body sags a little. */
 void eyes_lean(float x, float y);
@@ -167,14 +143,13 @@ void eyes_blink(void);
 void eyes_set_status(eyes_status_t status);
 eyes_status_t eyes_get_status(void);
 
-/** Play a gesture now, replacing the one playing (and any clip). */
-void eyes_gesture(eyes_gesture_t gesture);
-
 /** Play a clip keyed in the Rive file (docs/animations.md): for its length
  * it moves the body, the hands and the eyes itself, then the engine takes
- * over from the rest pose it ends in (where it ends, if it moved away).
- * `mirror` plays it left for right. Moves, knocks and the mood go on
- * underneath; a gesture stops it. A `_loop` clip plays until stopped. */
+ * over from the pose it ends in (where it ends, if it moved away). What
+ * was on screen eases into the clip, and the clip into what follows (the
+ * mood's face, or the next clip when one cuts it short), so nothing jumps.
+ * `mirror` plays it left for right. Moves and the mood go on underneath. A
+ * `_loop` clip plays until stopped. */
 void eyes_play(clip_id_t clip, bool mirror);
 /** The same, with the clip's effects (its glow, sparkles and prop) in `rgb`,
  * the prop a card showing `glyph` (an LV_SYMBOL or a few letters, kept by
@@ -184,19 +159,13 @@ bool eyes_playing(void);
 /** The clip playing, or CLIP_NONE. */
 clip_id_t eyes_clip(void);
 void eyes_stop_clip(void);
-const char *eyes_gesture_name(eyes_gesture_t gesture);
 
 /** A finger held on the screen at (x, y): both hands reach out and hold it,
  * in front of the body, following it as it moves (call again with the new
- * point), until eyes_let_go() or a gesture. */
+ * point), until eyes_let_go(). */
 void eyes_clutch(int32_t x, int32_t y);
 /** The finger lifted: the hands let go and tuck away behind the body. */
 void eyes_let_go(void);
-
-/** What the hands hold during EYES_GESTURE_CARRY: a little parcel in `rgb`
- * (0xRRGGBB) with a ribbon, brought back from an errand (errand.c). 0: none,
- * and the parcel goes at once. */
-void eyes_carry(uint32_t rgb);
 
 /** Move along a smooth curve through `pts` (from where it is) in `ms`;
  * 0 ms jumps there. Replaces any move or follow. */
@@ -213,8 +182,6 @@ eyes_pos_t eyes_unproject(int32_t x, int32_t y, float z);
 /** Screen point (x, y) is on Yoru's body. */
 bool eyes_hit(int32_t x, int32_t y);
 
-/** Shut one eye (0 left, 1 right) for `ms` (0: a quick wink). */
-void eyes_wink(int eye, uint32_t ms);
 /** Cross-eyed, 0 (not) .. 1: the eyes turn in towards each other. */
 void eyes_cross(float amount);
 /** A firefly at (x, y), screen pixels from the middle, flickering; `on`
