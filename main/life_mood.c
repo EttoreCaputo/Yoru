@@ -74,6 +74,9 @@ static const struct {
     [LIFE_FEEL_FUN] = {"fun", {0.15f, -0.05f, 0, 0.20f, 0}},
     [LIFE_FEEL_SOUND] = {"sound", {0, 0, 0, 0.20f, 0}},
     [LIFE_FEEL_PLUGGED] = {"plugged", {0.10f, 0.20f, 0, 0.30f, 0}},
+    [LIFE_FEEL_PRAISED] = {"praised", {0.40f, 0, 0.50f, 0.20f, 0.010f}},
+    [LIFE_FEEL_SCOLDED] = {"scolded", {-0.40f, 0, -0.30f, 0.30f, -0.015f}},
+    [LIFE_FEEL_AMUSED] = {"amused", {0.30f, 0, 0.30f, 0.30f, 0.003f}},
     // Company, but not you: no trust.
 };
 

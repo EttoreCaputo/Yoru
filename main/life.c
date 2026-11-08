@@ -402,6 +402,17 @@ void life_feel(life_feel_t feel)
     mood_feel(feel);
 }
 
+bool life_feel_named(const char *name)
+{
+    for (int f = 0; f < LIFE_FEEL_COUNT; f++) {
+        if (strcmp(mood_feel_name((life_feel_t) f), name) == 0) {
+            life_feel((life_feel_t) f);
+            return true;
+        }
+    }
+    return false;
+}
+
 void life_slept(void)
 {
     tick();

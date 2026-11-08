@@ -50,6 +50,10 @@ void behaviour_voice(voice_state_t state);
 /** Play one of the scenes (names as in DualEye) now, waking it if
  * asleep; false for an unknown one. With the LVGL lock held. */
 bool behaviour_play(const char *name);
+/** The face Yoru makes as it answers (the host's `set_feeling`): the scene's
+ * clip and mood, without its sound, even during a conversation; false for
+ * an unknown one. With the LVGL lock held. */
+bool behaviour_face(const char *name);
 /** To sleep, as a tap of PWR does, out of the menu or the inbox first.
  * With the LVGL lock held. */
 void behaviour_sleep(void);

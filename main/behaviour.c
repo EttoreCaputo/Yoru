@@ -1113,6 +1113,31 @@ bool behaviour_play(const char *name)
     return play(name);
 }
 
+bool behaviour_face(const char *name)
+{
+    if (s.asleep) {
+        return false;
+    }
+    for (size_t i = 0; i < sizeof(SCENES) / sizeof(SCENES[0]); i++) {
+        const scene_t *sc = &SCENES[i];
+        if (strcmp(name, sc->name) != 0) {
+            continue;
+        }
+        // Silent: it is talking, and its voice is the sound.
+        uint32_t clip_ms = 0;
+        const clip_t *c = clips_get(sc->clip);
+        if (c != NULL) {
+            eyes_play_fx(sc->clip, sc->either_side && (esp_random() & 1), sc->rgb ? sc->rgb : SCENE_RGB, NULL);
+            clip_ms = (uint32_t) c->n * 1000 / 30;
+        }
+        if (sc->ms > 0) {
+            react(sc->mood, clip_ms + sc->ms);
+        }
+        return true;
+    }
+    return false;
+}
+
 int behaviour_scenes(const char **names, int max)
 {
     int n = 0;

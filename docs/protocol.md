@@ -95,8 +95,9 @@ Settings are kept in NVS and survive a reboot.
 | `show_fetch` | `state`, `source`?, `id`? | Since 0.11.0. A connector call starts or ends: Yoru's errand (see Fetch) |
 | `set_icon` | `name`, `at`?, `data`? | Since 0.20.15. An app's icon, in parts (see Icons) |
 | `set_meeting` | `state`, `source`? | Since 0.20.15. A meeting is recorded, transcribed, summarized (see Meetings) |
+| `set_feeling` | `face`?, `feel`? | Since 0.20.17. How Yoru feels about what was just said to him (see Feelings) |
 
-The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `show_fetch`, and since 0.16.0 `set_tasks`, and since 0.20.15 `set_icon` and `set_meeting`) are for the host only: Yoru Hub keeps them out of its MCP server.
+The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `show_fetch`, and since 0.16.0 `set_tasks`, and since 0.20.15 `set_icon` and `set_meeting`, and since 0.20.17 `set_feeling`) are for the host only: Yoru Hub keeps them out of its MCP server.
 
 ## Confirmations
 
@@ -330,10 +331,21 @@ Since 0.15.0 (`docs/life.md`). `debug/life` takes any of:
 
 - `state`: one of `lounge`, `watch`, `explore`, `play`, `dream`, `bored`, `seek`, `sulk`, `drowsy`, entered now, its cooldown ignored;
 - `act`: an act's name (`firefly`, `dance`, `gaze`, `rest`...), played next;
-- `feel`: an event's name (`stroke`, `drop`, `ignored`...), applied to the emotions;
+- `feel`: an event's name (`stroke`, `drop`, `ignored`, since 0.20.17 `praised`, `scolded`, `amused`...), applied to the emotions;
 - `speed`: how much faster the life clock runs (1 to 300; dwell times, cooldowns and the emotions' fading; the animations stay at their pace). A restart sets it back to 1.
 
 It answers with `get_state`'s `life`, or `-32602` for an unknown name.
+
+## Feelings
+
+Since 0.20.17 (Yoru Hub: `core/src/assistant/memory/feelings.rs` and the face tag in `core/src/assistant/mod.rs`). The host's assistant tells Yoru how he takes what he was just told, so his face and his mood follow the conversation.
+
+| Tool | Arguments | Effect |
+|------|-----------|--------|
+| `set_feeling` | `face`?: one of `react`'s names (`love`, `giggle`, `sad`...), `feel`?: an event's name (`praised`, `scolded`, `amused`, or any of `debug/life`'s) | `face` plays the scene silently (his voice is the sound) while Yoru is awake; `feel` moves his emotions. An unknown `feel` answers an error; an unknown `face` is ignored |
+
+- The host sends `face` as soon as the reply's face tag is read, before the voice starts, and `feel` once the reply is done.
+- `praised` cheers him up and warms him to the person, `scolded` saddens and tenses him, `amused` cheers and wakes him a little.
 
 ## Friends (removed)
 

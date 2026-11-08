@@ -740,6 +740,24 @@ static bool tool_set_meeting(const cJSON *args, char *text, cJSON **structured)
     return true;
 }
 
+static bool tool_set_feeling(const cJSON *args, char *text, cJSON **structured)
+{
+    const char *face, *feel;
+    if (!get_str(args, "face", false, 24, &face, text) || !get_str(args, "feel", false, 24, &feel, text)) {
+        return false;
+    }
+    lvgl_port_lock();
+    const bool felt = feel[0] == '\0' || life_feel_named(feel);
+    const bool shown = face[0] != '\0' && felt && behaviour_face(face);
+    lvgl_port_unlock();
+    if (!felt) {
+        snprintf(text, TEXT_MAX, "no feeling \"%s\"", feel);
+        return false;
+    }
+    snprintf(text, TEXT_MAX, shown ? "Yoru shows it" : "noted");
+    return true;
+}
+
 static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
@@ -877,6 +895,15 @@ static const tool_t TOOLS[] = {
                   "\"recording\",\"transcribing\",\"summarizing\",\"done\",\"failed\"]},"
                   "\"source\":{\"type\":\"string\",\"maxLength\":24}},\"required\":[\"state\"]}",
         .fn = tool_set_meeting,
+    },
+    {
+        .name = "set_feeling",
+        .description = "How Yoru feels about what was just said in a conversation: `face`, a scene Yoru shows "
+                       "while it answers (silent, even while it talks), and `feel`, what it does to its moods "
+                       "(praised, scolded, amused, or any other of its feelings). The host sends it itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"face\":{\"type\":\"string\",\"maxLength\":24},"
+                  "\"feel\":{\"type\":\"string\",\"maxLength\":24}}}",
+        .fn = tool_set_feeling,
     },
     {
         .name = "set_brightness",

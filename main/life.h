@@ -60,6 +60,9 @@ typedef enum {
     LIFE_FEEL_FUN,     // it had fun on its own
     LIFE_FEEL_SOUND,   // a sudden noise
     LIFE_FEEL_PLUGGED,
+    LIFE_FEEL_PRAISED, // a compliment or thanks in a conversation (the host)
+    LIFE_FEEL_SCOLDED, // rude words in a conversation (the host)
+    LIFE_FEEL_AMUSED,  // a laugh shared in a conversation (the host)
     LIFE_FEEL_COUNT,
 } life_feel_t;
 
@@ -85,6 +88,8 @@ bool life_calling(void);
 
 /** Something happened to it: its emotions move. */
 void life_feel(life_feel_t feel);
+/** The same by the feeling's name (poke, praised...); false for an unknown one. */
+bool life_feel_named(const char *name);
 /** What it is doing: its state (lounge, watch, explore, play, dream, bored,
  * seek, sulk, drowsy) or what interrupted it (call, nap, sleep, come,
  * greet), for get_state. */

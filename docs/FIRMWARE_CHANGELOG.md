@@ -1,5 +1,11 @@
 # Firmware changelog
 
+## 0.20.17
+
+- **Yoru's face follows the conversation.** When Yoru Hub answers you, Yoru now shows how he takes it as he starts to speak: a laugh at a joke, a warm look at a compliment, a sad face when you tell him off. Silent: his voice is the sound.
+- **Compliments and scoldings stay with him.** Three new feelings, praised, scolded and amused, move his mood for a while after the conversation, as a stroke or a drop does.
+- New tool for the host: `set_feeling`.
+
 ## 0.20.16
 
 - **Smooth face while charging.** The green charging ring around Yoru used to halve the frame rate whenever the board was on USB and charging. It is now drawn from a picture prepared once, and only where the ring is: it looks the same, and the face runs as smoothly as off the charger.
