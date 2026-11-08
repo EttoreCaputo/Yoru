@@ -1,5 +1,17 @@
 # Firmware changelog
 
+## 0.20.10
+
+- **Everything Yoru does is now a hand-made animation.** The old drawn-in-code gestures are gone; 29 new animations replace them and fill the gaps:
+  - **waving** hello, **falling asleep** (he nods off into the sleeping face) and **waking up** (eyes open, hello again);
+  - **diving into the portal** and **coming back with the parcel** in the service's colour, on an errand;
+  - **thinking** in a loop while he works something out, **focus**, a **sigh**, **boredom**, a **huff** when he's cross, fanning himself when **hot**, **covering his eyes** when scared, a **sleepy sway**;
+  - the case as an input: **being tapped**, a **bonk**, a **jolt**, being **set down**, **landing**, **falling**, and **shooing** you away when annoyed;
+  - on his own: **looking around**, a slow **blink while gazing**, **humming** and swaying, a **loop the loop**, **bouncing off the walls**, **peeking** round the side, **sniffing**, **stargazing** and **searching for you**.
+  - Every reaction (happy, excited, wink, relieved, charged, love, giggle, yes, no...) plays its animation, and one eases into the next so nothing jumps.
+- The animations take half the flash they did, so there's room for many more.
+- **Yorus no longer talk to each other.** Two boards in the same house used to find each other over the WiFi radio, greet each other, catch each other's yawns, wake together, get jealous, chatter, pass a firefly and play **Pass the ball**, and only one would answer "Alexa". All of that is gone: it kept the radio busy and cost memory and CPU the voice and WiFi need. Each Yoru now lives on its own; if two hear "Alexa", both answer. **Pass the ball** is no longer in Games.
+
 ## 0.20.9
 
 - **Colourful animations for what Yoru does for you.** The animations can now light Yoru up in a colour, throw sparkles and hold a card with a service's icon, in that service's colour:
