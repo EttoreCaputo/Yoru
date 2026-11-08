@@ -5,6 +5,7 @@
 
 #include "board.h"
 #include "esp_heap_caps.h"
+#include "esp_timer.h"
 #include "esp_random.h"
 #include "look.h"
 
@@ -82,6 +83,46 @@
 #define LOWBAT_RGB 0xFFB340
 #define LOWBAT_EMPTY_RGB 0xFF4D5E
 #define LOWBAT_BLINK_MS 600
+/* Where a frame's time goes (debug/perf): the frame's own logic, the
+ * sprites rendered on the fly, and each layer drawn. */
+typedef enum {
+    PROF_LOGIC,
+    PROF_BALL,
+    PROF_EYE_RENDER,
+    PROF_HALO,
+    PROF_GLOW,
+    PROF_RINGS,
+    PROF_HANDS,
+    PROF_BODY,
+    PROF_TINT,
+    PROF_BADGE,
+    PROF_EYES,
+    PROF_PROP,
+    PROF_OVERLAYS,
+    PROF_SPARKS,
+    PROF_REST,
+    PROF_COUNT,
+} prof_id_t;
+
+static const char *const PROF_NAMES[PROF_COUNT] = {
+    "logic", "ball_render", "eye_render", "halo", "glow", "rings", "hands", "body",
+    "tint", "badge", "eyes", "prop", "overlays", "sparks", "rest",
+};
+
+static struct {
+    int64_t since_us;
+    uint64_t us[PROF_COUNT];
+    uint32_t frames, draws;
+    uint64_t px;
+} s_prof;
+
+#define PROF(id, stmt)                                                     \
+    do {                                                                   \
+        const int64_t prof_t0_ = esp_timer_get_time();                     \
+        stmt;                                                              \
+        s_prof.us[id] += (uint64_t) (esp_timer_get_time() - prof_t0_);     \
+    } while (0)
+
 /* The most pieces an overlay has (three z's, three dots). */
 #define MAX_OVERLAY_RECTS 3
 
@@ -191,6 +232,7 @@ typedef struct {
     float bottom;
     float spiral;          // > 0.5: a spiral, turned by `phase` (radians)
     float phase;
+    float swell;           // drawn this much bigger (the voice): scaled, not rendered again
 } eye_box_t;
 
 /* An eye's picture, redrawn only when its shape changes. */
@@ -590,6 +632,7 @@ static void clip_eye_layout(void)
         e->bottom = p[5];
         e->spiral = 0;
         e->phase = 0;
+        e->swell = 1;
     }
 }
 
@@ -602,9 +645,11 @@ static void eye_layout(void)
     // Near the edge of the ball the eyes get narrower: it seems to turn.
     const float nx = 1 - 0.3f * s.gx * s.gx;
     const float ny = 1 - 0.25f * s.gy * s.gy;
+    // The voice swells the drawn sprite, not the shape: rendering the eyes
+    // again every frame while Yoru talks cost a seventh of a core (0.20.11).
     const float swell = 1 + 0.14f * s.level;
-    const float w = s.cur.w * K * nx * swell * s.body.sx;
-    const float h = s.cur.h * K * ny * swell * s.body.sy * s.lid;
+    const float w = s.cur.w * K * nx * s.body.sx;
+    const float h = s.cur.h * K * ny * s.body.sy * s.lid;
     const float lift = EYE_SPACING * sinf(s.cur.tilt * (float) M_PI / 180.0f);
     // The lean rolls the eyes towards the low side, on top of the gaze.
     const float gx = clampf(s.gx + 0.6f * s.lx, -1, 1), gy = clampf(s.gy + 0.6f * s.ly, -1, 1);
@@ -616,6 +661,7 @@ static void eye_layout(void)
         eye_box_t *e = &s.eye[i];
         e->w = w;
         e->h = h * (i == 0 ? s.cur.left : s.cur.right);
+        e->swell = swell;
         e->x = (float) s.body.bx + ((float) side * (EYE_SPACING * nx - 0.45f * GAZE_X * s.cross) + ox) * s.body.sx;
         e->y = (float) s.body.by + (FACE_Y + oy) * s.body.sy - (float) side * lift * s.body.dist;
         const float hh = e->h < 2 ? 2 : e->h;
@@ -1292,44 +1338,58 @@ static void draw_cb(lv_event_t *e)
     const look_t *lk = look_get();
     const body_vis_t *v = &s.body;
     const lv_color_t black = lv_color_black();
+    s_prof.draws++;
+    s_prof.px += (uint64_t) lv_area_get_size(&layer->_clip_area);
 
     if (v->tint > 0.01f) {
         const float d = fminf(1, v->dist);
-        look_draw(layer, &lk->halo, v->bx, v->by, d, d, 0, (lv_opa_t) (90 * v->tint), rgb_color(v->tint_rgb));
+        PROF(PROF_HALO, look_draw(layer, &lk->halo, v->bx, v->by, d, d, 0, (lv_opa_t) (90 * v->tint),
+                                  rgb_color(v->tint_rgb)));
     }
-    draw_fx_glow(layer, v);
-    draw_countdown(layer, v);
-    draw_charge(layer, v);
-    draw_zap(layer);
+    PROF(PROF_GLOW, draw_fx_glow(layer, v));
+    PROF(PROF_RINGS, {
+        draw_countdown(layer, v);
+        draw_charge(layer, v);
+        draw_zap(layer);
+    });
     if (!s.hands_front) {
-        draw_hands(layer);
+        PROF(PROF_HANDS, draw_hands(layer));
     }
     const lv_opa_t body_opa = (lv_opa_t) (255 * v->fog);
     if (s.ball == NULL) {
-        s.ball = look_ball(v->rx, v->ry, s.frame); // shown again before the next frame
+        PROF(PROF_BALL, s.ball = look_ball(v->rx, v->ry, s.frame)); // shown again before the next frame
     }
-    if (s.ball != NULL) {
-        look_draw(layer, s.ball, v->bx, v->by, 1, 1, 0, body_opa, black);
-    } else {
-        look_draw(layer, &lk->day, v->bx, v->by, v->sx, v->sy, 0, body_opa, black);
-    }
+    PROF(PROF_BODY, {
+        if (s.ball != NULL) {
+            look_draw(layer, s.ball, v->bx, v->by, 1, 1, 0, body_opa, black);
+        } else {
+            look_draw(layer, &lk->day, v->bx, v->by, v->sx, v->sy, 0, body_opa, black);
+        }
+    });
     if (v->tint > 0.01f) {
-        look_draw(layer, &lk->tint, v->bx, v->by, v->sx, v->sy, 0, (lv_opa_t) (217 * v->tint), rgb_color(v->tint_rgb));
+        PROF(PROF_TINT, look_draw(layer, &lk->tint, v->bx, v->by, v->sx, v->sy, 0, (lv_opa_t) (217 * v->tint),
+                                  rgb_color(v->tint_rgb)));
     }
-    draw_fx_wash(layer, v);
-    draw_badge(layer, v);
-    for (int i = 0; i < 2; i++) {
-        look_draw(layer, &s.eye_sp[i].sp, (int32_t) lroundf(s.eye[i].x), (int32_t) lroundf(s.eye[i].y), 1, 1, 0,
-                  LV_OPA_COVER, black);
-    }
-    draw_fx_prop(layer);
+    PROF(PROF_BADGE, {
+        draw_fx_wash(layer, v);
+        draw_badge(layer, v);
+    });
+    PROF(PROF_EYES, {
+        for (int i = 0; i < 2; i++) {
+            look_draw(layer, &s.eye_sp[i].sp, (int32_t) lroundf(s.eye[i].x), (int32_t) lroundf(s.eye[i].y),
+                      s.eye[i].swell, s.eye[i].swell, 0, LV_OPA_COVER, black);
+        }
+    });
+    PROF(PROF_PROP, draw_fx_prop(layer));
     if (s.hands_front) {
-        draw_hands(layer);
+        PROF(PROF_HANDS, draw_hands(layer));
     }
-    draw_overlays(layer);
-    draw_fx_sparks(layer);
-    draw_lowbat(layer);
-    draw_firefly(layer);
+    PROF(PROF_OVERLAYS, draw_overlays(layer));
+    PROF(PROF_SPARKS, draw_fx_sparks(layer));
+    PROF(PROF_REST, {
+        draw_lowbat(layer);
+        draw_firefly(layer);
+    });
 }
 
 /* ---- What to redraw ------------------------------------------------------- */
@@ -1356,7 +1416,8 @@ static lv_area_t body_area(const body_vis_t *v)
 static lv_area_t eye_area(int i)
 {
     const look_sprite_t *sp = &s.eye_sp[i].sp;
-    return look_area(sp, (int32_t) lroundf(s.eye[i].x), (int32_t) lroundf(s.eye[i].y), 1, 1, false);
+    return look_area(sp, (int32_t) lroundf(s.eye[i].x), (int32_t) lroundf(s.eye[i].y), s.eye[i].swell, s.eye[i].swell,
+                     false);
 }
 
 static lv_area_t hand_area(int i)
@@ -1810,12 +1871,15 @@ static void frame_cb(lv_timer_t *timer)
     s.dt_ms = (int32_t) LV_CLAMP(1, elapsed, EYES_MAX_STEP_MS);
     s.frames = (float) s.dt_ms / EYES_FRAME_MS;
     s.t_ms += (uint32_t) s.dt_ms;
+    s_prof.frames++;
+    const int64_t logic_t0 = esp_timer_get_time();
     const bool eyes_moved = step();
 
     const body_vis_t was = s.body;
     body_layout(&s.body);
     eye_layout();
     const bool bridged = bridge_step();
+    s_prof.us[PROF_LOGIC] += (uint64_t) (esp_timer_get_time() - logic_t0);
     s.frame++;
     // The firefly flickers and flies: its box, where it was and where it is.
     if (s.fly || s.fly_shown) {
@@ -1830,7 +1894,8 @@ static void frame_cb(lv_timer_t *timer)
     }
     // Hidden under the menu or the dark it isn't drawn: no new sizes to
     // render (the menu draws its own Yoru meanwhile).
-    s.ball = lv_obj_has_flag(s.obj, LV_OBJ_FLAG_HIDDEN) ? NULL : look_ball(s.body.rx, s.body.ry, s.frame);
+    PROF(PROF_BALL, s.ball = lv_obj_has_flag(s.obj, LV_OBJ_FLAG_HIDDEN) ? NULL
+                                                                         : look_ball(s.body.rx, s.body.ry, s.frame));
 
     // The body: the sphere, the tint, the halo.
     const bool body_changed = !s.body_valid || memcmp(&was, &s.body, sizeof(was)) != 0;
@@ -1853,7 +1918,7 @@ static void frame_cb(lv_timer_t *timer)
         const bool reshaped = memcmp(key, es->key, sizeof(key)) != 0;
         if (reshaped) {
             memcpy(es->key, key, sizeof(key));
-            eye_render(es, &s.eye[i]);
+            PROF(PROF_EYE_RENDER, eye_render(es, &s.eye[i]));
         }
         lv_area_t now = eye_area(i);
         if (!es->valid || reshaped || eyes_moved || bridged || !areas_equal(&now, &es->drawn)) {
@@ -2059,6 +2124,27 @@ void eyes_zap(void)
     s.zapping = true;
     s.zap_ms = 0;
     s.charge_deg = 0; // the ring fills up with the energy
+}
+
+cJSON *eyes_profile(bool reset)
+{
+    const int64_t now = esp_timer_get_time();
+    cJSON *r = cJSON_CreateObject();
+    const double secs = s_prof.since_us > 0 ? (double) (now - s_prof.since_us) / 1e6 : 0;
+    if (secs > 0) {
+        cJSON_AddNumberToObject(r, "fps", s_prof.frames / secs);
+        cJSON_AddNumberToObject(r, "draws_per_s", s_prof.draws / secs);
+        cJSON_AddNumberToObject(r, "kpx_per_s", (double) s_prof.px / 1000.0 / secs);
+        cJSON *ms = cJSON_AddObjectToObject(r, "ms_per_s");
+        for (int i = 0; i < PROF_COUNT; i++) {
+            cJSON_AddNumberToObject(ms, PROF_NAMES[i], (double) s_prof.us[i] / 1000.0 / secs);
+        }
+    }
+    if (reset || s_prof.since_us == 0) {
+        memset(&s_prof, 0, sizeof(s_prof));
+        s_prof.since_us = now;
+    }
+    return r;
 }
 
 void eyes_set_level(float level)

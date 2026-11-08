@@ -1,5 +1,10 @@
 # Firmware changelog
 
+## 0.20.12
+
+- **Yoru's face stays smooth while he talks.** His eyes swell with his voice, and every frame they were drawn again from scratch: the face dropped to about 20 frames a second while he spoke. Now the same eyes are just drawn a little bigger, and he talks at a steady 30 frames a second with less than half the work.
+- `debug/perf` also says where each frame's time goes (the sphere, the eyes, the glow, the rings...), to find the next slow spot: the coloured glow while he listens and thinks still slows him to 12-20 frames a second.
+
 ## 0.20.11
 
 - **Yoru's voice no longer breaks up while he talks.** Every tenth of a second the sound waited for the face to finish drawing, to make his eyes swell with his voice; while he talks the face can take more than a tenth of a second to draw, and the speaker ran out of sound meanwhile: small holes in the speech (62 in one answer, measured). Now the sound never waits for the face: 1 left, at the start. The mics while he listens are spared the same wait.

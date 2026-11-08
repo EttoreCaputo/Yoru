@@ -176,6 +176,9 @@ void perf_reset(void)
     s_windows = 0;
     s_base = gaps_now();
     xSemaphoreGive(s_lock);
+    lvgl_port_lock();
+    cJSON_Delete(eyes_profile(true));
+    lvgl_port_unlock();
 }
 
 cJSON *perf_report(void)
@@ -219,6 +222,9 @@ cJSON *perf_report(void)
         cJSON_AddItemToArray(tasks, item);
     }
     xSemaphoreGive(s_lock);
+    lvgl_port_lock();
+    cJSON_AddItemToObject(r, "draw", eyes_profile(false));
+    lvgl_port_unlock();
     cJSON_AddNumberToObject(r, "internal_free", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(r, "internal_min", heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
     cJSON_AddNumberToObject(r, "psram_free", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));

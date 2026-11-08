@@ -1,5 +1,7 @@
 #pragma once
 
+#include "cJSON.h"
+
 /* Yoru on screen (docs/CONCEPT.md): a matte sphere with two small dark eyes
  * and two floating hands, floating in the black disc. A mood is a set of
  * targets (eye shape, lids, tilt) the eyes ease towards; blinks, saccades,
@@ -109,6 +111,10 @@ void eyes_look_around(void);
  * speaking): the eyes swell a little with it. 0 when nobody talks. Safe
  * without the LVGL lock: one float, read every frame. */
 void eyes_set_level(float level);
+
+/** Where the frames' time went since the last reset, in ms per second
+ *  (debug/perf). With the LVGL lock held. */
+cJSON *eyes_profile(bool reset);
 
 /** A ring round the body running out over `ms`: how long it still listens
  * without the wake word. 0 takes it away. */
