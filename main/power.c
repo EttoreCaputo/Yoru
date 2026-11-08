@@ -60,7 +60,7 @@ static struct {
     int was_held; // a power_hold_t, or -1: not kept from hibernating
 } s = {
     .profile = POWER_DESK,
-    .pace = EYES_PACE_FULL,
+    .pace = EYES_PACE_SMOOTH,
     .motion = MOTION_FULL,
     .run_mux = portMUX_INITIALIZER_UNLOCKED,
     .was_held = -1,
@@ -360,7 +360,11 @@ bool power_tick(const power_scene_t *sc)
                        : saver && sc->dark  ? WIFI_PS_MAX_MODEM
                                             : WIFI_PS_MIN_MODEM);
     voice_set_resting(saver && sc->asleep && !sc->busy);
-    set_pace(sc->dark ? EYES_PACE_STOPPED : battery && sc->asleep ? EYES_PACE_SLOW : EYES_PACE_FULL);
+    // 60 frames a second only on USB: on battery half of them is plenty.
+    set_pace(sc->dark                   ? EYES_PACE_STOPPED
+             : battery && sc->asleep    ? EYES_PACE_SLOW
+             : battery                  ? EYES_PACE_FULL
+                                        : EYES_PACE_SMOOTH);
     set_motion(battery && sc->dark ? MOTION_SLOW : MOTION_FULL);
     board_pmu_set_slow(sc->dark);
     set_light_sleep(battery && sc->dark);

@@ -88,7 +88,8 @@ typedef struct {
 lv_obj_t *eyes_create(lv_obj_t *parent);
 
 typedef enum {
-    EYES_PACE_FULL,    // 30 frames a second
+    EYES_PACE_SMOOTH,  // 60 frames a second, as the panel refreshes: on USB
+    EYES_PACE_FULL,    // 30: on battery
     EYES_PACE_SLOW,    // 15: asleep on battery, the dot and its z's
     EYES_PACE_STOPPED, // hidden and not stepped: the screen is dark
 } eyes_pace_t;

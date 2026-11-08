@@ -1,5 +1,13 @@
 # Firmware changelog
 
+## 0.20.13
+
+- **Yoru moves at up to 60 frames a second on USB**, twice as smooth as before: at rest 45-60, while he talks about 50. On battery he stays at 30, so the battery lasts as long as before.
+- **The glow while he thinks is lighter**: about 30 frames a second instead of 12-23. The halo, the coloured wash and his hands are now drawn ready-made at the right size instead of being stretched every frame, and nothing is drawn under the sphere where it can't be seen.
+- The screen is now drawn a strip at a time straight into the buffers that go to the panel, with no extra memory.
+- The hand-made animations stay at about 25 frames a second: every frame they draw new eyes and a new sphere, and sending the frame to the screen takes a quarter of the time on its own.
+- `debug/perf` also says how many frames reached the panel (`panel_fps`), how long sending them took, and how much time went to sprites drawn as they are or stretched.
+
 ## 0.20.12
 
 - **Yoru's face stays smooth while he talks.** His eyes swell with his voice, and every frame they were drawn again from scratch: the face dropped to about 20 frames a second while he spoke. Now the same eyes are just drawn a little bigger, and he talks at a steady 30 frames a second with less than half the work.

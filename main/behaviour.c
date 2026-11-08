@@ -589,7 +589,7 @@ static void light_up(void)
     ESP_LOGI(TAG, "screen lit");
     s.dark = false;
     board_display_set_sleep(false);
-    eyes_set_pace(EYES_PACE_FULL); // power.c slows it again if it should
+    eyes_set_pace(EYES_PACE_SMOOTH); // power.c slows it again if it should
     board_touch_set_sleep(false);
     lvgl_port_set_touch(true);
     s.last_touch_ms = lv_tick_get();

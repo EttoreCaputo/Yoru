@@ -34,7 +34,7 @@ typedef struct {
  * a quarter smaller than ARGB and much quicker to blend. */
 typedef struct {
     look_sprite_t day;   // the lit sphere
-    look_sprite_t tint;  // the lower part of the sphere, A8
+    look_sprite_t tint;  // the lower part of the sphere, A8 (day's)
     look_sprite_t halo;  // a soft disc around it, A8
     look_sprite_t hand;  // a small flattened sphere
 } look_t;
@@ -49,6 +49,25 @@ esp_err_t look_init(void);
  * valid until the next call with `frame` changed. NULL if memory runs out. */
 const look_sprite_t *look_ball(int rx, int ry, uint32_t frame);
 
+/** The tint of a sphere look_ball() gave (or look_get()'s day), its size,
+ * drawn at scale 1 on it; NULL for any other sprite. */
+const look_sprite_t *look_ball_tint(const look_sprite_t *ball);
+
+/** The same sphere's colour alone (RGB565, no alpha), to copy where it
+ * is opaque: about twice as quick as blending. NULL as above. */
+const look_sprite_t *look_ball_core(const look_sprite_t *ball);
+
+/** The halo at `scale` (at most 1), rendered and kept like the spheres,
+ * so it is drawn at scale 1: LVGL scaling it costs four times as much a
+ * pixel. A little smaller than `scale` (steps of a few px), never bigger.
+ * NULL if memory runs out. */
+const look_sprite_t *look_halo(float scale, uint32_t frame);
+
+/** The hand at `scale`, rendered and kept like the halo, to draw at scale
+ * 1: a little off `scale` (to the nearest pixel of radius). NULL when tiny
+ * or out of memory. */
+const look_sprite_t *look_hand(float scale, uint32_t frame);
+
 const look_t *look_get(void);
 
 /** Draw a sprite with its anchor at (x, y), scaled and turned (degrees)
@@ -58,6 +77,10 @@ void look_draw(lv_layer_t *layer, const look_sprite_t *sp, int32_t x, int32_t y,
 
 /** The area a sprite covers when drawn that way (a bounding box, generous
  * for rotation). */
+/** Time (us), pixels and draws of the sprites drawn [0] as they are, [1]
+ * scaled or turned, since the last reset (debug/perf). */
+void look_draw_stats(uint64_t us[2], uint64_t px[2], uint64_t n[2], bool reset);
+
 lv_area_t look_area(const look_sprite_t *sp, int32_t x, int32_t y, float scale_x, float scale_y, bool rotated);
 
 #ifdef __cplusplus

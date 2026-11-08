@@ -13,6 +13,8 @@ static const char *TAG = "look";
 /* The light comes from the top left, as in the Rive file: a radial gradient
  * centred there, from pearl to a soft shadow at the bottom-right edge. */
 #define K LOOK_SCALE
+/* The hand's long radius. */
+#define HAND_RX (27 * K)
 #define LIGHT_X (-62.0f * K)
 #define LIGHT_Y (-68.0f * K)
 #define LIGHT_R (276.0f * K)
@@ -34,6 +36,8 @@ static look_t s_look;
 #define BALL_BUDGET (1024 * 1024)
 typedef struct {
     look_sprite_t sp;
+    look_sprite_t tint; // its tint, in the same block
+    look_sprite_t core; // its colour alone, RGB565
     int rx, ry; // 0: empty
     uint32_t used;
 } ball_slot_t;
@@ -58,13 +62,6 @@ static float clampf(float v, float lo, float hi)
 static float dither(int x, int y)
 {
     return ((float) BAYER[y & 3][x & 3] + 0.5f) / 16.0f;
-}
-
-/* An alpha map recoloured at draw time bands the same way; `amp` is how much
- * alpha one colour step takes at its brightest. */
-static uint8_t dither_a8(float a, int x, int y, float amp)
-{
-    return (uint8_t) clampf(a + (dither(x, y) - 0.5f) * amp, 0, 255);
 }
 
 /* A colour along a gradient, as r, g, b 0..255. */
@@ -143,44 +140,11 @@ static esp_err_t render_ball(look_sprite_t *sp, float rx, float ry, float light_
     return ESP_OK;
 }
 
-/* The tint fills the lower half of the sphere, strongest at the bottom. */
-static esp_err_t render_tint(look_sprite_t *sp)
-{
-    const float r = LOOK_SPHERE_R;
-    const int size = 2 * LOOK_SPHERE_R + 4;
-    ESP_RETURN_ON_ERROR(sprite_alloc(sp, size, size, LV_COLOR_FORMAT_A8, size / 2, size / 2), TAG, "tint");
-    uint8_t *a8 = (uint8_t *) sp->img.data;
-    for (int y = 0; y < size; y++) {
-        float py = (float) y + 0.5f - (float) size / 2;
-        float k = clampf(py / r, 0, 1);
-        for (int x = 0; x < size; x++) {
-            float px = (float) x + 0.5f - (float) size / 2;
-            float cov = clampf(r - hypotf(px, py) + 0.5f, 0, 1);
-            a8[y * size + x] = dither_a8(255 * cov * k, x, y, 10);
-        }
-    }
-    return ESP_OK;
-}
-
-/* The halo: a soft ring of glow just around the sphere. Kept tight, so
- * redrawing it each frame stays near Yoru instead of the whole screen. */
-static esp_err_t render_halo(look_sprite_t *sp)
-{
-    const int size = ((int) (384 * K)) & ~1;
-    ESP_RETURN_ON_ERROR(sprite_alloc(sp, size, size, LV_COLOR_FORMAT_A8, size / 2, size / 2), TAG, "halo");
-    uint8_t *a8 = (uint8_t *) sp->img.data;
-    for (int y = 0; y < size; y++) {
-        for (int x = 0; x < size; x++) {
-            float d = hypotf((float) x + 0.5f - size / 2.0f, (float) y + 0.5f - size / 2.0f);
-            float k = clampf((190 * K - d) / (60 * K), 0, 1);
-            // Drawn at about a third: a colour step is three times the alpha.
-            a8[y * size + x] = dither_a8(255 * k * k * (3 - 2 * k), x, y, 24);
-        }
-    }
-    return ESP_OK;
-}
-
-static esp_err_t render_ball_fast(look_sprite_t *sp, int rx, int ry);
+static esp_err_t render_halo_at(look_sprite_t *sp, int size);
+static int halo_full(void);
+static esp_err_t render_ball_fast(look_sprite_t *sp, look_sprite_t *tint, look_sprite_t *core, int rx, int ry);
+/* The day sphere's colour alone (look_ball_core). */
+static look_sprite_t s_day_core;
 
 esp_err_t look_init(void)
 {
@@ -201,10 +165,11 @@ esp_err_t look_init(void)
     }
     // The same renderer as every other size, so going nearer or farther
     // never changes the shading.
-    ESP_RETURN_ON_ERROR(render_ball_fast(&s_look.day, LOOK_SPHERE_R, LOOK_SPHERE_R), TAG, "day");
-    ESP_RETURN_ON_ERROR(render_tint(&s_look.tint), TAG, "tint");
-    ESP_RETURN_ON_ERROR(render_halo(&s_look.halo), TAG, "halo");
-    ESP_RETURN_ON_ERROR(render_ball(&s_look.hand, 27 * K, 22 * K, -12 * K, -11 * K, 31 * K, PEARL), TAG, "hand");
+    ESP_RETURN_ON_ERROR(render_ball_fast(&s_look.day, &s_look.tint, &s_day_core, LOOK_SPHERE_R, LOOK_SPHERE_R), TAG, "day");
+    // The halo: a soft ring of glow just around the sphere. Kept tight, so
+    // redrawing it each frame stays near Yoru instead of the whole screen.
+    ESP_RETURN_ON_ERROR(render_halo_at(&s_look.halo, halo_full()), TAG, "halo");
+    ESP_RETURN_ON_ERROR(render_ball(&s_look.hand, HAND_RX, 22 * K, -12 * K, -11 * K, 31 * K, PEARL), TAG, "hand");
     ESP_LOGI(TAG, "Yoru rendered in %lld ms", (esp_timer_get_time() - start) / 1000);
     return ESP_OK;
 }
@@ -213,17 +178,21 @@ esp_err_t look_init(void)
  * squared distance to the light, already dithered and packed for each of the
  * 16 dither levels, and walked along each row by forward differences (adds
  * only, no square roots); only the rim's pixels work out their coverage.
- * The light moves with the surface, as if the round one were scaled. */
-static esp_err_t render_ball_fast(look_sprite_t *sp, int rx, int ry)
+ * The light moves with the surface, as if the round one were scaled.
+ *
+ * Its tint comes along, an A8 plane after the sphere's: the lower half of
+ * the disc, strongest at the bottom. Drawn at scale 1 like the sphere, it
+ * costs a quarter of what LVGL scaling one tint to every size did. */
+static esp_err_t render_ball_fast(look_sprite_t *sp, look_sprite_t *tint, look_sprite_t *core, int rx, int ry)
 {
     const int w = 2 * rx + 4, h = 2 * ry + 4;
-    const uint32_t size = (uint32_t) (w * h * 3);
-    // Only the alpha plane needs clearing: colour outside the disc is unseen.
+    const uint32_t size = (uint32_t) (w * h * 4);
+    // Only the alpha planes need clearing: colour outside the disc is unseen.
     uint8_t *data = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (data == NULL) {
         return ESP_ERR_NO_MEM; // look_ball() makes room and tries again
     }
-    memset(data + w * h * 2, 0, (size_t) (w * h));
+    memset(data + w * h * 2, 0, (size_t) (w * h * 2));
     memset(&sp->img, 0, sizeof(sp->img));
     sp->img.header.magic = LV_IMAGE_HEADER_MAGIC;
     sp->img.header.cf = LV_COLOR_FORMAT_RGB565A8;
@@ -234,6 +203,16 @@ static esp_err_t render_ball_fast(look_sprite_t *sp, int rx, int ry)
     sp->img.data = data;
     sp->ax = w / 2;
     sp->ay = h / 2;
+    *tint = *sp;
+    tint->img.header.cf = LV_COLOR_FORMAT_A8;
+    tint->img.header.stride = w;
+    tint->img.data_size = (uint32_t) (w * h);
+    tint->img.data = data + w * h * 3;
+    // The colour plane alone: where the sphere is opaque it is copied, not
+    // blended.
+    *core = *sp;
+    core->img.header.cf = LV_COLOR_FORMAT_RGB565;
+    core->img.data_size = (uint32_t) (w * h * 2);
 
     const float f = sqrtf((float) (rx * ry)) / LOOK_SPHERE_R;
     const float lx = LIGHT_X * (float) rx / LOOK_SPHERE_R, ly = LIGHT_Y * (float) ry / LOOK_SPHERE_R;
@@ -293,6 +272,15 @@ static esp_err_t render_ball_fast(look_sprite_t *sp, int rx, int ry)
             const float cov = clampf(0.5f - (sqrtf(q) - 1) * rmin, 0, 1);
             a[x] = (uint8_t) (cov * 255.0f + 0.5f);
         }
+        // The tint: the coverage, fading in from the middle down.
+        if (py > 0) {
+            const float k = clampf(py / (float) ry, 0, 1);
+            uint8_t *ta = alpha + w * h + y * w;
+            for (int x = x0; x < x1; x++) {
+                const float v = (float) a[x] * k + ((float) bayer[x & 3] - 7.5f) * (10.0f / 16.0f);
+                ta[x] = a[x] == 0 ? 0 : (uint8_t) clampf(v, 0, 255);
+            }
+        }
     }
     return ESP_OK;
 }
@@ -325,7 +313,7 @@ const look_sprite_t *look_ball(int rx, int ry, uint32_t frame)
         }
     }
     // Room for it: the least recently drawn go, never one drawn this frame.
-    const uint32_t need = (uint32_t) ((2 * rx + 4) * (2 * ry + 4) * 3);
+    const uint32_t need = (uint32_t) ((2 * rx + 4) * (2 * ry + 4) * 4);
     while (oldest != NULL && (free_slot == NULL || s_ball_bytes + need > BALL_BUDGET)) {
         ball_free(oldest);
         free_slot = free_slot ? free_slot : oldest;
@@ -344,7 +332,7 @@ const look_sprite_t *look_ball(int rx, int ry, uint32_t frame)
     // PSRAM is shared with the voice, the WiFi's TLS and the cloud: when no
     // block is big enough, older sizes go until one is (freed neighbours
     // merge).
-    while (render_ball_fast(&free_slot->sp, rx, ry) != ESP_OK) {
+    while (render_ball_fast(&free_slot->sp, &free_slot->tint, &free_slot->core, rx, ry) != ESP_OK) {
         oldest = NULL;
         for (int i = 0; i < BALL_SLOTS; i++) {
             ball_slot_t *b = &s_balls[i];
@@ -369,9 +357,189 @@ const look_sprite_t *look_ball(int rx, int ry, uint32_t frame)
     return &free_slot->sp;
 }
 
+const look_sprite_t *look_ball_tint(const look_sprite_t *ball)
+{
+    if (ball == &s_look.day) {
+        return &s_look.tint;
+    }
+    for (int i = 0; i < BALL_SLOTS; i++) {
+        if (ball == &s_balls[i].sp) {
+            return &s_balls[i].tint;
+        }
+    }
+    return NULL;
+}
+
+const look_sprite_t *look_ball_core(const look_sprite_t *ball)
+{
+    if (ball == &s_look.day) {
+        return &s_day_core;
+    }
+    for (int i = 0; i < BALL_SLOTS; i++) {
+        if (ball == &s_balls[i].sp) {
+            return &s_balls[i].core;
+        }
+    }
+    return NULL;
+}
+
+/* The halo at other sizes, as Yoru moves nearer or farther: a couple kept,
+ * in steps of HALO_STEP px (it is soft: the steps don't show). */
+#define HALO_SLOTS 2
+#define HALO_STEP 4
+typedef struct {
+    look_sprite_t sp;
+    int size; // 0: empty
+    uint32_t used;
+} halo_slot_t;
+static halo_slot_t s_halos[HALO_SLOTS];
+/* The halo's alpha by the squared distance from the middle, as a share of
+ * its radius squared. */
+#define HALO_LUT_N 512
+static float s_halo_lut[HALO_LUT_N];
+
+static int halo_full(void)
+{
+    return ((int) (384 * K)) & ~1;
+}
+
+/* Dithered like the boot one; the shape is the same at every size. */
+static esp_err_t render_halo_at(look_sprite_t *sp, int size)
+{
+    ESP_RETURN_ON_ERROR(sprite_alloc(sp, size, size, LV_COLOR_FORMAT_A8, size / 2, size / 2), TAG, "halo");
+    if (s_halo_lut[0] == 0) {
+        for (int i = 0; i < HALO_LUT_N; i++) {
+            const float u = sqrtf(((float) i + 0.5f) / HALO_LUT_N); // distance / radius
+            const float k = clampf((1 - u) * (190.0f / 60.0f), 0, 1);
+            s_halo_lut[i] = 255 * k * k * (3 - 2 * k);
+        }
+    }
+    // Twice the distance, in whole numbers: (2x + 1 - size) from the middle.
+    const float r2 = 2 * 190 * K * (float) size / (float) halo_full();
+    const float idx_k = HALO_LUT_N / (r2 * r2);
+    uint8_t *a8 = (uint8_t *) sp->img.data;
+    for (int y = 0; y < size; y++) {
+        const int dy = 2 * y + 1 - size;
+        const uint8_t *bayer = BAYER[y & 3];
+        for (int x = 0; x < size; x++) {
+            const int dx = 2 * x + 1 - size;
+            const int i = (int) ((float) (dx * dx + dy * dy) * idx_k);
+            if (i >= HALO_LUT_N) {
+                continue; // calloc'd
+            }
+            const float v = s_halo_lut[i] + ((float) bayer[x & 3] - 7.5f) * (24.0f / 16.0f);
+            a8[y * size + x] = (uint8_t) clampf(v, 0, 255);
+        }
+    }
+    return ESP_OK;
+}
+
+const look_sprite_t *look_halo(float scale, uint32_t frame)
+{
+    const int full = halo_full();
+    // Down to the step, never up: the areas worked out at `scale` cover it.
+    int size = (int) ((float) full * scale) / HALO_STEP * HALO_STEP;
+    if (size >= full - 1) {
+        return &s_look.halo;
+    }
+    size = size < 8 ? 8 : size;
+    // An empty slot, or the one drawn longest ago (never one drawn this frame).
+    halo_slot_t *pick = NULL;
+    for (int i = 0; i < HALO_SLOTS; i++) {
+        halo_slot_t *h = &s_halos[i];
+        if (h->size == size) {
+            h->used = frame;
+            return &h->sp;
+        }
+        if (h->size == 0) {
+            pick = pick == NULL || pick->size != 0 ? h : pick;
+        } else if (h->used != frame && (pick == NULL || (pick->size != 0 && frame - h->used > frame - pick->used))) {
+            pick = h;
+        }
+    }
+    if (pick == NULL) {
+        return NULL;
+    }
+    if (pick->size != 0) {
+        heap_caps_free((void *) pick->sp.img.data);
+        pick->size = 0;
+    }
+    if (render_halo_at(&pick->sp, size) != ESP_OK) {
+        return NULL;
+    }
+    pick->size = size;
+    pick->used = frame;
+    return &pick->sp;
+}
+
+/* The hand at other sizes, kept like the halo, a pixel of radius apart. */
+#define HAND_SLOTS 4
+typedef struct {
+    look_sprite_t sp;
+    int rx; // 0: empty
+    uint32_t used;
+} hand_slot_t;
+static hand_slot_t s_hands[HAND_SLOTS];
+
+
+const look_sprite_t *look_hand(float scale, uint32_t frame)
+{
+    const int rx = (int) lroundf(HAND_RX * scale);
+    if (rx < 3) {
+        return NULL;
+    }
+    if (rx == (int) lroundf(HAND_RX)) {
+        return &s_look.hand;
+    }
+    hand_slot_t *pick = NULL;
+    for (int i = 0; i < HAND_SLOTS; i++) {
+        hand_slot_t *h = &s_hands[i];
+        if (h->rx == rx) {
+            h->used = frame;
+            return &h->sp;
+        }
+        if (h->rx == 0) {
+            pick = pick == NULL || pick->rx != 0 ? h : pick;
+        } else if (h->used != frame && (pick == NULL || (pick->rx != 0 && frame - h->used > frame - pick->used))) {
+            pick = h;
+        }
+    }
+    if (pick == NULL) {
+        return NULL;
+    }
+    if (pick->rx != 0) {
+        heap_caps_free((void *) pick->sp.img.data);
+        pick->rx = 0;
+    }
+    // The boot one's shape and light, at this size.
+    const float k = (float) rx / HAND_RX;
+    if (render_ball(&pick->sp, (float) rx, 22 * K * k, -12 * K * k, -11 * K * k, 31 * K * k, PEARL) != ESP_OK) {
+        return NULL;
+    }
+    pick->rx = rx;
+    pick->used = frame;
+    return &pick->sp;
+}
+
 const look_t *look_get(void)
 {
     return &s_look;
+}
+
+/* Time and pixels of the sprites drawn as they are and scaled or turned
+ * (debug/perf): a transform costs several times as much a pixel. */
+static uint64_t s_draw_us[2], s_draw_px[2], s_draw_n[2];
+
+void look_draw_stats(uint64_t us[2], uint64_t px[2], uint64_t n[2], bool reset)
+{
+    memcpy(us, s_draw_us, sizeof(s_draw_us));
+    memcpy(px, s_draw_px, sizeof(s_draw_px));
+    memcpy(n, s_draw_n, sizeof(s_draw_n));
+    if (reset) {
+        memset(s_draw_us, 0, sizeof(s_draw_us));
+        memset(s_draw_px, 0, sizeof(s_draw_px));
+        memset(s_draw_n, 0, sizeof(s_draw_n));
+    }
 }
 
 void look_draw(lv_layer_t *layer, const look_sprite_t *sp, int32_t x, int32_t y, float scale_x, float scale_y,
@@ -396,7 +564,16 @@ void look_draw(lv_layer_t *layer, const look_sprite_t *sp, int32_t x, int32_t y,
     }
     const lv_area_t coords = {x - sp->ax, y - sp->ay, x - sp->ax + (int32_t) sp->img.header.w - 1,
                               y - sp->ay + (int32_t) sp->img.header.h - 1};
+    const int64_t t0 = esp_timer_get_time();
     lv_draw_image(layer, &dsc, &coords);
+    const int k = dsc.scale_x != LV_SCALE_NONE || dsc.scale_y != LV_SCALE_NONE || dsc.rotation != 0;
+    s_draw_us[k] += (uint64_t) (esp_timer_get_time() - t0);
+    s_draw_n[k]++;
+    const lv_area_t a = look_area(sp, x, y, scale_x, scale_y, dsc.rotation != 0), *c = &layer->_clip_area;
+    const int32_t w = LV_MIN(a.x2, c->x2) - LV_MAX(a.x1, c->x1) + 1, h = LV_MIN(a.y2, c->y2) - LV_MAX(a.y1, c->y1) + 1;
+    if (w > 0 && h > 0) {
+        s_draw_px[k] += (uint64_t) (w * h);
+    }
 }
 
 lv_area_t look_area(const look_sprite_t *sp, int32_t x, int32_t y, float scale_x, float scale_y, bool rotated)

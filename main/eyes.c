@@ -9,9 +9,13 @@
 #include "esp_random.h"
 #include "look.h"
 
-/* One frame every 33 ms; when nothing moves, nothing is redrawn. Motion
- * follows the clock, not the frame count, so a slow frame doesn't slow it. */
+/* The easing's unit: its rates are per 33 ms, whatever the frame rate.
+ * Motion follows the clock, not the frame count, so a slow frame doesn't
+ * slow it. */
 #define EYES_FRAME_MS 33
+/* A frame every 16 ms at the smooth pace, the panel's own rate (about
+ * 60 Hz); when nothing moves, nothing is redrawn. */
+#define EYES_TICK_MS 16
 /* A frame later than this is a stall (a flash write, a long log): the
  * animation skips ahead at most this far. */
 #define EYES_MAX_STEP_MS 200
@@ -821,8 +825,14 @@ static void draw_hands(lv_layer_t *layer)
     for (int i = 0; i < 2; i++) {
         const hand_pose_t *h = &s.hand[i];
         const int32_t x = s.body.bx + (int32_t) (h->x * K * d), y = s.body.by + (int32_t) (h->y * K * d);
-        look_draw(layer, &lk->hand, x, y, h->s * d, h->s * d, 0, (lv_opa_t) (255 * s.near * s.body.fog),
-                  lv_color_black());
+        const lv_opa_t opa = (lv_opa_t) (255 * s.near * s.body.fog);
+        // Rendered at its size: scaling it costs several times as much.
+        const look_sprite_t *sp = look_hand(h->s * d, s.frame);
+        if (sp != NULL) {
+            look_draw(layer, sp, x, y, 1, 1, 0, opa, lv_color_black());
+        } else {
+            look_draw(layer, &lk->hand, x, y, h->s * d, h->s * d, 0, opa, lv_color_black());
+        }
     }
 }
 
@@ -1221,14 +1231,110 @@ static void fx_step(void)
     }
 }
 
+static bool area_and(lv_area_t *out, const lv_area_t *a, const lv_area_t *b)
+{
+    *out = (lv_area_t) {LV_MAX(a->x1, b->x1), LV_MAX(a->y1, b->y1), LV_MIN(a->x2, b->x2), LV_MIN(a->y2, b->y2)};
+    return out->x1 <= out->x2 && out->y1 <= out->y2;
+}
+
+/* A sprite at scale 1, only where it shows in `part`: the layer's clip
+ * narrowed for the draw. */
+static void draw_part(lv_layer_t *layer, const look_sprite_t *sp, int32_t x, int32_t y, lv_opa_t opa, lv_color_t color,
+                      lv_area_t part)
+{
+    const lv_area_t clip = layer->_clip_area;
+    lv_area_t a;
+    if (area_and(&a, &part, &clip)) {
+        layer->_clip_area = a;
+        look_draw(layer, sp, x, y, 1, 1, 0, opa, color);
+        layer->_clip_area = clip;
+    }
+}
+
+/* Bands across the sphere, each leaving out its chord. */
+#define HOLE_BANDS 6
+
+/* A sprite at scale 1 on the sphere, in bands across it: `sp` all round,
+ * and under the sphere's opaque middle `inner` (opaque, black-recoloured
+ * only if A8), or nothing when NULL. */
+static void draw_banded(lv_layer_t *layer, const look_sprite_t *sp, const body_vis_t *v, lv_opa_t opa,
+                        lv_color_t color, const look_sprite_t *inner)
+{
+    const lv_area_t f = look_area(sp, v->bx, v->by, 1, 1, false);
+    // Inside the rim's antialiasing, where the sphere is opaque.
+    const int32_t rx = v->rx - 2, ry = v->ry - 2, top = v->by - ry, bottom = v->by + ry;
+    if (rx < 8 || ry < 8) {
+        look_draw(layer, sp, v->bx, v->by, 1, 1, 0, opa, color);
+        return;
+    }
+    draw_part(layer, sp, v->bx, v->by, opa, color, (lv_area_t) {f.x1, f.y1, f.x2, top - 1});
+    draw_part(layer, sp, v->bx, v->by, opa, color, (lv_area_t) {f.x1, bottom + 1, f.x2, f.y2});
+    for (int i = 0; i < HOLE_BANDS; i++) {
+        const int32_t y0 = top + (2 * ry + 1) * i / HOLE_BANDS, y1 = top + (2 * ry + 1) * (i + 1) / HOLE_BANDS - 1;
+        // The chord where the band is narrowest across the sphere.
+        const float dy = (float) LV_MAX(LV_ABS(y0 - v->by), LV_ABS(y1 - v->by)) / (float) ry;
+        const int32_t hx = dy < 1 ? (int32_t) ((float) rx * sqrtf(1 - dy * dy)) : -1;
+        if (hx <= 0) {
+            draw_part(layer, sp, v->bx, v->by, opa, color, (lv_area_t) {f.x1, y0, f.x2, y1});
+            continue;
+        }
+        draw_part(layer, sp, v->bx, v->by, opa, color, (lv_area_t) {f.x1, y0, v->bx - hx - 1, y1});
+        draw_part(layer, sp, v->bx, v->by, opa, color, (lv_area_t) {v->bx + hx + 1, y0, f.x2, y1});
+        if (inner != NULL) {
+            draw_part(layer, inner, v->bx, v->by, LV_OPA_COVER, color, (lv_area_t) {v->bx - hx, y0, v->bx + hx, y1});
+        }
+    }
+}
+
+/* The sphere: where it is opaque its colour is copied, quicker than
+ * blending it with its alpha. */
+static void draw_body(lv_layer_t *layer, const body_vis_t *v, lv_opa_t opa)
+{
+    const look_sprite_t *core = s.ball != NULL && opa == LV_OPA_COVER ? look_ball_core(s.ball) : NULL;
+    if (core != NULL) {
+        draw_banded(layer, s.ball, v, opa, lv_color_black(), core);
+    } else if (s.ball != NULL) {
+        look_draw(layer, s.ball, v->bx, v->by, 1, 1, 0, opa, lv_color_black());
+    } else {
+        look_draw(layer, &look_get()->day, v->bx, v->by, v->sx, v->sy, 0, opa, lv_color_black());
+    }
+}
+
+/* The halo round the body, rendered at its size (scaling it costs four
+ * times as much a pixel), and only where the sphere doesn't cover it. */
+static void draw_halo(lv_layer_t *layer, const body_vis_t *v, lv_opa_t opa, lv_color_t color)
+{
+    const float d = fminf(1, v->dist);
+    const look_sprite_t *h = look_halo(d, s.frame);
+    if (h == NULL) {
+        look_draw(layer, &look_get()->halo, v->bx, v->by, d, d, 0, opa, color);
+    } else if (s.ball != NULL && v->fog >= 1) {
+        draw_banded(layer, h, v, opa, color, NULL);
+    } else {
+        look_draw(layer, h, v->bx, v->by, 1, 1, 0, opa, color);
+    }
+}
+
+/* The lower part of the sphere in a colour: the sphere's own tint, at its
+ * size, when it has one. Only its lower half has any. */
+static void draw_tint(lv_layer_t *layer, const body_vis_t *v, lv_opa_t opa, lv_color_t color)
+{
+    const look_sprite_t *t = s.ball != NULL ? look_ball_tint(s.ball) : NULL;
+    if (t != NULL) {
+        const lv_area_t f = look_area(t, v->bx, v->by, 1, 1, false);
+        draw_part(layer, t, v->bx, v->by, opa, color, (lv_area_t) {f.x1, v->by, f.x2, f.y2});
+    } else {
+        look_draw(layer, &look_get()->tint, v->bx, v->by, v->sx, v->sy, 0, opa, color);
+    }
+}
+
 /* The glow behind the body: the halo in the effects' colour. */
 static void draw_fx_glow(lv_layer_t *layer, const body_vis_t *v)
 {
     if (s.clip == NULL || s.cf.glow <= 0.01f) {
         return;
     }
-    const float d = fminf(1, v->dist);
-    look_draw(layer, &look_get()->halo, v->bx, v->by, d, d, 0, (lv_opa_t) (150 * s.cf.glow), lv_color_hex(s.fx_rgb));
+    draw_halo(layer, v, (lv_opa_t) (150 * s.cf.glow), lv_color_hex(s.fx_rgb));
 }
 
 /* The same colour washed over the sphere, lighter than a tint. */
@@ -1237,8 +1343,7 @@ static void draw_fx_wash(lv_layer_t *layer, const body_vis_t *v)
     if (s.clip == NULL || s.cf.glow <= 0.01f) {
         return;
     }
-    look_draw(layer, &look_get()->tint, v->bx, v->by, v->sx, v->sy, 0, (lv_opa_t) (90 * s.cf.glow),
-              lv_color_hex(s.fx_rgb));
+    draw_tint(layer, v, (lv_opa_t) (90 * s.cf.glow), lv_color_hex(s.fx_rgb));
 }
 
 /* The prop: a card in the colour with its glyph, or a glowing orb. */
@@ -1335,16 +1440,17 @@ static bool fx_area(lv_area_t *out)
 static void draw_cb(lv_event_t *e)
 {
     lv_layer_t *layer = lv_event_get_layer(e);
-    const look_t *lk = look_get();
     const body_vis_t *v = &s.body;
     const lv_color_t black = lv_color_black();
     s_prof.draws++;
     s_prof.px += (uint64_t) lv_area_get_size(&layer->_clip_area);
 
+    // The sphere first: what lies under it is left out.
+    if (s.ball == NULL) {
+        PROF(PROF_BALL, s.ball = look_ball(v->rx, v->ry, s.frame)); // shown again before the next frame
+    }
     if (v->tint > 0.01f) {
-        const float d = fminf(1, v->dist);
-        PROF(PROF_HALO, look_draw(layer, &lk->halo, v->bx, v->by, d, d, 0, (lv_opa_t) (90 * v->tint),
-                                  rgb_color(v->tint_rgb)));
+        PROF(PROF_HALO, draw_halo(layer, v, (lv_opa_t) (90 * v->tint), rgb_color(v->tint_rgb)));
     }
     PROF(PROF_GLOW, draw_fx_glow(layer, v));
     PROF(PROF_RINGS, {
@@ -1356,19 +1462,9 @@ static void draw_cb(lv_event_t *e)
         PROF(PROF_HANDS, draw_hands(layer));
     }
     const lv_opa_t body_opa = (lv_opa_t) (255 * v->fog);
-    if (s.ball == NULL) {
-        PROF(PROF_BALL, s.ball = look_ball(v->rx, v->ry, s.frame)); // shown again before the next frame
-    }
-    PROF(PROF_BODY, {
-        if (s.ball != NULL) {
-            look_draw(layer, s.ball, v->bx, v->by, 1, 1, 0, body_opa, black);
-        } else {
-            look_draw(layer, &lk->day, v->bx, v->by, v->sx, v->sy, 0, body_opa, black);
-        }
-    });
+    PROF(PROF_BODY, draw_body(layer, v, body_opa));
     if (v->tint > 0.01f) {
-        PROF(PROF_TINT, look_draw(layer, &lk->tint, v->bx, v->by, v->sx, v->sy, 0, (lv_opa_t) (217 * v->tint),
-                                  rgb_color(v->tint_rgb)));
+        PROF(PROF_TINT, draw_tint(layer, v, (lv_opa_t) (217 * v->tint), rgb_color(v->tint_rgb)));
     }
     PROF(PROF_BADGE, {
         draw_fx_wash(layer, v);
@@ -2051,7 +2147,7 @@ lv_obj_t *eyes_create(lv_obj_t *parent)
     lv_obj_remove_flag(s.obj, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(s.obj, draw_cb, LV_EVENT_DRAW_MAIN, NULL);
 
-    s.timer = lv_timer_create(frame_cb, EYES_FRAME_MS, NULL);
+    s.timer = lv_timer_create(frame_cb, EYES_TICK_MS, NULL);
     return s.obj;
 }
 
@@ -2071,7 +2167,9 @@ void eyes_set_pace(eyes_pace_t pace)
         lv_obj_remove_flag(s.obj, LV_OBJ_FLAG_HIDDEN);
         s.last_tick = lv_tick_get(); // no jump for the time it was stopped
     }
-    lv_timer_set_period(s.timer, pace == EYES_PACE_SLOW ? EYES_FRAME_MS * 2 : EYES_FRAME_MS);
+    lv_timer_set_period(s.timer, pace == EYES_PACE_SLOW   ? EYES_FRAME_MS * 2
+                                 : pace == EYES_PACE_FULL ? EYES_FRAME_MS
+                                                          : EYES_TICK_MS);
     lv_timer_resume(s.timer);
 }
 
@@ -2139,10 +2237,21 @@ cJSON *eyes_profile(bool reset)
         for (int i = 0; i < PROF_COUNT; i++) {
             cJSON_AddNumberToObject(ms, PROF_NAMES[i], (double) s_prof.us[i] / 1000.0 / secs);
         }
+        uint64_t us[2], px[2], n[2];
+        look_draw_stats(us, px, n, false);
+        cJSON *sp = cJSON_AddObjectToObject(r, "sprites");
+        cJSON_AddNumberToObject(sp, "plain_ms_per_s", (double) us[0] / 1000.0 / secs);
+        cJSON_AddNumberToObject(sp, "plain_kpx_per_s", (double) px[0] / 1000.0 / secs);
+        cJSON_AddNumberToObject(sp, "scaled_ms_per_s", (double) us[1] / 1000.0 / secs);
+        cJSON_AddNumberToObject(sp, "scaled_kpx_per_s", (double) px[1] / 1000.0 / secs);
+        cJSON_AddNumberToObject(sp, "plain_per_s", (double) n[0] / secs);
+        cJSON_AddNumberToObject(sp, "scaled_per_s", (double) n[1] / secs);
     }
     if (reset || s_prof.since_us == 0) {
         memset(&s_prof, 0, sizeof(s_prof));
         s_prof.since_us = now;
+        uint64_t us[2], px[2], n[2];
+        look_draw_stats(us, px, n, true);
     }
     return r;
 }

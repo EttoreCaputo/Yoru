@@ -5,6 +5,7 @@
 #include "board_audio.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "eyes.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
@@ -42,6 +43,10 @@ static float s_lvgl_busy_peak;
 static uint32_t s_lvgl_max_peak;
 static uint32_t s_windows;
 static gaps_t s_base;
+/* The panel's counters at the reset. */
+static uint32_t s_sent_frames0;
+static uint64_t s_sent_us0, s_sent_px0;
+static int64_t s_reset_us;
 
 /* Two snapshots of the run-time counters, swapped every window. PSRAM: big,
  * and only this task touches them. */
@@ -176,6 +181,8 @@ void perf_reset(void)
     s_windows = 0;
     s_base = gaps_now();
     xSemaphoreGive(s_lock);
+    lvgl_port_get_sent(&s_sent_frames0, &s_sent_us0, &s_sent_px0);
+    s_reset_us = esp_timer_get_time();
     lvgl_port_lock();
     cJSON_Delete(eyes_profile(true));
     lvgl_port_unlock();
@@ -202,6 +209,15 @@ cJSON *perf_report(void)
     cJSON_AddNumberToObject(lvgl, "longest_us", s_lvgl.max_us);
     cJSON_AddNumberToObject(lvgl, "busy_peak_pct", s_lvgl_busy_peak);
     cJSON_AddNumberToObject(lvgl, "longest_peak_us", s_lvgl_max_peak);
+    uint32_t frames;
+    uint64_t sent_us, sent_px;
+    lvgl_port_get_sent(&frames, &sent_us, &sent_px);
+    const double secs = (double) (esp_timer_get_time() - s_reset_us) / 1e6;
+    if (s_reset_us > 0 && secs > 0) {
+        cJSON_AddNumberToObject(lvgl, "panel_fps", (frames - s_sent_frames0) / secs);
+        cJSON_AddNumberToObject(lvgl, "send_ms_per_s", (double) (sent_us - s_sent_us0) / 1000.0 / secs);
+        cJSON_AddNumberToObject(lvgl, "kpx_sent_per_s", (double) (sent_px - s_sent_px0) / 1000.0 / secs);
+    }
     cJSON *audio = cJSON_AddObjectToObject(r, "audio");
     cJSON_AddNumberToObject(audio, "speaker_gaps", g.tx_gaps - s_base.tx_gaps);
     cJSON_AddNumberToObject(audio, "mic_lost", g.rx_lost - s_base.rx_lost);

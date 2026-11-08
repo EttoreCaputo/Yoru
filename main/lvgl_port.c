@@ -18,14 +18,19 @@
 
 /* Against tearing, a frame reaches the panel all at once, right after it
  * starts scanning out (the TE pin):
- * - LVGL draws the whole frame first, into a screen-sized buffer in PSRAM
- *   (direct mode, 424 KB, 636 KB in 24-bit colour), instead of 20-line
- *   strips sent while the next ones are still being drawn, over several of
- *   the panel's refreshes.
- * - On the frame's last area flush_cb waits for TE and sends every changed
+ * - The whole frame is drawn first, into a screen-sized buffer in PSRAM
+ *   (424 KB, 636 KB in 24-bit colour), instead of strips sent while the next
+ *   ones are still being drawn, over several of the panel's refreshes.
+ * - LVGL draws it a strip at a time into internal RAM (partial mode), and
+ *   flush_cb copies each strip into the PSRAM buffer: blending in PSRAM
+ *   (direct mode, until 0.20.13) cost about as much a pixel as the blend
+ *   itself, and kept Yoru well under 60 frames a second.
+ * - On the frame's last strip flush_cb waits for TE and sends every changed
  *   area, top to bottom, through two small bounce buffers in internal DMA
  *   RAM (18 KB each, no larger than the panel's biggest transfer,
  *   board_display.c): put in the panel's byte order and turned on the way.
+ *   They are the strips' buffer too, in one block: LVGL draws while nothing
+ *   is being sent, and nothing is sent while LVGL draws.
  * Started at TE, the writes run ahead of the scan for Yoru-sized areas and
  * behind it for full-width ones, so either way each area shows whole. */
 #define LVGL_BOUNCE_LINES 20
@@ -61,6 +66,10 @@ static int64_t s_window_start_us;
 static int64_t s_window_busy_us;
 static uint32_t s_window_max_us;
 static lvgl_port_stats_t s_stats;
+/* Frames sent to the panel and the time and pixels it took (debug/perf). */
+static volatile uint32_t s_sent_frames;
+static volatile uint64_t s_sent_us;
+static volatile uint64_t s_sent_px;
 static portMUX_TYPE s_stats_mux = portMUX_INITIALIZER_UNLOCKED;
 
 static void account(int64_t start_us, int64_t end_us)
@@ -87,6 +96,15 @@ static void account(int64_t start_us, int64_t end_us)
         s_window_busy_us = 0;
         s_window_max_us = 0;
     }
+}
+
+void lvgl_port_get_sent(uint32_t *frames, uint64_t *us, uint64_t *px)
+{
+    _lock_acquire(&s_lvgl_lock);
+    *frames = s_sent_frames;
+    *us = s_sent_us;
+    *px = s_sent_px;
+    _lock_release(&s_lvgl_lock);
 }
 
 void lvgl_port_get_stats(lvgl_port_stats_t *out)
@@ -255,11 +273,28 @@ static int32_t panel_top(lv_display_t *disp, const lv_area_t *a)
     return out.y1;
 }
 
+/* A strip LVGL drew in the bounce buffers, into the frame buffer. */
+static void strip_to_fb(const lv_area_t *area, const uint8_t *px_map)
+{
+    const int32_t w = lv_area_get_width(area);
+    const uint32_t stride = lv_draw_buf_width_to_stride((uint32_t) w, lv_display_get_color_format(s_disp));
+    uint8_t *dst = s_fb + (area->y1 * BOARD_LCD_H_RES + area->x1) * s_px;
+    for (int32_t y = area->y1; y <= area->y2; y++) {
+        memcpy(dst, px_map, (size_t) w * s_px);
+        dst += BOARD_LCD_H_RES * s_px;
+        px_map += stride;
+    }
+}
+
 static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
-    // Direct mode: LVGL has drawn `area` into s_fb, and draws the frame's
-    // other areas next. Only the last one sends them all.
-    if (s_nareas < LVGL_MAX_AREAS) {
+    // Partial mode: LVGL has drawn a strip of an area, and draws the rest
+    // and the frame's other areas next. Only the last strip sends them all.
+    strip_to_fb(area, px_map);
+    lv_area_t *prev = s_nareas > 0 ? &s_areas[s_nareas - 1] : NULL;
+    if (prev != NULL && prev->x1 == area->x1 && prev->x2 == area->x2 && prev->y2 + 1 == area->y1) {
+        prev->y2 = area->y2; // the next strip of the same area
+    } else if (s_nareas < LVGL_MAX_AREAS) {
         s_areas[s_nareas++] = *area;
     } else {
         // Out of room: the last one grows to cover this one too.
@@ -285,11 +320,21 @@ static void flush_cb(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
         s_areas[j + 1] = a;
     }
     wait_te();
+    const int64_t sent_t0 = esp_timer_get_time();
     for (int i = 0; i < s_nareas; i++) {
         send_area(disp, &s_areas[i]);
+        s_sent_px += (uint64_t) lv_area_get_size(&s_areas[i]);
     }
+    // LVGL draws the next frame in the bounce buffers: off the wire first.
+    for (int i = 0; i < 2; i++) {
+        xSemaphoreTake(s_bounce_free, portMAX_DELAY);
+    }
+    for (int i = 0; i < 2; i++) {
+        xSemaphoreGive(s_bounce_free);
+    }
+    s_sent_us += (uint64_t) (esp_timer_get_time() - sent_t0);
+    s_sent_frames++;
     s_nareas = 0;
-    // The bounce buffers may still be on the wire; s_fb is free to draw in.
     lv_display_flush_ready(disp);
 }
 
@@ -426,15 +471,15 @@ esp_err_t lvgl_port_init(const board_lcd_t *lcd, bool deep, lv_display_t **out_d
     // The same bytes at either depth: fewer lines of 24-bit pixels.
     const size_t bounce_bytes = BOARD_LCD_H_RES * LVGL_BOUNCE_LINES * 2;
     s_bounce_px = bounce_bytes / s_px;
-    for (int i = 0; i < 2; i++) {
-        s_bounce[i] = spi_bus_dma_memory_alloc(BOARD_LCD_SPI_HOST, bounce_bytes, 0);
-        ESP_RETURN_ON_FALSE(s_bounce[i], ESP_ERR_NO_MEM, TAG, "bounce buffers");
-    }
+    // One block: LVGL's strips use both.
+    s_bounce[0] = spi_bus_dma_memory_alloc(BOARD_LCD_SPI_HOST, 2 * bounce_bytes, 0);
+    ESP_RETURN_ON_FALSE(s_bounce[0], ESP_ERR_NO_MEM, TAG, "bounce buffers");
+    s_bounce[1] = s_bounce[0] + bounce_bytes;
     s_bounce_free = xSemaphoreCreateCounting(2, 2);
     ESP_RETURN_ON_FALSE(s_bounce_free, ESP_ERR_NO_MEM, TAG, "bounce semaphore");
     s_disp = disp;
 
-    lv_display_set_buffers(disp, s_fb, NULL, fb_size, LV_DISPLAY_RENDER_MODE_DIRECT);
+    lv_display_set_buffers(disp, s_bounce[0], NULL, 2 * bounce_bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
     lv_display_set_user_data(disp, lcd->panel);
     lv_display_set_flush_cb(disp, flush_cb);
     lv_display_add_event_cb(disp, round_area_cb, LV_EVENT_INVALIDATE_AREA, NULL);
