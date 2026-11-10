@@ -98,3 +98,6 @@ audio_capture/
 
 # Sidecars for the app bundle (tools/build_sidecars.sh)
 host/dualeye-app/src-tauri/binaries/
+
+# Wake word training data and environment (tools/wakeword/setup.sh)
+tools/wakeword/work/

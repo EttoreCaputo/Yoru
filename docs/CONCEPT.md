@@ -201,4 +201,4 @@ The moods, knocks, slaps, lean, greeting and pointer-follow added with firmware 
 
 ## Wake word
 
-"Yoru" works as a wake word: two syllables with clear vowels. ESP-SR only ships fixed words, so it needs a custom model, via microWakeWord (see the DualEye wake-word study). Until then, an ESP-SR word stands in: Alexa, Hi ESP, Jarvis or Computer.
+His word is «Hey Yoru»: the "hey" gives the two clear syllables of the name something to hold on to. ESP-SR only ships fixed words, so it is a custom model, via microWakeWord ([wakeword.md](wakeword.md)). Since 0.20.18 a first model can be chosen; until it hears well enough to be the default, an ESP-SR word stands in: Alexa or Hi ESP.

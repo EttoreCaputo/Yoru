@@ -1,4 +1,5 @@
 #include "voice.h"
+#include "wake_mww.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -173,11 +174,17 @@ static voice_phrase_t *s_phrases;
 static int s_phrase_count;
 static volatile voice_command_cb_t s_on_command;
 static volatile bool s_wake_sound = true;
-/* The wake word is listened for (the menu's switch), and whether WakeNet is
- * on in the AFE now: off during an utterance, and while the switch is. Only
- * the fetch task touches the AFE's switch. */
+/* The wake word is listened for (the menu's switch), and whether it is
+ * listened for now: not during an utterance, nor while the switch is off.
+ * Only the fetch task touches it (wake_listen()). */
 static volatile bool s_wake_on = true;
 static bool s_wakenet_on = true;
+/* The word in use is one of Yoru's own, heard by wake_mww.cc instead of
+ * WakeNet: its index there, or -1 for a WakeNet word. The AFE then runs no
+ * WakeNet at all. */
+static int s_mww = -1;
+/* What s_model holds for one of them, before its id. */
+#define MWW_PREFIX "mww_"
 
 static const char *const STATE_NAMES[VOICE_STATE_COUNT] = {
     [VOICE_IDLE] = "idle",
@@ -187,8 +194,9 @@ static const char *const STATE_NAMES[VOICE_STATE_COUNT] = {
     [VOICE_ERROR] = "error",
 };
 
-/* Wake words people can pick, by the WakeNet model names that carry them.
- * Those in the `model` partition are set in sdkconfig.defaults. */
+/* ESP-SR's wake words people can pick, by the WakeNet model names that carry
+ * them. Those in the `model` partition are set in sdkconfig.defaults. Yoru's
+ * own words come before them (wake_mww.h). */
 static const struct {
     const char *id;
     const char *word;
@@ -196,7 +204,10 @@ static const struct {
     {"alexa", "Alexa"}, {"hiesp", "Hi ESP"}, {"jarvis", "Jarvis"}, {"computer", "Computer"},
 };
 #define WORD_COUNT (sizeof(WORDS) / sizeof(WORDS[0]))
+/* ESP-SR's word until Yoru's own («heyyoru», docs/wakeword.md) hears well
+ * enough to be the default: for now it is a word to choose. */
 #define DEFAULT_WORD "alexa"
+#define FALLBACK_WORD "hiesp"
 
 static srmodel_list_t *s_models;
 static const esp_afe_sr_iface_t *s_afe;
@@ -279,6 +290,9 @@ const char *voice_wake_word(void)
     if (!s_available) {
         return NULL;
     }
+    if (s_mww >= 0) {
+        return wake_mww_word(s_mww);
+    }
     int w = word_of_model(s_model);
     return w >= 0 ? WORDS[w].word : s_model;
 }
@@ -287,6 +301,9 @@ const char *voice_wake_word_id(void)
 {
     if (!s_available) {
         return NULL;
+    }
+    if (s_mww >= 0) {
+        return wake_mww_id(s_mww);
     }
     int w = word_of_model(s_model);
     return w >= 0 ? WORDS[w].id : s_model;
@@ -301,12 +318,40 @@ static char *model_for(const char *id)
 int voice_wake_words(const char **ids, int max)
 {
     int n = 0;
+    for (int i = 0; i < wake_mww_count() && n < max && s_models != NULL; i++) {
+        ids[n++] = wake_mww_id(i);
+    }
     for (int i = 0; i < (int) WORD_COUNT && n < max && s_models != NULL; i++) {
         if (model_for(WORDS[i].id) != NULL) {
             ids[n++] = WORDS[i].id;
         }
     }
     return n;
+}
+
+/* Listen for the wake word, or stop: WakeNet's switch in the AFE, or
+ * whether Yoru's own word is fed (wake_heard()). From the fetch task. */
+static void wake_listen(bool on)
+{
+    if (s_mww >= 0) {
+        if (on && !s_wakenet_on) {
+            wake_mww_reset(); // what it heard before the pause is stale
+        }
+    } else if (on) {
+        s_afe->enable_wakenet(s_afe_data);
+    } else {
+        s_afe->disable_wakenet(s_afe_data);
+    }
+    s_wakenet_on = on;
+}
+
+/* The wake word is in what the AFE just gave back. */
+static bool wake_heard(const afe_fetch_result_t *res)
+{
+    if (s_mww < 0) {
+        return res->wakeup_state == WAKENET_DETECTED;
+    }
+    return s_wakenet_on && wake_mww_feed(res->data, (size_t) res->data_size / sizeof(int16_t));
 }
 
 static void update_run(void)
@@ -495,8 +540,7 @@ static void stream_start(const char *trigger, int ignore_ms, int no_speech_ms, i
     st->max_ms = st->cloud ? CLOUD_REC_MAX_MS : st->button ? MAX_TALK_MS : MAX_UTTERANCE_MS;
     // "Alexa" said again mid-sentence isn't a new wake, and WakeNet's CPU is
     // free meanwhile.
-    s_afe->disable_wakenet(s_afe_data);
-    s_wakenet_on = false;
+    wake_listen(false);
     cJSON *params = cJSON_CreateObject();
     cJSON_AddNumberToObject(params, "id", st->id);
     cJSON_AddStringToObject(params, "trigger", trigger);
@@ -534,8 +578,7 @@ static void stream_end(end_reason_t reason)
     }
     st->active = false;
     if (s_wake_on) {
-        s_afe->enable_wakenet(s_afe_data);
-        s_wakenet_on = true;
+        wake_listen(true);
     }
     s_total_dropped += st->dropped;
     int ms = (int) (st->samples / 16);
@@ -671,8 +714,7 @@ static bool local_start(void)
     }
     s_local.active = true;
     s_local.level_us = 0;
-    s_afe->disable_wakenet(s_afe_data);
-    s_wakenet_on = false;
+    wake_listen(false);
     s_mn->clean(s_mn_data);
     ESP_LOGI(TAG, "no host: listening on the board");
     voice_set_state(VOICE_LISTENING);
@@ -687,8 +729,7 @@ static void local_end(int command)
     s_local.active = false;
     xSemaphoreGive(s_mn_lock);
     if (s_wake_on) {
-        s_afe->enable_wakenet(s_afe_data);
-        s_wakenet_on = true;
+        wake_listen(true);
     }
     ui_voice_set_level(0);
     voice_set_state(VOICE_IDLE);
@@ -848,13 +889,8 @@ static void fetch_task(void *arg)
                 s_stream.end_silence_ms = s_pause_ms;
             }
             if (!s_stream.active && !s_local.active && s_wakenet_on != s_wake_on) {
-                // The menu's switch: WakeNet's CPU is free while it's off.
-                if (s_wake_on) {
-                    s_afe->enable_wakenet(s_afe_data);
-                } else {
-                    s_afe->disable_wakenet(s_afe_data);
-                }
-                s_wakenet_on = s_wake_on;
+                // The menu's switch: the wake word's CPU is free while it's off.
+                wake_listen(s_wake_on);
             }
             afe_fetch_result_t *res = s_afe->fetch_with_delay(s_afe_data, pdMS_TO_TICKS(FETCH_WAIT_MS));
             if (res != NULL && res->ret_value != ESP_FAIL) {
@@ -862,7 +898,7 @@ static void fetch_task(void *arg)
                     stream_frame(res);
                 } else if (s_local.active) {
                     local_frame(res);
-                } else if (res->wakeup_state == WAKENET_DETECTED) {
+                } else if (wake_heard(res)) {
                     if (esp_timer_get_time() >= s_speaker_until_us) {
                         on_wake(res);
                     } else if (BARGE_IN) {
@@ -980,7 +1016,8 @@ static void load_multinet(void)
              (unsigned) (after / 1024));
 }
 
-/** Build the AFE with the WakeNet `model`. */
+/** Build the AFE with the WakeNet `model`, or with none (NULL) for a word
+ * of Yoru's own. */
 static esp_afe_sr_data_t *create_afe(const char *model)
 {
     afe_config_t *cfg = afe_config_init(VOICE_INPUT_FORMAT, s_models, AFE_TYPE_SR, AFE_MODE_LOW_COST);
@@ -994,6 +1031,7 @@ static esp_afe_sr_data_t *create_afe(const char *model)
     char *second = cfg->wakenet_model_name_2;
     cfg->wakenet_model_name = (char *) model;
     cfg->wakenet_model_name_2 = NULL;
+    cfg->wakenet_init = model != NULL;
     // VADNet rather than WebRTC's VAD, which took music and noise for speech:
     // the utterance then only ended at MAX_UTTERANCE_MS. Without it in the
     // partition, WebRTC's still.
@@ -1017,16 +1055,53 @@ static esp_afe_sr_data_t *create_afe(const char *model)
     return data;
 }
 
+/** What the word `id` is on this board: one of Yoru's own (`*mww` its index
+ * in wake_mww.h) or a WakeNet model (`*mww` -1), and the name s_model keeps
+ * for it. False when the board has neither. */
+static bool resolve_word(const char *id, int *mww, char *name, size_t len)
+{
+    *mww = wake_mww_find(id);
+    if (*mww >= 0) {
+        snprintf(name, len, MWW_PREFIX "%s", id);
+        return true;
+    }
+    const char *model = model_for(id);
+    if (model == NULL) {
+        return false;
+    }
+    strlcpy(name, model, len);
+    return true;
+}
+
+/** The AFE for a word resolve_word() found, with its own model loaded when
+ * it is one of Yoru's. NULL when either fails; nothing is left loaded. */
+static esp_afe_sr_data_t *afe_for(int mww, const char *name)
+{
+    if (mww < 0) {
+        wake_mww_stop();
+        return create_afe(name);
+    }
+    if (!wake_mww_start(mww)) {
+        return NULL;
+    }
+    esp_afe_sr_data_t *data = create_afe(NULL);
+    if (data == NULL) {
+        wake_mww_stop();
+    }
+    return data;
+}
+
 esp_err_t voice_set_wake_word(const char *id)
 {
     if (!s_available) {
         return ESP_ERR_INVALID_STATE;
     }
-    char *model = model_for(id);
-    if (model == NULL) {
+    int mww;
+    char name[sizeof(s_model)];
+    if (id == NULL || !resolve_word(id, &mww, name, sizeof(name))) {
         return ESP_ERR_NOT_FOUND;
     }
-    if (strcmp(model, s_model) == 0) {
+    if (strcmp(name, s_model) == 0) {
         return ESP_OK;
     }
     // Neither task is in the AFE while we hold both. A self-test `rec` holds
@@ -1037,16 +1112,17 @@ esp_err_t voice_set_wake_word(const char *id)
     local_end(VOICE_COMMAND_NONE);
     s_afe->destroy(s_afe_data);
     esp_err_t err = ESP_OK;
-    s_afe_data = create_afe(model);
+    s_afe_data = afe_for(mww, name);
     if (s_afe_data == NULL || s_afe->get_feed_chunksize(s_afe_data) != s_chunk) {
-        ESP_LOGE(TAG, "AFE with %s failed, back to %s", model, s_model);
+        ESP_LOGE(TAG, "AFE with %s failed, back to %s", name, s_model);
         if (s_afe_data != NULL) {
             s_afe->destroy(s_afe_data);
         }
-        s_afe_data = create_afe(s_model);
+        s_afe_data = afe_for(s_mww, s_model);
         err = ESP_FAIL;
     } else {
-        strlcpy(s_model, model, sizeof(s_model));
+        s_mww = mww;
+        strlcpy(s_model, name, sizeof(s_model));
     }
     // A new AFE listens: the fetch task turns it off again if it should.
     s_wakenet_on = true;
@@ -1079,19 +1155,23 @@ void voice_start(bool muted, const char *wake_word)
         ESP_LOGE(TAG, "no ESP-SR models in the \"%s\" partition, continuing without voice", VOICE_MODEL_PARTITION);
         return;
     }
-    char *model = model_for(wake_word);
-    if (model == NULL) {
-        model = model_for(DEFAULT_WORD);
+    // The word picked, else Yoru's own, else ESP-SR's first.
+    const char *const tries[] = {wake_word, DEFAULT_WORD, FALLBACK_WORD};
+    for (size_t i = 0; i < sizeof(tries) / sizeof(tries[0]) && s_afe_data == NULL; i++) {
+        if (tries[i] != NULL && tries[i][0] != '\0' && resolve_word(tries[i], &s_mww, s_model, sizeof(s_model))) {
+            s_afe_data = afe_for(s_mww, s_model);
+        }
     }
-    if (model == NULL) {
-        model = esp_srmodel_filter(s_models, ESP_WN_PREFIX, NULL);
+    if (s_afe_data == NULL) {
+        char *model = esp_srmodel_filter(s_models, ESP_WN_PREFIX, NULL);
+        if (model == NULL) {
+            ESP_LOGE(TAG, "no wake word model, continuing without voice");
+            return;
+        }
+        s_mww = -1;
+        strlcpy(s_model, model, sizeof(s_model));
+        s_afe_data = create_afe(model);
     }
-    if (model == NULL) {
-        ESP_LOGE(TAG, "no WakeNet model, continuing without voice");
-        return;
-    }
-    strlcpy(s_model, model, sizeof(s_model));
-    s_afe_data = create_afe(model);
     if (s_afe_data == NULL) {
         ESP_LOGE(TAG, "AFE create failed, continuing without voice");
         return;

@@ -48,8 +48,10 @@ idf_component_register(SRCS "approval.c" "toast.c" "recmark.c" "icons.c" "inbox_
                             "clock.c"
                             "commands.c"
                             "cloud.c"
+                            "wake_mww.cc"
                        INCLUDE_DIRS "."
+                       EMBED_FILES "wake/hey_yoru.tflite"
                        LDFRAGMENTS "linker.lf"
-                       REQUIRES esp_app_format esp_codec_dev esp-sr esp_driver_gpio esp_driver_i2c esp_driver_i2s
+                       REQUIRES esp_app_format esp_codec_dev esp-sr esp-tflite-micro esp-micro-speech-features esp_driver_gpio esp_driver_i2c esp_driver_i2s
                                 esp_driver_spi esp_driver_usb_serial_jtag esp_event esp_http_client esp_lcd esp_lcd_co5300
                                 esp_lcd_touch_cst9217 esp_netif app_update esp_timer esp_wifi lvgl lwip mbedtls nvs_flash spi_flash)

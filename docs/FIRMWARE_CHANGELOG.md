@@ -1,5 +1,12 @@
 # Firmware changelog
 
+## 0.20.18
+
+- **A wake word of his own: «Hey Yoru».** Until now Yoru could only answer to the words Espressif ships (Alexa, Hi ESP). He can now hear a word trained for him. Choose it in the menu (Voice, wake word) or with `set_wake_word` (`heyyoru`).
+- **It is a first try, so Alexa stays the default.** In the first test it heard «Hey Yoru» about two times in ten from the computer's synthetic voices, and woke by mistake on some phrases that begin the same way («hey you», «hey Joe»). It gets better with more training and with recordings of real voices; how to train it is in `docs/wakeword.md`.
+- Echo cancelling, noise suppression and the end of a sentence work as before with the new word. It costs about a tenth of one processor core and no internal memory worth noting.
+- `debug/perf` also says `wake`: the last second's highest probability and the time one step of the model takes.
+
 ## 0.20.17
 
 - **Yoru's face follows the conversation.** When Yoru Hub answers you, Yoru now shows how he takes it as he starts to speak: a laugh at a joke, a warm look at a compliment, a sad face when you tell him off. Silent: his voice is the sound.

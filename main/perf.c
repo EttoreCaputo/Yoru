@@ -15,6 +15,7 @@
 #include "lvgl_port.h"
 #include "playback.h"
 #include "voice.h"
+#include "wake_mww.h"
 
 static const char *TAG = "perf";
 
@@ -204,6 +205,10 @@ cJSON *perf_report(void)
         cJSON_AddItemToArray(idle, cJSON_CreateNumber(s_idle[c]));
         cJSON_AddItemToArray(idle_min, cJSON_CreateNumber(s_idle_min[c]));
     }
+    /* Yoru's own wake word (wake_mww.cc): zeros while a WakeNet word is in use. */
+    cJSON *wake = cJSON_AddObjectToObject(r, "wake");
+    cJSON_AddNumberToObject(wake, "peak", wake_mww_peak());
+    cJSON_AddNumberToObject(wake, "step_us", wake_mww_step_us());
     cJSON *lvgl = cJSON_AddObjectToObject(r, "lvgl");
     cJSON_AddNumberToObject(lvgl, "busy_pct", s_lvgl.busy_pct);
     cJSON_AddNumberToObject(lvgl, "longest_us", s_lvgl.max_us);

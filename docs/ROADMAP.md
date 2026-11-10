@@ -175,7 +175,7 @@ Yoru is the physical side of the coding agents on the computer, the way the couc
 ### M6: hackability and integrations
 - Moods and looks as data (JSON) that can be loaded and shared from the app.
 - Skills for devices in the house, run by the host's agent and confirmed by the user.
-- Custom wake word "Yoru" (microWakeWord). Until then: Alexa, Hi ESP, Jarvis, Computer.
+- Custom wake word (microWakeWord, `docs/wakeword.md`). In 0.20.18: the engine on the board (`wake_mww.cc`), the training tools (`tools/wakeword`) and a first «Hey Yoru» model, to choose; Alexa stays the default. Left: a model good enough to be the default (real recordings, an Italian voice among the samples, more near phrases); models loaded from the flash, sent by Yoru Hub, instead of built in; and from there a word of the user's own, taught from Yoru Hub.
 - Simulator: the eye engine compiled for the desktop (SDL), so animations can be made without flashing.
 
 All four are still to do.
