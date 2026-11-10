@@ -28,7 +28,15 @@ MODEL_OUT = HERE.parent.parent / "main" / "wake" / "hey_yoru.tflite"
 # with piper_phonemize): a long, a closing and an open "o", the stress on the
 # first part or on both.
 WORD = ["hey yoru", "hey yoh roo", "hey yo-roo", "hey yaw roo"]
+# The same as an Italian says it, which no English spelling gives: an open
+# "o", a tapped or rolled "r", a short "u", "hey" with or without the "h".
+# These are phonemes (espeak's), not text. The first model, without them,
+# never heard an Italian speaker.
+WORD_PHONEMES = ["hˈɛi jˈɔɾu", "ˈɛi jˈɔɾu", "hˈeɪ jˈɔru", "ˈei jˈoːɾʊ"]
 WORD_SAMPLES = 1500  # per spelling
+# Each real recording (work/recordings) is mixed with rooms and noise this
+# many times: they are few, and worth more than any synthetic clip.
+REAL_REPEAT = 100
 
 # What must not wake Yoru although it sounds close. The ready-made negative
 # sets have no idea of this word: these are what teach its edges.
@@ -37,24 +45,28 @@ NEAR = [
     "hey Joe", "hey Jude", "hey Yoda", "hey Yoshi", "hey Google", "hey Siri",
     "a euro", "they're all", "hey", "you're a", "hello", "okay", "hey there",
     "say your", "stay or go", "eight or two",
+    # Sentences that woke the first model.
+    "hey you, how are you today", "hey Joe, your order is here",
+    "hey there, you're early", "hey you over there", "hey, you all right",
+    "hey Joe", "hey there you", "hey, your phone is ringing",
 ]
 NEAR_SAMPLES = 250  # per phrase
 
 GENERATOR = WORK / "piper-sample-generator" / "generate_samples.py"
 
 
-def speak(phrases: list[str], count: int, out: Path) -> None:
+def speak(phrases: list[str], count: int, out: Path, phonemes: bool = False) -> None:
     """`count` clips of each phrase, in a folder of its own under `out`."""
     for i, phrase in enumerate(phrases):
-        folder = out / f"{i:02d}"
+        folder = out / (f"p{i:02d}" if phonemes else f"{i:02d}")
         if folder.exists():
             continue
-        part = out / f"{i:02d}.part"
+        part = out / (folder.name + ".part")
         shutil.rmtree(part, ignore_errors=True)
         subprocess.run(
             [sys.executable, str(GENERATOR), phrase,
              "--max-samples", str(count), "--batch-size", "50",
-             "--output-dir", str(part)],
+             "--output-dir", str(part)] + (["--phoneme-input"] if phonemes else []),
             check=True,
             # Piper's checkpoint (from rhasspy's release, fetched by setup.sh)
             # is a whole pickled model, which torch 2.6 and later refuse to
@@ -64,7 +76,43 @@ def speak(phrases: list[str], count: int, out: Path) -> None:
         part.rename(folder)  # only a finished folder counts
 
 
-def features(clips_dir: Path, out: Path) -> None:
+def cut_recordings(source: Path, out: Path) -> int:
+    """The words in the recordings of `source` (what the board heard while PWR
+    was held and the word was said a few times, saved by `yoru --voice-dump`),
+    one clip each in `out`. Returns how many."""
+    import numpy as np
+    import soundfile
+
+    shutil.rmtree(out, ignore_errors=True)
+    out.mkdir(parents=True)
+    count = 0
+    for path in sorted(source.glob("*.wav")):
+        samples, rate = soundfile.read(path, dtype="float32")
+        samples = samples[rate // 4:]  # the button's click
+        hop = rate // 100
+        frames = len(samples) // hop
+        level = 20 * np.log10(np.sqrt(np.mean(
+            samples[:frames * hop].reshape(frames, hop) ** 2, axis=1)) + 1e-9)
+        loud = level > max(np.percentile(level, 20) + 12, -60)
+        start, quiet, words = None, 0, []
+        for i, on in enumerate(list(loud) + [False] * 31):
+            if on:
+                start, quiet = (i if start is None else start), 0
+            elif start is not None:
+                quiet += 1
+                if quiet > 30:  # 0.3 s of silence ends a word
+                    words.append((start, i - quiet + 1))
+                    start = None
+        for first, last in words:
+            if not 30 <= last - first <= 150:  # a word lasts 0.3 to 1.5 s
+                continue
+            clip = samples[max(0, first - 10) * hop:(last + 5) * hop]
+            soundfile.write(out / f"{path.stem}-{first:04d}.wav", clip, rate, subtype="PCM_16")
+            count += 1
+    return count
+
+
+def features(clips_dir: Path, out: Path, repeat: int = 2) -> None:
     """The clips of `clips_dir`, mixed with rooms and noise, as the
     spectrograms the model trains on: training, validation and testing."""
     from mmap_ninja.ragged import RaggedMmap
@@ -107,9 +155,9 @@ def features(clips_dir: Path, out: Path) -> None:
     # Training and validation run the model without streaming, so the same
     # spectrogram is repeated shifted by a frame; testing streams for real.
     for folder, split, repeat, slide in (
-        ("training", "train", 2, 10),
-        ("validation", "validation", 1, 10),
-        ("testing", "test", 1, 1),
+        ("training", "train", repeat, 10),
+        ("validation", "validation", max(1, repeat // 10), 10),
+        ("testing", "test", max(1, repeat // 10), 1),
     ):
         spectrograms = SpectrogramGeneration(
             clips=clips, augmenter=augmenter, slide_frames=slide, step_ms=10
@@ -124,7 +172,7 @@ def features(clips_dir: Path, out: Path) -> None:
     part.rename(out)
 
 
-def config(steps: int) -> Path:
+def config(steps: int, real: bool) -> Path:
     import yaml
 
     def negative(name: str, weight: float, strategy: str = "random") -> dict:
@@ -142,7 +190,12 @@ def config(steps: int) -> Path:
                 "penalty_weight": 1.0, "truth": True,
                 "truncation_strategy": "truncate_start", "type": "mmap",
             },
-            negative("features/near", 3.0, "truncate_start"),
+        ] + ([{
+            "features_dir": "features/real", "sampling_weight": 2.0,
+            "penalty_weight": 1.0, "truth": True,
+            "truncation_strategy": "truncate_start", "type": "mmap",
+        }] if real else []) + [
+            negative("features/near", 4.0, "truncate_start"),
             negative("negative_datasets/speech", 10.0),
             negative("negative_datasets/dinner_party", 10.0),
             negative("negative_datasets/no_speech", 5.0),
@@ -169,11 +222,11 @@ def config(steps: int) -> Path:
     return path
 
 
-def train(steps: int) -> None:
+def train(steps: int, real: bool) -> None:
     """The model ESPHome's own words use (mixednet, about 50 KB)."""
     subprocess.run(
         [sys.executable, "-m", "microwakeword.model_train_eval",
-         f"--training_config={config(steps)}",
+         f"--training_config={config(steps, real)}",
          "--train", "1", "--restore_checkpoint", "1",
          "--test_tf_nonstreaming", "0", "--test_tflite_nonstreaming", "0",
          "--test_tflite_nonstreaming_quantized", "0",
@@ -215,7 +268,14 @@ if __name__ == "__main__":
         shutil.rmtree(WORK / name, ignore_errors=True)
 
     speak(WORD, WORD_SAMPLES, WORK / "samples" / "word")
+    speak(WORD_PHONEMES, WORD_SAMPLES, WORK / "samples" / "word", phonemes=True)
     speak(NEAR, NEAR_SAMPLES, WORK / "samples" / "near")
     features(WORK / "samples" / "word", WORK / "features" / "word")
     features(WORK / "samples" / "near", WORK / "features" / "near")
-    train(args.steps)
+    real = (WORK / "recordings").is_dir() and not (WORK / "features" / "real").exists()
+    if real:
+        words = cut_recordings(WORK / "recordings", WORK / "samples" / "real")
+        print(f"real recordings: {words} words")
+        if words >= 10:
+            features(WORK / "samples" / "real", WORK / "features" / "real", REAL_REPEAT)
+    train(args.steps, (WORK / "features" / "real").exists())

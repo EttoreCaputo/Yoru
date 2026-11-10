@@ -15,20 +15,25 @@ Yoru answers to «Hey Yoru». ESP-SR's WakeNet only hears the words Espressif tr
 Everything is in `tools/wakeword/`; what it downloads and makes goes to `tools/wakeword/work/` (about 30 GB, not in git).
 
 1. `tools/wakeword/setup.sh`, once: a Python 3.10 environment (with `uv`), microWakeWord, Piper's sample generator, the rooms, noises and music the samples are mixed with, and microWakeWord's ready-made negative sets.
-2. `tools/wakeword/work/venv/bin/python tools/wakeword/train.py`: Piper says the word in hundreds of voices, in a few spellings; it also says phrases that sound close and must not wake Yoru («hey you», «hey Yuri»...). The clips are mixed with rooms and noise, and the model trains on them against hours of other speech. Every stage keeps its work, so a stopped run goes on; `--fresh samples|features|model` redoes from a stage.
+2. `tools/wakeword/work/venv/bin/python tools/wakeword/train.py`: Piper says the word in hundreds of voices, in a few spellings and, as phonemes, the way an Italian says it; it also says phrases that sound close and must not wake Yoru («hey you», «hey Yuri»...). The clips are mixed with rooms and noise, and the model trains on them against hours of other speech. Every stage keeps its work, so a stopped run goes on; `--fresh samples|features|model` redoes from a stage.
 3. The model lands in `main/wake/hey_yoru.tflite`. The test report at the end gives, for each cutoff, how often the word is heard and how many false wakes an hour: choose the cutoff, put it in `MODELS` (as 0-255: the probability times 255), build and try with a real voice.
 
 To make it better: more spellings and samples in `train.py`, more near phrases for what wakes it by mistake, more steps (`--steps`). Recordings of real people saying the word, added to `work/samples/word/`, help most.
 
 ## Where the model stands
 
-The first model (0.20.18): 6000 clips of the word, 5500 of near phrases, 20000 steps, half an hour on an M1 Pro.
+The first model (0.20.18) learnt from English synthetic voices only: 6000 clips of the word, 5500 of near phrases, 20000 steps. On the board it heard 2 of 10 «Hey Yoru» from macOS's voices, woke on 3 of 7 near phrases («hey you...», «hey Joe...», «hey there...»), and never heard an Italian speaker. Run on recordings of that speaker it stayed near zero at any gain: the pronunciation, not the level.
 
-- In the training's own test, at the cutoff in use (0.90): about one word in six missed, less than one false wake in five hours of talk at a table. That test is kind: its words come from the same synthetic voices as the training's.
-- On the board, with macOS's voices from the computer's speakers: 2 of 10 «Hey Yoru» heard, and 3 of 7 near phrases woke it («hey you...», «hey Joe...», «hey there...»). The averages that passed were barely over the cutoff. Not yet tried with a real voice.
+The second model (0.20.19) adds the Italian pronunciation (four phoneme spellings, 6000 more clips), 30 real recordings from the board's mic (one speaker; each mixed with rooms and noise 100 times), eight more near phrases, and 30000 steps: an hour on an M1 Pro.
+
+- In the training's own test, at cutoff 0.89: about one word in seven missed, one false wake an hour of talk at a table. That is more false wakes than the first model at the same cutoff.
+- Run on the 30 recordings it learnt from: 19 heard at the cutoff in use (0.90), 14 at 0.97. Of 40 synthetic «hey Joe, your order is here» it had also learnt from, 7 still woke it at 0.97.
+- So it underfits: a small model, a short word, and "hey" in front of many other things. Not yet measured live on the board.
 - One step of the model takes 3 ms every 30 ms (a tenth of one core); its memory is in PSRAM.
 
-What to try next: recordings of real voices at the board's mic, an Italian Piper voice among the samples (the English ones say the "r" and the vowels their way), longer near phrases that begin with «hey you», more steps.
+Recording real voices: quit the app, run `yoru --voice-dump tools/wakeword/work/recordings`, hold PWR and say the word a few times with two seconds between; `train.py` cuts the recordings into words by itself.
+
+What to try next: many more real recordings, from more people; a larger model (more filters); a longer or less common word than "hey" in front.
 
 ## Licence
 

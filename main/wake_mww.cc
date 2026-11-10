@@ -49,9 +49,9 @@ typedef struct {
 extern const uint8_t hey_yoru_start[] asm("_binary_hey_yoru_tflite_start");
 extern const uint8_t hey_yoru_end[] asm("_binary_hey_yoru_tflite_end");
 
-/* «Hey Yoru», trained with tools/wakeword/train.py. The cutoff is 0.90: in
- * the training's test that misses about one word in six and wakes by
- * mistake less than once in five hours of people talking at a table. */
+/* «Hey Yoru», trained with tools/wakeword/train.py. The cutoff is 0.90: the
+ * second model (Italian pronunciation, real recordings) hears about two in
+ * three of the recordings it learnt from at that cutoff, and fewer above. */
 static const model_t MODELS[] = {
     {"heyyoru", "Hey Yoru", hey_yoru_start, hey_yoru_end, 230, 5, 26000},
 };

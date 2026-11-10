@@ -1,5 +1,9 @@
 # Firmware changelog
 
+## 0.20.19
+
+- **«Hey Yoru» now knows how an Italian says it.** The first model had only learnt the word from English synthetic voices, and never heard a real Italian speaker. The new one was also trained on the Italian pronunciation and on real recordings made at Yoru's own microphone. It is still a word to choose (menu, Voice, wake word); Alexa stays the default.
+
 ## 0.20.18
 
 - **A wake word of his own: «Hey Yoru».** Until now Yoru could only answer to the words Espressif ships (Alexa, Hi ESP). He can now hear a word trained for him. Choose it in the menu (Voice, wake word) or with `set_wake_word` (`heyyoru`).
