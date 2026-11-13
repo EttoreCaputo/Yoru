@@ -80,10 +80,10 @@ Settings are kept in NVS and survive a reboot.
 | `set_volume` | `percent`: 0–100 | Speaker volume, with the `volume` sound at the new level |
 | `react` | `name`: `happy` · `excited` · `wink` · `proud` · `relieved` · `charged` · `plugged` (0.12.1) · `dance` · `love` · `curious` · `thinking` · `focus` · `angry` · `hot` · `sleepy` · `yawn` · `tired` · `sigh` · `sad` · `surprised` · `scared` · `bored` · `look_around` · `blink` · `wave` · `point` · `shy` · `clap` · `stretch` · `dizzy` · `annoyed` · `falling` · `drowsy` · `lifted` | The eyes react for a few seconds, with Yoru's sound for it. DualEye's `play_eyes` names, those these eyes can show. Since 0.20.6 `proud` and `stretch`, since 0.20.7 `yawn`, `surprised` and `thinking`, and since 0.20.8 `dance`, `curious`, `sad`, `dizzy`, `shy`, `lifted` and `point`, play hand-keyed clips (`docs/animations.md`, 1 to 3 s). Refused during a conversation |
 | `play_sound` | `name` | As on DualEye: the same sounds, plus Yoru's own: `unplug` and, an earcon played with pet sounds off too, `battery_low` (0.12.1) |
-| `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it), `power_saver` (on battery, the Saver profile instead of Balanced; 0.12.0, see Power), `hibernate` (on battery, minutes of dark screen before hibernating, 0 never; 0.12.0). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
+| `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it), `power_saver` (on battery, the Saver profile instead of Balanced; 0.12.0, see Power), `hibernate` (on battery, minutes of dark screen before hibernating, 0 never; 0.12.0), `sphere` (the sphere's colour, 0.20.20: 0 pearl, 1 dawn, 2 mint, 3 lilac, 4 night, 5 gold, 6 rose; one not unlocked yet shows pearl, see Growth). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
 | `set_setting` | `name`, `value`: integer | Change one setting within its range (switches are 0 or 1); it applies at once |
 | `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0; since 0.15.0 also its state, `watch`, `explore`, `play`, `dream`, `bored`, `seek`, `sulk`, `drowsy`, and `greet`), `cheer` (0..1), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`; since 0.20.3 `run`, the last stretch on battery, see Power) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`; replaced in 0.16.0 by `tasks`: `count`, `failed`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time); since 0.20.15 `meeting` (`idle`, `recording`, `transcribing`, `summarizing`) and `icons` (how many icons it keeps); since 0.15.0 `life`: `activity`, `state`, `act`, `since_s`, `left_s` and `emotions` (`happy`, `energy`, `social`, `stim`, `trust`, -1..1), see `docs/life.md`. `eyes` may also be `delighted`, `smitten`, `starry` or `dreamy` since 0.15.0; `friends` (the other Yorus in range, 0.18.0 to 0.20.9) is gone since 0.20.10 |
-| `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `tasks` (0.16.0 and later; `habits` before) · `games` (0.11.8 and later) · `settings` · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it. Since 0.11.0; before, the menu was a ring and `inbox` one of its pages |
+| `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `tasks` (0.16.0 and later; `habits` before) · `games` (0.11.8 and later) · `settings` · `yoru` (0.20.20) · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it. Since 0.11.0; before, the menu was a ring and `inbox` one of its pages |
 | `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Yoru asks before it acts for you, over the eyes, with Allow and Deny (see Confirmations). A second call replaces it |
 | `hide_approval` | `id`: string | Take that card away: it was answered in the app, or gave up. An `id` that isn't shown is fine |
 | `show_toast` | `text`: string, `seconds`: integer, `tone`?: `info` · `done` · `wait` · `error` | Since 0.7.0. One line above the bottom rim for a few seconds. A second call replaces it. Yoru Hub no longer sends it (since 2026-10-21) |
@@ -96,8 +96,9 @@ Settings are kept in NVS and survive a reboot.
 | `set_icon` | `name`, `at`?, `data`? | Since 0.20.15. An app's icon, in parts (see Icons) |
 | `set_meeting` | `state`, `source`? | Since 0.20.15. A meeting is recorded, transcribed, summarized (see Meetings) |
 | `set_feeling` | `face`?, `feel`? | Since 0.20.17. How Yoru feels about what was just said to him (see Feelings) |
+| `set_growth` | `days`, `facts`, `people`, `useful`: integers | Since 0.20.20. What the host counted from its memory; milestones unlock colours and rare acts (see Growth) |
 
-The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `show_fetch`, and since 0.16.0 `set_tasks`, and since 0.20.15 `set_icon` and `set_meeting`, and since 0.20.17 `set_feeling`) are for the host only: Yoru Hub keeps them out of its MCP server.
+The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `show_fetch`, and since 0.16.0 `set_tasks`, and since 0.20.15 `set_icon` and `set_meeting`, and since 0.20.17 `set_feeling`, and since 0.20.20 `set_growth`) are for the host only: Yoru Hub keeps them out of its MCP server.
 
 ## Confirmations
 
@@ -196,7 +197,7 @@ How it arrives depends on `urgency`:
 
 Do not disturb on the board (setting `focus`) makes every notification but `urgent` arrive as `low`; the host's quiet hours are the host's to apply (it sends `low`). While the screen is dark only `urgent` shows; the rest wait in the inbox. Turned face down, nothing shows. A banner doesn't come over the menu or the views.
 
-The inbox view opens from the banner, from the menu (Inbox), and from BOOT. It lists every notification with its source, title and age on the board ("now", "5 min", "2 h"), the unread ones marked. A tap opens one: the whole text, the `actions`, Dismiss and Open. Swipe right or down, or tap the title, to go back.
+The inbox view opens from the banner, from the menu (Inbox), and from BOOT. It lists every notification with its source, title and age on the board ("now", "5 min", "2 h"), the unread ones marked. A tap opens one: the whole text, the `actions` and Open, then the user's verdict (0.20.20): Useful and Enough («Utile», «Basta»), which take it away. Dismiss was replaced by them: Enough is how a notification goes without being useful. Swipe right or down, or tap the title, to go back.
 
 What the user does comes back as `notification_action`:
 
@@ -207,7 +208,9 @@ What the user does comes back as `notification_action`:
 | `action` | When | On the board |
 |---|---|---|
 | `read` | The notification was opened, the first time | It is read |
-| `dismiss` | Dismiss | It leaves the inbox |
+| `dismiss` | Dismiss (before 0.20.20) | It leaves the inbox |
+| `useful` | Useful (0.20.20): the user was glad to be told | It leaves the inbox. The host keeps the verdict, tells more like it, and counts it towards growth |
+| `enough` | Enough (0.20.20): don't tell me things like this | It leaves the inbox. The host keeps it in the memory's "Don't tell me about", tells less like it, and after a few, more «Enough» than «Useful», brings what comes from that source in a step quieter (high to normal, normal to low; urgent still comes through) |
 | `open` | Open: show it on the computer (the mail in the browser, the issue on GitHub) | It stays, read; the view closes |
 | `"0"`, `"1"` | One of `actions`, by its index, as a string | It stays, read |
 
@@ -346,6 +349,18 @@ Since 0.20.17 (Yoru Hub: `core/src/assistant/memory/feelings.rs` and the face ta
 
 - The host sends `face` as soon as the reply's face tag is read, before the voice starts, and `feel` once the reply is done.
 - `praised` cheers him up and warms him to the person, `scolded` saddens and tenses him, `amused` cheers and wakes him a little.
+
+## Growth
+
+Since 0.20.20 (capability `growth`; Yoru Hub: `core/src/assistant/memory/growth.rs`, sent with the other lists in `core/src/bridge/session.rs`). Yoru grows with real use (docs/CONCEPT.md, Growing up): the host counts, the board unlocks.
+
+| Tool | Arguments | Effect |
+|------|-----------|--------|
+| `set_growth` | `days`: days the user talked with Yoru (by voice or in the app), `facts`: what Yoru knows about the user, still true, `people`: the people it knows by name, `useful`: notifications called useful | The board keeps the counts and the milestones reached in NVS. Answers `structuredContent` `{"reached": [...], "new": [...]}` with ids such as `sphere:dawn` or `act:wave` |
+
+- The milestones, in `growth.c`: days 2 (act `wave`), 7 (sphere `mint`), 21 (`night`), 60 (act `love`); facts 10 (`dawn`), 30 (`lilac`), 75 (`gold`); people 1 (act `shy`), 3 (act `giggle`), 6 (`rose`); useful 3 (act `hop`), 10 (act `cheer`).
+- A milestone reached stays reached when a count goes down (a fact forgotten). A new one is celebrated once Yoru is awake and free: `proud` and a line on the screen.
+- The host sends the counts when it connects and whenever they change, looking at most once a minute.
 
 ## Friends (removed)
 

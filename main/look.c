@@ -23,9 +23,28 @@ typedef struct {
     uint32_t rgb;
 } stop_t;
 
-static const stop_t PEARL[] = {
-    {0.00f, 0xF6F4F7}, {0.22f, 0xDEDBE2}, {0.58f, 0xAEAAB5}, {0.84f, 0x6F6B78}, {1.00f, 0x3A3742},
+/* The sphere's colours, light to shadow (docs/CONCEPT.md, Growing up):
+ * pearl from the start, the others unlocked by time together (growth.c). */
+#define STOPS 5
+typedef struct {
+    const char *en, *it;
+    stop_t stops[STOPS];
+} palette_t;
+#define P(a, b, c, d, e) {{0.00f, a}, {0.22f, b}, {0.58f, c}, {0.84f, d}, {1.00f, e}}
+static const palette_t PALETTES[LOOK_PALETTES] = {
+    {"Pearl", "Perla", P(0xF6F4F7, 0xDEDBE2, 0xAEAAB5, 0x6F6B78, 0x3A3742)},
+    {"Dawn", "Alba", P(0xFFF1E6, 0xFAD3BE, 0xE09F86, 0x9A5B4E, 0x4A2A2C)},
+    {"Mint", "Menta", P(0xEEFBF5, 0xC8EEDD, 0x8CCDB2, 0x4C8A75, 0x213F37)},
+    {"Lilac", "Lilla", P(0xF6F0FF, 0xDCCFF5, 0xAE9AD8, 0x6E5C99, 0x352C4E)},
+    {"Night", "Notte", P(0xE8EEFF, 0xB8C6EE, 0x7C8CC6, 0x434F86, 0x1E2546)},
+    {"Gold", "Oro", P(0xFFF8E4, 0xF5E1A8, 0xD4B060, 0x8E6E2E, 0x46361A)},
+    {"Rose", "Rosa", P(0xFFF0F3, 0xF7CCD6, 0xE096AA, 0x9A5468, 0x4A2532)},
 };
+#undef P
+static int s_palette;
+/* Asked from any task (a setting), done on LVGL's (look_apply_palette). */
+static volatile int s_palette_wanted = -1;
+#define STOPS_NOW (PALETTES[s_palette].stops)
 static look_t s_look;
 /* The spheres of other sizes, rendered when first drawn: a few for the
  * sizes and squashes in use, within a budget of PSRAM (a sphere up at the
@@ -133,7 +152,7 @@ static esp_err_t render_ball(look_sprite_t *sp, float rx, float ry, float light_
                 continue;
             }
             float rgb[3];
-            gradient(stops, 5, hypotf(px - light_x, py - light_y) / light_r, rgb);
+            gradient(stops, STOPS, hypotf(px - light_x, py - light_y) / light_r, rgb);
             put_px(sp, x, y, rgb, cov);
         }
     }
@@ -143,6 +162,7 @@ static esp_err_t render_ball(look_sprite_t *sp, float rx, float ry, float light_
 static esp_err_t render_halo_at(look_sprite_t *sp, int size);
 static int halo_full(void);
 static esp_err_t render_ball_fast(look_sprite_t *sp, look_sprite_t *tint, look_sprite_t *core, int rx, int ry);
+static void shade_table(void);
 /* The day sphere's colour alone (look_ball_core). */
 static look_sprite_t s_day_core;
 
@@ -151,9 +171,28 @@ esp_err_t look_init(void)
     const int64_t start = esp_timer_get_time();
     s_shade565 = heap_caps_malloc(SHADE_N * 16 * sizeof(uint16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     ESP_RETURN_ON_FALSE(s_shade565, ESP_ERR_NO_MEM, TAG, "shade table");
+    if (s_palette_wanted >= 0) {
+        s_palette = s_palette_wanted;
+        s_palette_wanted = -1;
+    }
+    shade_table();
+    // The same renderer as every other size, so going nearer or farther
+    // never changes the shading.
+    ESP_RETURN_ON_ERROR(render_ball_fast(&s_look.day, &s_look.tint, &s_day_core, LOOK_SPHERE_R, LOOK_SPHERE_R), TAG, "day");
+    // The halo: a soft ring of glow just around the sphere. Kept tight, so
+    // redrawing it each frame stays near Yoru instead of the whole screen.
+    ESP_RETURN_ON_ERROR(render_halo_at(&s_look.halo, halo_full()), TAG, "halo");
+    ESP_RETURN_ON_ERROR(render_ball(&s_look.hand, HAND_RX, 22 * K, -12 * K, -11 * K, 31 * K, STOPS_NOW), TAG, "hand");
+    ESP_LOGI(TAG, "Yoru rendered in %lld ms", (esp_timer_get_time() - start) / 1000);
+    return ESP_OK;
+}
+
+/* The gradient of the palette in use, by the squared distance to the light. */
+static void shade_table(void)
+{
     for (int i = 0; i < SHADE_N; i++) {
         float rgb[3];
-        gradient(PEARL, 5, sqrtf((float) i / (SHADE_N - 1)), rgb);
+        gradient(STOPS_NOW, STOPS, sqrtf((float) i / (SHADE_N - 1)), rgb);
         for (int d = 0; d < 16; d++) {
             // RGB565 keeps the top bits: up to one step of dither before the cut.
             const float k = ((float) d + 0.5f) / 16;
@@ -163,15 +202,6 @@ esp_err_t look_init(void)
             s_shade565[(i << 4) | d] = lv_color_to_u16(c);
         }
     }
-    // The same renderer as every other size, so going nearer or farther
-    // never changes the shading.
-    ESP_RETURN_ON_ERROR(render_ball_fast(&s_look.day, &s_look.tint, &s_day_core, LOOK_SPHERE_R, LOOK_SPHERE_R), TAG, "day");
-    // The halo: a soft ring of glow just around the sphere. Kept tight, so
-    // redrawing it each frame stays near Yoru instead of the whole screen.
-    ESP_RETURN_ON_ERROR(render_halo_at(&s_look.halo, halo_full()), TAG, "halo");
-    ESP_RETURN_ON_ERROR(render_ball(&s_look.hand, HAND_RX, 22 * K, -12 * K, -11 * K, 31 * K, PEARL), TAG, "hand");
-    ESP_LOGI(TAG, "Yoru rendered in %lld ms", (esp_timer_get_time() - start) / 1000);
-    return ESP_OK;
 }
 
 /* The sphere at any size, quickly: the shading comes from a table by the
@@ -513,12 +543,80 @@ const look_sprite_t *look_hand(float scale, uint32_t frame)
     }
     // The boot one's shape and light, at this size.
     const float k = (float) rx / HAND_RX;
-    if (render_ball(&pick->sp, (float) rx, 22 * K * k, -12 * K * k, -11 * K * k, 31 * K * k, PEARL) != ESP_OK) {
+    if (render_ball(&pick->sp, (float) rx, 22 * K * k, -12 * K * k, -11 * K * k, 31 * K * k, STOPS_NOW) != ESP_OK) {
         return NULL;
     }
     pick->rx = rx;
     pick->used = frame;
     return &pick->sp;
+}
+
+int look_palette(void)
+{
+    return s_palette_wanted >= 0 ? s_palette_wanted : s_palette;
+}
+
+const char *look_palette_name(int i, bool italian)
+{
+    if (i < 0 || i >= LOOK_PALETTES) {
+        return "?";
+    }
+    return italian ? PALETTES[i].it : PALETTES[i].en;
+}
+
+void look_set_palette(int i)
+{
+    if (i >= 0 && i < LOOK_PALETTES) {
+        s_palette_wanted = i;
+    }
+}
+
+/* The other sizes go (rendered again in the new colours when drawn), the day
+ * sphere and the hand are rendered now. The new day sphere is made before
+ * the old one goes: if PSRAM has no room, Yoru keeps its colours. */
+bool look_apply_palette(void)
+{
+    const int want = s_palette_wanted;
+    if (want < 0 || s_shade565 == NULL) {
+        return false;
+    }
+    s_palette_wanted = -1;
+    if (want == s_palette) {
+        return false;
+    }
+    const int was = s_palette;
+    for (int i = 0; i < BALL_SLOTS; i++) {
+        if (s_balls[i].rx != 0) {
+            ball_free(&s_balls[i]);
+        }
+    }
+    for (int i = 0; i < HAND_SLOTS; i++) {
+        if (s_hands[i].rx != 0) {
+            heap_caps_free((void *) s_hands[i].sp.img.data);
+            s_hands[i].rx = 0;
+        }
+    }
+    s_palette = want;
+    shade_table();
+    look_sprite_t day, tint, core, hand;
+    if (render_ball_fast(&day, &tint, &core, LOOK_SPHERE_R, LOOK_SPHERE_R) != ESP_OK) {
+        ESP_LOGW(TAG, "no room for the %s sphere", PALETTES[want].en);
+        s_palette = was;
+        shade_table();
+        return true;
+    }
+    if (render_ball(&hand, HAND_RX, 22 * K, -12 * K, -11 * K, 31 * K, STOPS_NOW) != ESP_OK) {
+        hand = s_look.hand; // the old hand, rather than none
+    } else {
+        heap_caps_free((void *) s_look.hand.img.data);
+    }
+    heap_caps_free((void *) s_look.day.img.data);
+    s_look.day = day;
+    s_look.tint = tint;
+    s_day_core = core;
+    s_look.hand = hand;
+    ESP_LOGI(TAG, "sphere: %s", PALETTES[want].en);
+    return true;
 }
 
 const look_t *look_get(void)

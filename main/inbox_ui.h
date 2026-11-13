@@ -7,9 +7,10 @@
  *   source and title for a few seconds; a tap opens it;
  * - the inbox view (the banner, BOOT with something unread, the menu): the
  *   list, newest first, with each one's source, title and age, the unread
- *   marked; a tap opens one: its whole text, the host's actions, Dismiss
- *   and Open (on the computer). Swipe right or down, or tap the title, to
- *   go back.
+ *   marked; a tap opens one: its whole text, the host's actions and Open
+ *   (on the computer), then Useful and Enough, the user's verdict, which
+ *   take it away and teach the host what to tell. Swipe right or down, or
+ *   tap the title, to go back.
  * The dot and the banner keep out of the way of the menu, the views and the
  * cards. All calls with the LVGL lock held. */
 

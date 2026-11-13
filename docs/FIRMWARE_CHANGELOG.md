@@ -1,5 +1,14 @@
 # Firmware changelog
 
+## 0.20.20
+
+- **Tell Yoru what was worth it.** An opened notification now ends with two buttons in place of Dismiss: **Useful** and **Enough**. One tap and it goes. Yoru Hub learns from it: what you call useful it tells you more of; with Enough it remembers not to tell you things like that again, and a source you keep saying Enough to arrives more quietly (urgent things still come through). Open stays, next to the host's own buttons.
+- **Yoru grows with you.** Yoru Hub counts a few real things from its memory: the days you talked, what Yoru learnt about you, the people he knows, the notifications you found useful. Each milestone unlocks something new, for good, and Yoru celebrates it with a cheer and a line on the screen.
+- **Six new colours for the sphere**: Dawn, Mint, Lilac, Night, Gold and Rose, chosen in Settings, Yoru, once unlocked. Pearl stays the default.
+- **Six gestures of his own**: once unlocked, Yoru now and then waves at you, peeks shyly, hops, giggles, cheers or sends you hearts, all by himself. Nothing he did before is locked.
+- **A Yoru page in Settings**: his colour, what comes next, and how far each count has come. It works without the computer too.
+- New tool for the host: `set_growth`; new setting `sphere`.
+
 ## 0.20.19
 
 - **«Hey Yoru» now knows how an Italian says it.** The first model had only learnt the word from English synthetic voices, and never heard a real Italian speaker. The new one was also trained on the Italian pronunciation and on real recordings made at Yoru's own microphone. It is still a word to choose (menu, Voice, wake word); Alexa stays the default.

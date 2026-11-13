@@ -17,6 +17,7 @@
 #include "eyes.h"
 #include "icons.h"
 #include "tasks.h"
+#include "growth.h"
 #include "inbox.h"
 #include "inbox_ui.h"
 #include "life.h"
@@ -758,11 +759,40 @@ static bool tool_set_feeling(const cJSON *args, char *text, cJSON **structured)
     return true;
 }
 
+static bool tool_set_growth(const cJSON *args, char *text, cJSON **structured)
+{
+    static const char *const KEYS[GROWTH_MEASURES] = {"days", "facts", "people", "useful"};
+    int32_t counts[GROWTH_MEASURES];
+    for (int i = 0; i < GROWTH_MEASURES; i++) {
+        const cJSON *v = cJSON_GetObjectItemCaseSensitive(args, KEYS[i]);
+        if (!cJSON_IsNumber(v) || v->valuedouble < 0) {
+            snprintf(text, TEXT_MAX, "%s must be a count, 0 or more", KEYS[i]);
+            return false;
+        }
+        counts[i] = v->valuedouble > INT32_MAX ? INT32_MAX : (int32_t) v->valuedouble;
+    }
+    const uint32_t fresh = growth_update(counts);
+    *structured = cJSON_CreateObject();
+    cJSON *reached = cJSON_AddArrayToObject(*structured, "reached");
+    cJSON *news = cJSON_AddArrayToObject(*structured, "new");
+    for (int i = 0; i < growth_milestones(); i++) {
+        if (growth_reached(i)) {
+            cJSON_AddItemToArray(reached, cJSON_CreateString(growth_milestone_id(i)));
+        }
+        if (fresh & (1u << i)) {
+            cJSON_AddItemToArray(news, cJSON_CreateString(growth_milestone_id(i)));
+        }
+    }
+    snprintf(text, TEXT_MAX, "%d of %d milestones reached, %d new", growth_reached_count(), growth_milestones(),
+             __builtin_popcount(fresh));
+    return true;
+}
+
 static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
         .description = "Open or close the menu on Yoru's screen: on its home (the apps around Yoru), on an app "
-                       "(inbox, timers, tasks, games, settings) or straight on a page of Settings (display, sound, "
+                       "(inbox, timers, tasks, games, settings) or straight on a page of Settings (yoru, display, sound, "
                        "behaviour, voice, connection, battery, about).",
         .schema = "{\"type\":\"object\",\"properties\":{\"open\":{\"type\":\"boolean\"},"
                   "\"page\":{\"type\":\"string\"}}}",
@@ -818,6 +848,18 @@ static const tool_t TOOLS[] = {
         .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},"
                   "\"required\":[\"id\"]}",
         .fn = tool_hide_notification,
+    },
+    {
+        .name = "set_growth",
+        .description = "What Yoru Hub counted from its memory: days talked together, things learnt about the user, "
+                       "people known, notifications called useful. Each milestone reached unlocks something on the "
+                       "board for good (a colour, a gesture of its own) and Yoru celebrates it. The host sends these "
+                       "itself.",
+        .schema = "{\"type\":\"object\",\"properties\":{\"days\":{\"type\":\"integer\",\"minimum\":0},"
+                  "\"facts\":{\"type\":\"integer\",\"minimum\":0},\"people\":{\"type\":\"integer\",\"minimum\":0},"
+                  "\"useful\":{\"type\":\"integer\",\"minimum\":0}},"
+                  "\"required\":[\"days\",\"facts\",\"people\",\"useful\"]}",
+        .fn = tool_set_growth,
     },
     {
         .name = "clear_notifications",

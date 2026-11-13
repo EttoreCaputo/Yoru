@@ -67,6 +67,9 @@ typedef enum {
     /* On battery, minutes of dark screen before it hibernates (power.c);
      * 0 never. */
     SETTING_HIBERNATE_MIN,
+    /* The sphere's colours (look.c): 0 pearl, the others once unlocked
+     * (growth.c). */
+    SETTING_SPHERE,
     SETTING_COUNT,
 } setting_t;
 

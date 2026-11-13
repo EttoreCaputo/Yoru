@@ -19,6 +19,7 @@
 #include "esp_random.h"
 #include "errand.h"
 #include "eyes.h"
+#include "growth.h"
 #include "icons.h"
 #include "inbox.h"
 #include "inbox_ui.h"
@@ -829,6 +830,15 @@ static void tick_cb(lv_timer_t *timer)
         return;
     }
     set_brightness(awake_brightness());
+    // A milestone reached (growth.c), told when Yoru is awake and free, so
+    // that a count at night doesn't wake it.
+    if (!s.pressed && !s.face_down && s.voice == VOICE_IDLE) {
+        const char *news = growth_take_news();
+        if (news != NULL) {
+            play("proud");
+            toast_show(news, 5, TOAST_DONE);
+        }
+    }
     if (s.gaze_ms != 0 && now - s.gaze_ms >= GAZE_HOLD_MS) {
         s.gaze_ms = 0;
         if (!s.pressed && s.voice == VOICE_IDLE) {

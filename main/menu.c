@@ -15,6 +15,7 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_system.h"
+#include "growth.h"
 #include "tasks.h"
 #include "tasks_ui.h"
 #include "inbox.h"
@@ -109,7 +110,7 @@ typedef enum {
     K_HOLD,   // an action on a long press, for the ones that can't be undone
 } kind_t;
 
-typedef enum { F_NONE, F_PCT, F_HOUR, F_TIME, F_ROTATION, F_LANG, F_HIBERNATE } fmt_t;
+typedef enum { F_NONE, F_PCT, F_HOUR, F_TIME, F_ROTATION, F_LANG, F_HIBERNATE, F_SPHERE } fmt_t;
 
 typedef void (*info_fn_t)(char *out, size_t len);
 typedef void (*action_fn_t)(void);
@@ -151,6 +152,12 @@ static void info_memory(char *out, size_t len);
 static void info_flash(char *out, size_t len);
 static void info_load(char *out, size_t len);
 static void info_hold(char *out, size_t len);
+static void info_days(char *out, size_t len);
+static void info_facts(char *out, size_t len);
+static void info_people(char *out, size_t len);
+static void info_useful(char *out, size_t len);
+static void info_unlocked(char *out, size_t len);
+static void info_next(char *out, size_t len);
 static void act_power_off(void);
 static void act_restart(void);
 static void act_factory_reset(void);
@@ -160,6 +167,16 @@ static void act_factory_reset(void);
 #define ACT(en, it, kind, fn, info) {en, it, kind, SETTING_COUNT, F_NONE, info, fn}
 
 /* Italian without accents: the built-in fonts only have ASCII. */
+/* Yoru himself: his colour, and how far he has grown with you (growth.c). */
+static const item_t YORU_ITEMS[] = {
+    SET("Colour", "Colore", K_CHOICE, SETTING_SPHERE, F_SPHERE),
+    INFO("Next to unlock", "Prossima novita'", info_next),
+    INFO("Days together", "Giorni insieme", info_days),
+    INFO("Learnt about you", "Cose che sa di te", info_facts),
+    INFO("People he knows", "Persone che conosce", info_people),
+    INFO("Useful notices", "Avvisi utili", info_useful),
+    INFO("Unlocked", "Sbloccati", info_unlocked),
+};
 static const item_t DISPLAY_ITEMS[] = {
     SET("Brightness", "Luce", K_ARC, SETTING_BRIGHTNESS, F_PCT),
     SET("Night brightness", "Luce di notte", K_ARC, SETTING_NIGHT_BRIGHTNESS, F_PCT),
@@ -217,6 +234,7 @@ static const item_t ABOUT_ITEMS[] = {
 /* Under Settings, each with its round icon in its colour, as a watch's. */
 #define CAT(en, it, icon, rgb, items) {en, it, icon, rgb, items, sizeof(items) / sizeof(items[0])}
 static const category_t CATEGORIES[] = {
+    CAT("Yoru", "Yoru", LV_SYMBOL_UP, 0xBF5AF2, YORU_ITEMS),
     CAT("Display", "Schermo", LV_SYMBOL_IMAGE, 0x0A84FF, DISPLAY_ITEMS),
     CAT("Sound", "Suono", LV_SYMBOL_VOLUME_MAX, 0xFF375F, SOUND_ITEMS),
     CAT("Behaviour", "Carattere", LV_SYMBOL_EYE_OPEN, 0xFF9F0A, BEHAVIOUR_ITEMS),
@@ -367,6 +385,9 @@ static void format(const item_t *it, int32_t v, char *out, size_t len)
     case F_LANG:
         snprintf(out, len, "%s", v == 1 ? "Italiano" : "English");
         break;
+    case F_SPHERE:
+        snprintf(out, len, "%s", look_palette_name((int) v, italian()));
+        break;
     case F_HIBERNATE:
         if (v == 0) {
             snprintf(out, len, "%s", tr("Never", "Mai"));
@@ -490,6 +511,61 @@ static void info_ip(char *out, size_t len)
 static void info_paired(char *out, size_t len)
 {
     wifi_field("paired", out, len);
+}
+
+/* ---- Growing up (growth.c) ---- */
+
+static void info_measure(growth_measure_t m, char *out, size_t len)
+{
+    const int32_t next = growth_next(m);
+    if (next < 0) {
+        snprintf(out, len, "%ld", (long) growth_count(m));
+    } else {
+        snprintf(out, len, "%ld  (%s %ld)", (long) growth_count(m), tr("next at", "prossima a"), (long) next);
+    }
+}
+
+static void info_days(char *out, size_t len)
+{
+    info_measure(GROWTH_DAYS, out, len);
+}
+
+static void info_facts(char *out, size_t len)
+{
+    info_measure(GROWTH_FACTS, out, len);
+}
+
+static void info_people(char *out, size_t len)
+{
+    info_measure(GROWTH_PEOPLE, out, len);
+}
+
+static void info_useful(char *out, size_t len)
+{
+    info_measure(GROWTH_USEFUL, out, len);
+}
+
+static void info_unlocked(char *out, size_t len)
+{
+    snprintf(out, len, tr("%d of %d", "%d di %d"), growth_reached_count(), growth_milestones());
+}
+
+/* The milestone nearest to being reached, by how much of it is done. */
+static void info_next(char *out, size_t len)
+{
+    int best = -1;
+    float done = -1;
+    for (int i = 0; i < growth_milestones(); i++) {
+        if (growth_reached(i)) {
+            continue;
+        }
+        const float d = (float) growth_count(growth_milestone_measure(i)) / (float) growth_milestone_need(i);
+        if (d > done) {
+            done = d;
+            best = i;
+        }
+    }
+    snprintf(out, len, "%s", best < 0 ? tr("All unlocked", "Tutto sbloccato") : growth_milestone_reward(best, italian()));
 }
 
 static void info_version(char *out, size_t len)
@@ -796,6 +872,16 @@ static void row_cb(lv_event_t *e)
         build_editor(it);
         break;
     case K_CHOICE: {
+        if (it->fmt == F_SPHERE) {
+            // The next colour already unlocked, round to pearl.
+            int v = (int) board_settings_get(it->setting);
+            do {
+                v = (v + 1) % LOOK_PALETTES;
+            } while (!growth_palette_ok(v));
+            board_settings_set(it->setting, v);
+            refresh_values();
+            break;
+        }
         if (it->fmt == F_HIBERNATE) {
             // The next of the round values past the current one.
             const int32_t now = board_settings_get(it->setting);

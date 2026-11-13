@@ -63,6 +63,8 @@ Yoru is mostly still. 0.15.0 had it doing something every few seconds, and it lo
 
 The acts: `rest`, `drift`, `look` (left, right, up), `gaze` (a little nearer, at you, a slow blink), `wink`, `tilt`, `stretch`, `sneeze`, `hiccup`, `peek` (out past the edge), `sniff` (a corner, little hops), `firefly`, `dance`, `loop`, `bounce` (off the walls), `stars`, `hum`, `sigh`, `yawn`, `nod` (nodding off, then a jolt), `search` (looking left and right for you, a whimper), `sad`, `sulk`.
 
+**The rare ones** (since 0.20.20, flag `ACTF_RARE`): `wave`, `shy`, `hop`, `giggle`, `cheer`, `love`. Each is picked only once its milestone is reached (`growth.c`, docs/CONCEPT.md, Growing up), and has a cooldown of 30 to 60 minutes, so that it still surprises. They are the clips of reactions Yoru already had when touched or told, now done of its own accord: `wave` and `love` while it watches you, `shy` and `giggle` lounging, `hop` and `cheer` at play. `debug/life` can force them, unlocked or not.
+
 0.15.0 also had a view up close, with only Yoru's eyes on the screen, light on black; it was taken out in 0.15.1.
 
 **The firefly** is the one thing Yoru knows from home: a flickering green-gold light wanders over the screen, Yoru follows it with its eyes and its whole body, its eyes go wide, and it pounces (two times in three) with a clap and a giggle; otherwise it flies off upwards and Yoru goes "aww".

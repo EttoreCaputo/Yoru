@@ -83,10 +83,19 @@ typedef enum {
     ACT_SEARCH,
     ACT_SAD,
     ACT_SULK,
+    /* The rare ones: a gesture of its own, once a milestone unlocks it
+     * (growth.c). */
+    ACT_WAVE,
+    ACT_SHY,
+    ACT_HOP,
+    ACT_GIGGLE,
+    ACT_CHEER,
+    ACT_LOVE,
     ACT_COUNT,
 } act_id_t;
 
 #define ACTF_LOUD 1 // too lively for Do not disturb
+#define ACTF_RARE 2 // only once growth.c has unlocked it
 
 typedef struct {
     const char *name;

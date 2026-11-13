@@ -158,6 +158,8 @@ Yoru grows by living with you, with no chores involved:
 - time together (days side by side, talking, work that goes well) is what it learns from;
 - as it grows it unlocks colours, eye shapes, finishes, rare animations and new reactions: things it has picked up from you and your world.
 
+How it works since 0.20.20: Yoru Hub counts four real things from its memory (the days you talked, what Yoru learnt about you, the people it knows by name, the notifications you called useful), and each milestone unlocks one thing on the board for good, celebrated with a cheer and a line on the screen. The first twelve: six colours for the sphere (Dawn, Mint, Lilac, Night, Gold, Rose; pearl is there from the start) and six gestures Yoru then makes on its own, now and then (a wave, a shy peek, a happy hop, a giggle, a little cheer, hearts). Nothing that was there before is locked, and nothing is taken back if a count goes down. Settings, Yoru on the board shows the colour to choose and how far each count has come.
+
 Updates add animations over time, so it keeps surprising people.
 
 ## The mascot

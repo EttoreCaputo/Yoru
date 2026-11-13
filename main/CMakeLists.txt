@@ -1,4 +1,4 @@
-idf_component_register(SRCS "approval.c" "toast.c" "recmark.c" "icons.c" "inbox_ui.c" "inbox.c" "main.c"
+idf_component_register(SRCS "approval.c" "toast.c" "recmark.c" "icons.c" "inbox_ui.c" "inbox.c" "growth.c" "main.c"
                             "board_i2c.c"
                             "board_display.c"
                             "board_touch.c"

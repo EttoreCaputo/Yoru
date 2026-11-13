@@ -126,6 +126,8 @@ static cJSON *identity(void)
     // The apps' icons and the meeting being recorded (docs/protocol.md, Icons, Meetings).
     cJSON_AddItemToArray(caps, cJSON_CreateString("icons"));
     cJSON_AddItemToArray(caps, cJSON_CreateString("meetings"));
+    // Growing up: set_growth (docs/protocol.md, Growth).
+    cJSON_AddItemToArray(caps, cJSON_CreateString("growth"));
     if (ota_available()) {
         // Updates over the link: ota/begin, ota/write, ota/end.
         cJSON_AddItemToArray(caps, cJSON_CreateString("ota"));

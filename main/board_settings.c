@@ -1,4 +1,5 @@
 #include "board_settings.h"
+#include "look.h"
 
 #include <string.h>
 
@@ -47,6 +48,7 @@ static const setting_info_t INFO[SETTING_COUNT] = {
     [SETTING_COLOR_24] = {"color_24bit", 0, 1, 0},
     [SETTING_POWER_SAVER] = {"power_saver", 0, 1, 0},
     [SETTING_HIBERNATE_MIN] = {"hibernate", 0, 240, 30},
+    [SETTING_SPHERE] = {"sphere", 0, LOOK_PALETTES - 1, 0},
 };
 
 static SemaphoreHandle_t s_lock;

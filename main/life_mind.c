@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "growth.h"
 #include "life_int.h"
 
 static const char *TAG = "mind";
@@ -81,12 +82,16 @@ static const pick_t LOUNGE_ACTS[] = {
     {ACT_STRETCH, 0.4f, {M(EMO_ENERGY, -0.6f)}},
     {ACT_SNEEZE, 0.15f},
     {ACT_HICCUP, 0.1f, {M(EMO_HAPPY, 1)}},
+    {ACT_SHY, 0.3f, {M(EMO_TRUST, 1)}},
+    {ACT_GIGGLE, 0.25f, {M(EMO_HAPPY, 1)}},
 };
 static const pick_t WATCH_ACTS[] = {
     {ACT_REST, 6},
     {ACT_GAZE, 4},
     {ACT_TILT, 1},
     {ACT_WINK, 0.6f, {M(EMO_HAPPY, 1), M(EMO_TRUST, 1)}},
+    {ACT_WAVE, 0.5f, {M(EMO_SOCIAL, 1)}},
+    {ACT_LOVE, 0.3f, {M(EMO_TRUST, 1), M(EMO_HAPPY, 0.5f)}},
 };
 static const pick_t EXPLORE_ACTS[] = {
     {ACT_REST, 4},
@@ -103,6 +108,8 @@ static const pick_t PLAY_ACTS[] = {
     {ACT_BOUNCE, 1.5f},
     {ACT_FIREFLY, 1, {M(MOD_NIGHT, 0.5f)}},
     {ACT_HICCUP, 0.2f},
+    {ACT_HOP, 0.8f},
+    {ACT_CHEER, 0.5f, {M(EMO_HAPPY, 1)}},
 };
 static const pick_t DREAM_ACTS[] = {
     {ACT_REST, 6},
@@ -359,7 +366,8 @@ static act_id_t pick(void)
     for (int i = 0; i < s->n_acts && i < 12; i++) {
         const pick_t *p = &s->acts[i];
         const act_info_t *info = &ACTS[p->act];
-        if ((LT.ctx.focus && (info->flags & ACTF_LOUD)) || !cooled(D.act_at[p->act], D.ever[p->act], info->cooldown_s)) {
+        if ((LT.ctx.focus && (info->flags & ACTF_LOUD)) || !cooled(D.act_at[p->act], D.ever[p->act], info->cooldown_s)
+            || !growth_act_ok(p->act)) {
             continue;
         }
         w[i] = weigh(p->w, p->m) * (recent(p->act) ? 0.3f : 1);

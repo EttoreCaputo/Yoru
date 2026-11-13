@@ -22,6 +22,7 @@
 #include "freertos/task.h"
 #include "freertos/timers.h"
 #include "link.h"
+#include "growth.h"
 #include "look.h"
 #include "lvgl_port.h"
 #include "metrics_io.h"
@@ -124,6 +125,10 @@ static void on_setting(setting_t id, int32_t value)
         fast_boots(0);
         xTimerStart(xTimerCreate("restart", pdMS_TO_TICKS(400), pdFALSE, NULL, restart_cb), 0);
         break;
+    case SETTING_SPHERE:
+        // A colour not unlocked (set from the host) falls back on pearl.
+        look_set_palette(growth_palette_ok((int) value) ? (int) value : 0);
+        break;
     case SETTING_COLOR_24:
         // The panel's format and the frame buffer are set up at boot too.
         xTimerStart(xTimerCreate("restart", pdMS_TO_TICKS(400), pdFALSE, NULL, restart_cb), 0);
@@ -162,6 +167,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Yoru %s", esp_app_get_description()->version);
     board_settings_init();
     board_settings_on_change(on_setting);
+    growth_init();
+    on_setting(SETTING_SPHERE, board_settings_get(SETTING_SPHERE)); // rendered by look_init()
     clock_init();
     tasks_init();
     // Before anything takes the power locks it sets up.

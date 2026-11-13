@@ -39,6 +39,18 @@ typedef struct {
     look_sprite_t hand;  // a small flattened sphere
 } look_t;
 
+/** The sphere's colours: how many, which is in use (or asked for), and its
+ * name in the menu. */
+#define LOOK_PALETTES 7
+int look_palette(void);
+const char *look_palette_name(int i, bool italian);
+/** Ask for palette `i`, from any task: before look_init() it is the one
+ * rendered at boot, after it look_apply_palette() renders it. */
+void look_set_palette(int i);
+/** On LVGL's task (eyes.c, each frame): render the palette asked for. True
+ * when the spheres changed: a sprite of before is no longer valid. */
+bool look_apply_palette(void);
+
 /** Render Yoru's pictures now (call once before eyes_create()). */
 esp_err_t look_init(void);
 

@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
 #include "board.h"
 #include "card.h"
@@ -37,8 +38,8 @@ static const char *TAG = "inbox_ui";
 #define ROW_H 78
 #define ROW_PAD 26
 #define MARK_D 10
-/* The detail: the words in a box that scrolls, the host's actions, then
- * Dismiss and Open, all inside the circle. */
+/* The detail: the words in a box that scrolls, the host's actions and Open,
+ * then what the user makes of it (Useful, Enough), all inside the circle. */
 #define HEAD_Y 30
 #define HEAD_W 260
 #define BOX_Y 84
@@ -50,7 +51,7 @@ static const char *TAG = "inbox_ui";
 #define BOTTOM_Y 342
 #define BODY_COLOR lv_color_hex(0xC4C7D4)
 
-enum { BTN_DISMISS = 10, BTN_OPEN = 11 };
+enum { BTN_USEFUL = 10, BTN_OPEN = 11, BTN_ENOUGH = 12 };
 
 /* What the rows and the detail point at, by id: the inbox may change under
  * them. PSRAM, as the inbox. */
@@ -371,9 +372,13 @@ static void button_cb(lv_event_t *e)
     const int b = (int) (intptr_t) lv_event_get_user_data(e);
     char id[INBOX_ID_MAX + 1];
     snprintf(id, sizeof(id), "%s", s_detail.id);
-    if (b == BTN_DISMISS) {
-        inbox_act(id, "dismiss");
+    if (b == BTN_USEFUL || b == BTN_ENOUGH) {
+        // The verdict is the way out: it leaves, and the host learns from it.
+        inbox_act(id, b == BTN_USEFUL ? "useful" : "enough");
         show_list();
+        toast_show(b == BTN_USEFUL ? card_tr("Good to know", "Buono a sapersi")
+                                   : card_tr("I won't tell you again", "Non te lo dico piu'"),
+                   3, TOAST_INFO);
     } else if (b == BTN_OPEN) {
         inbox_act(id, "open");
         inbox_ui_close(); // off to the computer
@@ -437,22 +442,35 @@ static void show_detail(const char *id)
     lv_obj_t *when = card_label(page, &lv_font_montserrat_14, urgency_color(s_detail.urgency), age);
     lv_obj_align(when, LV_ALIGN_TOP_MID, 0, HEAD_Y + 28);
 
-    const int na = s_detail.nactions;
-    add_words(page, (na > 0 ? ACTIONS_Y : BOTTOM_Y) - BOX_Y - 12);
-    for (int i = 0; i < na; i++) {
-        lv_obj_t *b = card_button(page, BTN_W, BTN_H, CARD_ACCENT, CARD_ROW, s_detail.actions[i],
-                                  &lv_font_montserrat_20, button_cb, LV_EVENT_CLICKED, (void *) (intptr_t) i);
-        const int32_t dx = na == 1 ? 0 : (i == 0 ? -1 : 1) * (BTN_W / 2 + BTN_GAP / 2);
+    // Open sits with the host's actions, unless one of them is it already.
+    const char *labels[3];
+    int codes[3];
+    int nb = 0;
+    bool has_open = false;
+    for (int i = 0; i < s_detail.nactions; i++) {
+        labels[nb] = s_detail.actions[i];
+        codes[nb++] = i;
+        has_open |= strcasecmp(s_detail.actions[i], "Open") == 0 || strcasecmp(s_detail.actions[i], "Apri") == 0;
+    }
+    if (!has_open && nb < 2) {
+        labels[nb] = card_tr(LV_SYMBOL_UPLOAD " Open", LV_SYMBOL_UPLOAD " Apri");
+        codes[nb++] = BTN_OPEN;
+    }
+    add_words(page, ACTIONS_Y - BOX_Y - 12);
+    for (int i = 0; i < nb; i++) {
+        lv_obj_t *b = card_button(page, BTN_W, BTN_H, codes[i] == BTN_OPEN ? CARD_TEXT : CARD_ACCENT, CARD_ROW, labels[i],
+                                  &lv_font_montserrat_20, button_cb, LV_EVENT_CLICKED, (void *) (intptr_t) codes[i]);
+        const int32_t dx = nb == 1 ? 0 : (i == 0 ? -1 : 1) * (BTN_W / 2 + BTN_GAP / 2);
         lv_obj_align(b, LV_ALIGN_TOP_MID, dx, ACTIONS_Y);
     }
-    lv_obj_t *dismiss = card_button(page, BTN_W, BTN_H, CARD_DENY, CARD_DENY_BG,
-                                    card_tr(LV_SYMBOL_CLOSE " Dismiss", LV_SYMBOL_CLOSE " Elimina"),
-                                    &lv_font_montserrat_20, button_cb, LV_EVENT_CLICKED, (void *) (intptr_t) BTN_DISMISS);
-    lv_obj_align(dismiss, LV_ALIGN_TOP_MID, -(BTN_W / 2 + BTN_GAP / 2), BOTTOM_Y);
-    lv_obj_t *open = card_button(page, BTN_W, BTN_H, CARD_TEXT, CARD_ROW,
-                                 card_tr(LV_SYMBOL_UPLOAD " Open", LV_SYMBOL_UPLOAD " Apri"), &lv_font_montserrat_20,
-                                 button_cb, LV_EVENT_CLICKED, (void *) (intptr_t) BTN_OPEN);
-    lv_obj_align(open, LV_ALIGN_TOP_MID, BTN_W / 2 + BTN_GAP / 2, BOTTOM_Y);
+    lv_obj_t *enough = card_button(page, BTN_W, BTN_H, CARD_DENY, CARD_DENY_BG,
+                                   card_tr(LV_SYMBOL_MUTE " Enough", LV_SYMBOL_MUTE " Basta"), &lv_font_montserrat_20,
+                                   button_cb, LV_EVENT_CLICKED, (void *) (intptr_t) BTN_ENOUGH);
+    lv_obj_align(enough, LV_ALIGN_TOP_MID, -(BTN_W / 2 + BTN_GAP / 2), BOTTOM_Y);
+    lv_obj_t *useful = card_button(page, BTN_W, BTN_H, CARD_ALLOW, CARD_ALLOW_BG,
+                                   card_tr(LV_SYMBOL_OK " Useful", LV_SYMBOL_OK " Utile"), &lv_font_montserrat_20,
+                                   button_cb, LV_EVENT_CLICKED, (void *) (intptr_t) BTN_USEFUL);
+    lv_obj_align(useful, LV_ALIGN_TOP_MID, BTN_W / 2 + BTN_GAP / 2, BOTTOM_Y);
 }
 
 /* ---- The view ---------------------------------------------------------------------- */

@@ -36,6 +36,14 @@ const act_info_t ACTS[ACT_COUNT] = {
     [ACT_SEARCH] = {"search", 0, 20},
     [ACT_SAD] = {"sad", 0, 30},
     [ACT_SULK] = {"sulk", 0, 0},
+    // Rare: unlocked by time together (growth.c), and kept rare by their
+    // long cooldowns, so that each still surprises.
+    [ACT_WAVE] = {"wave", ACTF_RARE, 1800},
+    [ACT_SHY] = {"shy", ACTF_RARE, 2400},
+    [ACT_HOP] = {"hop", ACTF_RARE | ACTF_LOUD, 2400},
+    [ACT_GIGGLE] = {"giggle", ACTF_RARE | ACTF_LOUD, 3000},
+    [ACT_CHEER] = {"cheer", ACTF_RARE | ACTF_LOUD, 3600},
+    [ACT_LOVE] = {"love", ACTF_RARE, 3600},
 };
 
 /* The firefly's wander, in screen pixels from the middle. */
@@ -569,6 +577,41 @@ static bool sad(void)
     return !busy();
 }
 
+/* The rare ones (growth.c): what it does when touched or told, now and then
+ * of its own accord. */
+static bool wave(void)
+{
+    return act_clip(CLIP_WAVE, coin() < 0, EYES_MOOD_HAPPY, EYES_MOOD_HAPPY, SOUND_HELLO);
+}
+
+static bool shy(void)
+{
+    return act_clip(CLIP_SHY_PEEK, false, EYES_MOOD_HAPPY, EYES_MOOD_HAPPY, SOUND_COUNT);
+}
+
+static bool hop(void)
+{
+    if (A.phase == 2 && !busy()) {
+        mood_feel(LIFE_FEEL_FUN);
+    }
+    return act_clip(CLIP_HAPPY_HOP, coin() < 0, EYES_MOOD_HAPPY, EYES_MOOD_HAPPY, SOUND_HAPPY);
+}
+
+static bool giggle(void)
+{
+    return act_clip(CLIP_GIGGLE, false, EYES_MOOD_DELIGHTED, EYES_MOOD_HAPPY, SOUND_GIGGLE);
+}
+
+static bool cheer(void)
+{
+    return act_clip(CLIP_CELEBRATE, false, EYES_MOOD_HAPPY, EYES_MOOD_HAPPY, SOUND_TADA);
+}
+
+static bool love(void)
+{
+    return act_clip(CLIP_LOVE, false, EYES_MOOD_LOVING, EYES_MOOD_HAPPY, SOUND_AWW);
+}
+
 /* ---- Running them ------------------------------------------------------------- */
 
 typedef bool (*act_fn)(void);
@@ -580,6 +623,8 @@ static const act_fn FNS[ACT_COUNT] = {
     [ACT_DANCE] = dance,     [ACT_LOOP] = loop_the_loop,  [ACT_BOUNCE] = bounce, [ACT_STARS] = stars,
     [ACT_HUM] = hum,         [ACT_SIGH] = sigh,           [ACT_YAWN] = yawn,     [ACT_NOD] = nod,
     [ACT_SEARCH] = search,   [ACT_SAD] = sad,             [ACT_SULK] = sulk,
+    [ACT_WAVE] = wave,       [ACT_SHY] = shy,             [ACT_HOP] = hop,       [ACT_GIGGLE] = giggle,
+    [ACT_CHEER] = cheer,     [ACT_LOVE] = love,
 };
 
 void acts_start(act_id_t id, const act_style_t *style)
