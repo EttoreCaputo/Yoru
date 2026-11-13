@@ -147,6 +147,7 @@ Since 0.11.7 a host can judge for itself when a sentence is finished (Yoru Hub d
 - `utterance_pause` comes at each pause once speech has started (wake word, host or follow-up, not push-to-talk): when the VAD's 500 ms hangover after the last speech is over. `ms` is how much audio was sent so far. It comes again after the next stretch of speech.
 - `voice/pause` sets how long a pause ends utterance `id` (200 to 3000 ms after the hangover), if it's the one being heard; an older id is ignored. A host that judges pauses sends it right after `utterance_start` with a long one, then `voice/stop` as soon as it hears the sentence is finished; the board's own pause only ends it if the host says nothing.
 - An older board answers `voice/pause` with `-32601` and never sends `utterance_pause`: its own pause ends every utterance.
+- `about_to_talk` (no params) says the user is likely to talk soon, before any `utterance_start`: Yoru Hub's notch sends it when the pointer comes onto it, and a host using Gemini Live opens its session then, so the press doesn't wait for it. Optional: the board doesn't send it, and a host may ignore it.
 
 ## PWR
 
