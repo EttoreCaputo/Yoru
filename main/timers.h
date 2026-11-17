@@ -3,12 +3,10 @@
 /* Timers and reminders on the board (docs/protocol.md, Timers). The host
  * keeps its own and sends the whole list with `set_timers` whenever it
  * changes; the board counts each one down from when it came, and tells the
- * host what you did with one (`timer_action`). A host that never sends the
- * list still has its snapshot's timer (metrics_model.h), the one that ends
- * first, shown here as the only one. The board starts timers of its own too
- * (the Timers app, a spoken command), rings them itself, and offers them to
- * the next host that is there (`timer_new`); once the host's list has one,
- * it is the host's. Without a host the board rings the host's as well.
+ * host what you did with one (`timer_action`). The board starts timers of
+ * its own too (the Timers app, a spoken command), rings them itself, and
+ * offers them to the next host that is there (`timer_new`); once the host's
+ * list has one, it is the host's. Without a host the board rings the host's as well.
  * timers_ui.c shows them; behaviour.c makes Yoru jump when one rings. All
  * calls with the LVGL lock held. */
 
@@ -30,7 +28,6 @@ typedef enum { TIMER_KIND_TIMER, TIMER_KIND_WORK, TIMER_KIND_BREAK, TIMER_KIND_R
 typedef enum { TIMER_RUN, TIMER_PAUSE, TIMER_RING } timer_state_t;
 
 typedef struct {
-    /* Empty for the snapshot's timer: there is nothing to send back. */
     char id[TIMERS_ID_MAX + 1];
     timer_kind_t kind;
     timer_state_t state;
@@ -45,7 +42,7 @@ typedef struct {
 /** `set_timers`' arguments; false with the reason in `err`. */
 bool timers_set(const cJSON *args, char *err, size_t len);
 
-/** How many there are now, the host's list or the snapshot's one. */
+/** How many there are now, the host's and the board's. */
 int timers_count(void);
 /** The i-th, the one that ends first first, as it stands now. */
 bool timers_at(int i, timer_view_t *out);

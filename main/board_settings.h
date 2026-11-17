@@ -30,8 +30,7 @@ typedef enum {
     SETTING_ROTATION,
     /* Sound. Percent. */
     SETTING_VOLUME,
-    /* Yoru's own sounds in its animations. The NVS key is still
-     * "pet_sounds", for boards already in use and the host. */
+    /* Yoru's own sounds in its animations. */
     SETTING_YORU_SOUNDS,
     /* The privacy switch: the mic isn't read. */
     SETTING_MIC_MUTED,
@@ -43,8 +42,7 @@ typedef enum {
     SETTING_TOUCH_REACTIONS,
     /* The case as an input: lift, shake, knocks, lean (motion.c). */
     SETTING_MOTION_REACTIONS,
-    /* It turns to a sudden sound (ears_dir.c). The NVS key is still
-     * "pet_hear", for boards already in use and the host. */
+    /* It turns to a sudden sound (ears_dir.c). */
     SETTING_TURN_TO_SOUNDS,
     /* Look: the resting eyes' colour as 0xRRGGBB, and the style (M5). */
     SETTING_EYE_COLOR,

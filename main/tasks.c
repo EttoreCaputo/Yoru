@@ -43,21 +43,8 @@ static void save(void)
     nvs_close(h);
 }
 
-/* The Habits app's list (firmware up to 0.15): gone with it. */
-static void forget_habits(void)
-{
-    nvs_handle_t h;
-    if (nvs_open("habits", NVS_READWRITE, &h) == ESP_OK) {
-        if (nvs_erase_all(h) == ESP_OK) {
-            nvs_commit(h);
-        }
-        nvs_close(h);
-    }
-}
-
 void tasks_init(void)
 {
-    forget_habits();
     nvs_handle_t h;
     if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK) {
         return;

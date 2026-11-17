@@ -2,27 +2,25 @@
 
 Yoru speaks DualEye's protocol v2, copied from [DualEye's protocol](../../esp32s3-dualeye-pcmonitor/docs/protocol.md): the same frames, channels, JSON-RPC methods, audio streams and WiFi pairing. This page lists only what is different on Yoru; read DualEye's for the rest. When the two diverge, fix both until the shared parts move to a repository of their own.
 
-Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main/net.c`, `main/rpc.c` (board); `tools/yoru_link.py` (test scripts); `core/src/protocol.rs`, `link.rs`, `wifi.rs` and `voice.rs` in Yoru Hub (`../yoru-hub`), the host, Yoru's personal assistant (its `docs/assistant.md`). The Yoru app (`NotchBuddy/Sources/Yoru/` in the coucou fork) was the host from 2026-10-18 to 2026-10-19. A change to the protocol is made here and in Yoru Hub's `core/src/` together.
+Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main/net.c`, `main/rpc.c` (board); `tools/yoru_link.py` (test scripts); `core/src/protocol.rs`, `link.rs`, `wifi.rs` and `voice.rs` in Yoru Hub (`../yoru-hub`), the host, Yoru's personal assistant (its `docs/assistant.md`). A change to the protocol is made here and in Yoru Hub's `core/src/` together.
 
 ## Identity
 
 `hello` and `ready` answer:
 
 ```json
-{"protocol":2,"firmware":"0.11.9","idf":"v6.1","board":"yoru-amoled-1.75c","id":"7c0c5f4233e4","transport":"usb","max_payload":4096,"channels":["ctrl","metrics","log","audio_up","audio_down"],"capabilities":["tools","gaze","wifi","voice","speaker","inbox","timers","tasks","fetch"]}
+{"protocol":2,"firmware":"0.21.1","idf":"v6.1","board":"yoru-amoled-1.75c","id":"7c0c5f4233e4","transport":"usb","max_payload":4096,"channels":["ctrl","metrics","log","audio_up","audio_down"],"capabilities":["tools","gaze","wifi","inbox","timers","tasks","fetch","icons","meetings","ota","voice","speaker","cloud"]}
 ```
 
 - `board` is `yoru-amoled-1.75c`; a host tells Yoru from DualEye by it.
-- `agents` and `remote` (0.7.0 to 0.11.4): the coding agents' tools and notifications and the remote for them. 0.11.5 removed them, with the agents' questions, drafts, chats and `shortcut` (`show_approval` stays, for Yoru's own confirmations): a host must not send those tools to a board without the capabilities.
-- `growth` (0.20.20 only): removed in 0.21.0 with the `set_growth` tool, and with `set_feeling` (0.20.17 to 0.20.20) and `debug/life` (0.15.0 to 0.20.20): a board of 0.21.0 or later answers them as unknown, so a host must not send them to a board without the capability.
-- `inbox` (0.10.0 and later): the inbox (see Inbox): the `show_notification`, `hide_notification` and `clear_notifications` tools and the `notification_action` notification.
-- `timers` (0.11.0 and later): the menu's Timers app (see Timers): the `set_timers` tool and the `timer_action` notification.
-- `tasks` (0.16.0 and later): the menu's Tasks app (see Tasks): the `set_tasks` tool and the `task_run` notification. `habits` (0.11.0 to 0.15.1) was the Habits app, with `set_habits` and `habit_check`.
-- `fetch` (0.11.0 and later): Yoru's errands (see Fetch): the `show_fetch` tool.
-- `cloud` (0.14.0 and later): talking without the host (see Cloud voice): the `cloud/set` and `cloud/get` methods.
-- `icons` (0.20.15 and later): the apps' icons (see Icons): the `set_icon` tool.
-- `meetings` (0.20.15 and later): the meeting recordings on the board (see Meetings): the `set_meeting` tool.
-- `ota` (0.19.0 and later, once flashed over USB with the two-slot partition table): updates over the link (see OTA).
+- `inbox`: the inbox (see Inbox): the `show_notification`, `hide_notification` and `clear_notifications` tools and the `notification_action` notification.
+- `timers`: the menu's Timers app (see Timers): the `set_timers` tool and the `timer_action` notification.
+- `tasks`: the menu's Tasks app (see Tasks): the `set_tasks` tool and the `task_run` notification.
+- `fetch`: Yoru's errands (see Fetch): the `show_fetch` tool.
+- `cloud`: talking without the host (see Cloud voice): the `cloud/set` and `cloud/get` methods.
+- `icons`: the apps' icons (see Icons): the `set_icon` tool.
+- `meetings`: the meeting recordings on the board (see Meetings): the `set_meeting` tool.
+- `ota`: updates over the link (see OTA).
 - There is no `media` or `music` capability: Yoru has no image or music face, so `media/...` and `music/...` answer `-32601`.
 - `eyes/gaze` turns Yoru's eyes towards the host's pointer for 6 s after the last one, unless a finger is on the screen, a conversation is on or it is asleep.
 - `voice/state` drives the eyes: `listening` (wide, looking at you), `thinking` (dots), `speaking` (warm, swelling with the speaker's level), `error` (sad). The wake word wakes Yoru up if it was asleep.
@@ -43,7 +41,7 @@ The TCP port is the same, 7340.
 
 ## OTA
 
-Since 0.19.0 the flash has two app slots, `ota_0` (where `factory` was, at 0x10000) and `ota_1` (0x820000), with `otadata` at 0x810000; `nvs` and `model` stay where they were, so the one flash over USB that brings the new table keeps the WiFi, the pairing and the models. From then on a host updates the board over its link, USB or WiFi (sealed with the pairing key, so only a paired host can):
+The flash has two app slots, `ota_0` (0x10000) and `ota_1` (0x820000), with `otadata` at 0x810000, besides `nvs` and `model`. A host updates the board over its link, USB or WiFi (sealed with the pairing key, so only a paired host can):
 
 | Method | Params | Result |
 |---|---|---|
@@ -54,19 +52,19 @@ Since 0.19.0 the flash has two app slots, `ota_0` (where `factory` was, at 0x100
 | `ota/status` | none | `running` (slot), `available`, `probation`, `active` (an update under way), `written` |
 
 - The image is the app's alone (`build/yoru.bin`, or the app partition's part of the merged image), not the merged one.
-- The board refuses, with `-32602`: an image that isn't Yoru's (the app descriptor's `project_name`, checked before anything is written), a write at another offset than the one reached (after a lost reply, `ota/status` says where it stands), a SHA-256 that doesn't match at the end. `ota/end` also has ESP-IDF check the image itself. A new `ota/begin` drops one left half done. A board flashed before 0.19.0 answers `-32601`: it needs the USB flash once.
+- The board refuses, with `-32602`: an image that isn't Yoru's (the app descriptor's `project_name`, checked before anything is written), a write at another offset than the one reached (after a lost reply, `ota/status` says where it stands), a SHA-256 that doesn't match at the end. `ota/end` also has ESP-IDF check the image itself. A new `ota/begin` drops one left half done.
 - **Probation.** The new firmware boots on probation (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE`). It's kept once it gets an address on the WiFi or a host says `hello`: then it can be updated again. If neither comes within 5 minutes it restarts into the firmware before; so does a restart before then (a crash, or a host opening the USB port, which resets the chip).
 - On the board a toast says "Updating…", then "Updated: restarting" or "Update failed". Yoru carries on meanwhile.
 - About a minute for 3 MB, over USB or WiFi.
 
 ## Metrics
 
-The same snapshot. Since 0.10.0 a snapshot needs only `pet` (the host's time and idle time; the key's name is historical, kept for compatibility): `cpu` and `gpu` are optional, and one with none of the three is still ignored. Since 0.8.0 Yoru reads only the host's time and idle time (night brightness, and the sleep times count from your last input on the computer); it shows none of the rest. A timer's `screen` is ignored.
+DualEye's snapshot, cut down to what Yoru reads: `ts` and `host`, the host's time and idle time (night brightness, and the sleep times count from your last input on the computer). `host` has `min` (local minutes since midnight), `idle` (seconds without input, optional: without it you count as there) and `tz` (optional). A snapshot without `host` is ignored, and so is any other key (DualEye's gauges, `timer`).
 
-**The board's clock (0.13.0).** The board keeps the time of day itself (`clock.c`): from the internet (SNTP, `pool.ntp.org`) once its WiFi is up, and from each snapshot: `ts` (UTC seconds) sets it when it is more than 2 s off, and `pet.tz`, the host's time zone as POSIX writes it (`"CET-1CEST,M3.5.0,M10.5.0/3"`, at most 47 characters), sets the zone, kept in NVS. A host without `tz` gives its offset from `pet.min` against `ts`, to a quarter of an hour. Until a host has said a zone, the board uses Central European Time. Night brightness, the tasks' times and "what time is it" use this clock, with or without a host. A host whose snapshots stopped more than 3 s ago is taken as gone: its idle time no longer counts, the board rings its timers and hears spoken commands itself (Offline commands).
+**The board's clock.** The board keeps the time of day itself (`clock.c`): from the internet (SNTP, `pool.ntp.org`) once its WiFi is up, and from each snapshot: `ts` (UTC seconds) sets it when it is more than 2 s off, and `host.tz`, the host's time zone as POSIX writes it (`"CET-1CEST,M3.5.0,M10.5.0/3"`, at most 47 characters), sets the zone, kept in NVS. A host whose system doesn't say its zone sends no `tz`: its offset then comes from `host.min` against `ts`, to a quarter of an hour. Until a host has said a zone, the board uses Central European Time. Night brightness, the tasks' times and "what time is it" use this clock, with or without a host. A host whose snapshots stopped more than 3 s ago is taken as gone: its idle time no longer counts, the board rings its timers and hears spoken commands itself (Offline commands).
 
 ```json
-{"v":2,"ts":1793574000,"pet":{"min":915,"idle":4,"tz":"CET-1CEST,M3.5.0,M10.5.0/3"}}
+{"v":2,"ts":1793574000,"host":{"min":915,"idle":4,"tz":"CET-1CEST,M3.5.0,M10.5.0/3"}}
 ```
 
 ## Board tools
@@ -77,31 +75,30 @@ Settings are kept in NVS and survive a reboot.
 |------|-----------|--------|
 | `set_brightness` | `percent`: 5–100 | How bright the eyes glow while awake. Asleep they dim by themselves (setting `auto_dim`) |
 | `set_mic` | `muted`, `wake_sound`: booleans, at least one | As on DualEye. Muted, the mic isn't read: no wake word, nothing heard in the room |
-| `set_wake_word` | `word`: one of `voice.wake_words` (`heyyoru`, `alexa`, `hiesp`) | Since 0.20.18 `heyyoru` is Yoru's own word, «Hey Yoru», heard by a microWakeWord model ([wakeword.md](wakeword.md)); the others are ESP-SR's. `alexa` is the default |
+| `set_wake_word` | `word`: one of `voice.wake_words` (`heyyoru`, `alexa`, `hiesp`) | `heyyoru` is Yoru's own word, «Hey Yoru», heard by a microWakeWord model ([wakeword.md](wakeword.md)); the others are ESP-SR's. `alexa` is the default |
 | `set_volume` | `percent`: 0–100 | Speaker volume, with the `volume` sound at the new level |
-| `react` | `name`: `happy` · `excited` · `wink` · `proud` · `relieved` · `charged` · `plugged` (0.12.1) · `dance` · `love` · `curious` · `thinking` · `focus` · `angry` · `hot` · `sleepy` · `yawn` · `tired` · `sigh` · `sad` · `surprised` · `scared` · `bored` · `look_around` · `blink` · `wave` · `point` · `shy` · `clap` · `stretch` · `dizzy` · `annoyed` · `falling` · `drowsy` · `lifted` | The eyes react for a few seconds, with Yoru's sound for it. DualEye's `play_eyes` names, those these eyes can show. Since 0.20.6 `proud` and `stretch`, since 0.20.7 `yawn`, `surprised` and `thinking`, and since 0.20.8 `dance`, `curious`, `sad`, `dizzy`, `shy`, `lifted` and `point`, play hand-keyed clips (`docs/animations.md`, 1 to 3 s). Refused during a conversation |
-| `play_sound` | `name` | As on DualEye: the same sounds, plus Yoru's own: `unplug` and, an earcon played with Yoru's sounds off too, `battery_low` (0.12.1) |
-| `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds` (Yoru's own sounds; the name is kept for compatibility), `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds; the name is kept for compatibility), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it), `power_saver` (on battery, the Saver profile instead of Balanced; 0.12.0, see Power), `hibernate` (on battery, minutes of dark screen before hibernating, 0 never; 0.12.0), `sphere` (the sphere's colour, 0.20.20: 0 pearl, 1 dawn, 2 mint, 3 lilac, 4 night, 5 gold, 6 rose; all available since 0.21.0). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
+| `react` | `name`: `happy` · `excited` · `wink` · `proud` · `relieved` · `charged` · `plugged` · `dance` · `love` · `curious` · `thinking` · `focus` · `angry` · `hot` · `sleepy` · `yawn` · `tired` · `sigh` · `sad` · `surprised` · `scared` · `bored` · `look_around` · `blink` · `wave` · `point` · `shy` · `clap` · `stretch` · `dizzy` · `annoyed` · `falling` · `drowsy` · `lifted` | The eyes react for a few seconds, with Yoru's sound for it. DualEye's `play_eyes` names, those these eyes can show. `proud`, `stretch`, `yawn`, `surprised`, `thinking`, `dance`, `curious`, `sad`, `dizzy`, `shy`, `lifted` and `point` play hand-keyed clips (`docs/animations.md`, 1 to 3 s). Refused during a conversation |
+| `play_sound` | `name` | As on DualEye: the same sounds, plus Yoru's own: `unplug` and, an earcon played with Yoru's sounds off too, `battery_low` |
+| `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `yoru_sounds` (Yoru's own sounds), `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `turn_to_sounds` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it), `power_saver` (on battery, the Saver profile instead of Balanced, see Power), `hibernate` (on battery, minutes of dark screen before hibernating, 0 never), `sphere` (the sphere's colour: 0 pearl, 1 dawn, 2 mint, 3 lilac, 4 night, 5 gold, 6 rose). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default. The menu on the board shows the same |
 | `set_setting` | `name`, `value`: integer | Change one setting within its range (switches are 0 or 1); it applies at once |
-| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' expression now), `brightness`, voice, `activity` (what Yoru does: since 0.21.0 `idle`, `drowsy`, `call`, `nap`, `sleep`, `come` or `greet`, see `docs/idle.md`), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`; since 0.20.3 `run`, the last stretch on battery, see Power) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`; replaced in 0.16.0 by `tasks`: `count`, `failed`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time); since 0.20.15 `meeting` (`idle`, `recording`, `transcribing`, `summarizing`) and `icons` (how many icons it keeps); `cheer` and `life` are gone since 0.21.0. `eyes` may also be `delighted`, `smitten`, `starry` or `dreamy` since 0.15.0; `friends` (the other Yorus in range, 0.18.0 to 0.20.9) is gone since 0.20.10 |
-| `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `tasks` (0.16.0 and later; `habits` before) · `games` (0.11.8 and later) · `settings` · `yoru` (0.20.20) · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it. Since 0.11.0; before, the menu was a ring and `inbox` one of its pages |
+| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' expression now), `brightness`, voice, `activity` (what Yoru does: `idle`, `drowsy`, `call`, `nap`, `sleep`, `come` or `greet`, see `docs/idle.md`), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging`, `profile`: `desk`, `balanced` or `saver`, and `run`, the last stretch on battery, see Power) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat), `inbox` (`count`, `unread`, `view`), `timers` (how many), `tasks` (`count`, `failed`), `errand` (Yoru is on one), `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time), `meeting` (`idle`, `recording`, `transcribing`, `summarizing`) and `icons` (how many icons it keeps). `eyes` may also be `delighted`, `smitten`, `starry` or `dreamy` |
+| `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `tasks` · `games` · `settings` · `yoru` · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it |
 | `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Yoru asks before it acts for you, over the eyes, with Allow and Deny (see Confirmations). A second call replaces it |
 | `hide_approval` | `id`: string | Take that card away: it was answered in the app, or gave up. An `id` that isn't shown is fine |
-| `show_toast` | `text`: string, `seconds`: integer, `tone`?: `info` · `done` · `wait` · `error` | Since 0.7.0. One line above the bottom rim for a few seconds. A second call replaces it. Yoru Hub no longer sends it (since 2026-10-21) |
-| `show_notification` | `id`, `source`?, `title`, `text`?, `urgency`?, `actions`? | Since 0.10.0. Put a notification in the inbox (see Inbox) |
-| `hide_notification` | `id`: string | Since 0.10.0. Take it out of the inbox. An `id` that isn't there is fine |
-| `clear_notifications` | none | Since 0.10.0. Empty the inbox |
-| `set_timers` | `timers`: array | Since 0.11.0. Every timer and reminder (see Timers) |
-| `set_tasks` | `tasks`: array | Since 0.16.0. The tasks the user gave the host (see Tasks); `set_habits` (0.11.0 to 0.15.1) is gone |
-| `show_fetch` | `state`, `source`?, `id`? | Since 0.11.0. A connector call starts or ends: Yoru's errand (see Fetch) |
-| `set_icon` | `name`, `at`?, `data`? | Since 0.20.15. An app's icon, in parts (see Icons) |
-| `set_meeting` | `state`, `source`? | Since 0.20.15. A meeting is recorded, transcribed, summarized (see Meetings) |
+| `show_notification` | `id`, `source`?, `title`, `text`?, `urgency`?, `actions`? | Put a notification in the inbox (see Inbox) |
+| `hide_notification` | `id`: string | Take it out of the inbox. An `id` that isn't there is fine |
+| `clear_notifications` | none | Empty the inbox |
+| `set_timers` | `timers`: array | Every timer and reminder (see Timers) |
+| `set_tasks` | `tasks`: array | The tasks the user gave the host (see Tasks) |
+| `show_fetch` | `state`, `source`?, `id`? | A connector call starts or ends: Yoru's errand (see Fetch) |
+| `set_icon` | `name`, `at`?, `data`? | An app's icon, in parts (see Icons) |
+| `set_meeting` | `state`, `source`? | A meeting is recorded, transcribed, summarized (see Meetings) |
 
-The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `show_fetch`, and since 0.16.0 `set_tasks`, and since 0.20.15 `set_icon` and `set_meeting`) are for the host only: Yoru Hub keeps them out of its MCP server.
+The host's tools (`show_approval`, `hide_approval`, `show_notification`, `hide_notification`, `clear_notifications`, `set_timers`, `set_tasks`, `show_fetch`, `set_icon` and `set_meeting`) are for the host only: Yoru Hub keeps them out of its MCP server.
 
 ## Confirmations
 
-Before Yoru Hub's assistant does something with one of your services that changes it (sends a mail, creates an event, deletes something), it asks. Up to 0.11.4 the same card answered Claude Code's permission requests; since 0.11.5 it is only Yoru's. The host sends it to every connected Yoru with `show_approval`:
+Before Yoru Hub's assistant does something with one of your services that changes it (sends a mail, creates an event, deletes something), it asks. The host sends it to every connected Yoru with `show_approval`:
 
 ```json
 {"id":"c3","tool":"Gmail: send","text":"To Marco: the meeting moves to 4","project":"Yoru","seconds":60}
@@ -122,21 +119,20 @@ Before Yoru Hub's assistant does something with one of your services that change
 
 ## Listening after an answer
 
-`voice/listen` with `"follow_up": true` (the host's "Keep listening after an answer") takes two more numbers since 0.11.6, both optional:
+`voice/listen` with `"follow_up": true` (the host's "Keep listening after an answer") takes two more numbers, both optional:
 
 ```json
 {"jsonrpc":"2.0","id":7,"method":"voice/listen","params":{"follow_up":true,"wait_ms":8000,"pause_ms":700}}
 ```
 
 - `wait_ms`: how long the board waits for speech before giving up (`utterance_end` `reason` `no_speech`), 1500 to 15000; 4000 without it.
-- `pause_ms`: how long a pause ends what's being said, 200 to 3000 (2000 in 0.11.6); 400 without it (the wake word's). The VAD's own 500 ms come on top.
+- `pause_ms`: how long a pause ends what's being said, 200 to 3000; 400 without it (the wake word's). The VAD's own 500 ms come on top.
 - Without the wake word only speech near the board counts: 350 ms of it, each frame at -50 dBFS or louder, gaps under 300 ms. Quieter or shorter speech leaves `speech` false.
 - The board plays a soft tick (`listen`) and shows a ring around Yoru running out over `wait_ms`; the ring goes once speech starts. Giving up without speech plays a soft falling note (`listen_end`). Both are earcons, played with Yoru's sounds off too.
-- Older boards ignore the two numbers and wait 4 s.
 
 ## Finished sentences
 
-Since 0.11.7 a host can judge for itself when a sentence is finished (Yoru Hub does with Smart Turn), instead of the board's short pause:
+A host can judge for itself when a sentence is finished (Yoru Hub does with Smart Turn), instead of the board's short pause:
 
 ```json
 {"jsonrpc":"2.0","method":"utterance_pause","params":{"id":12,"ms":2350}}
@@ -144,35 +140,34 @@ Since 0.11.7 a host can judge for itself when a sentence is finished (Yoru Hub d
 ```
 
 - `utterance_pause` comes at each pause once speech has started (wake word, host or follow-up, not push-to-talk): when the VAD's 500 ms hangover after the last speech is over. `ms` is how much audio was sent so far. It comes again after the next stretch of speech.
-- `voice/pause` sets how long a pause ends utterance `id` (200 to 3000 ms after the hangover), if it's the one being heard; an older id is ignored. A host that judges pauses sends it right after `utterance_start` with a long one, then `voice/stop` as soon as it hears the sentence is finished; the board's own pause only ends it if the host says nothing.
-- An older board answers `voice/pause` with `-32601` and never sends `utterance_pause`: its own pause ends every utterance.
+- `voice/pause` sets how long a pause ends utterance `id` (200 to 3000 ms after the hangover), if it's the one being heard; another id is ignored. A host that judges pauses sends it right after `utterance_start` with a long one, then `voice/stop` as soon as it hears the sentence is finished; the board's own pause only ends it if the host says nothing.
 - `about_to_talk` (no params) says the user is likely to talk soon, before any `utterance_start`: Yoru Hub's notch sends it when the pointer comes onto it, and a host using Gemini Live opens its session then, so the press doesn't wait for it. Optional: the board doesn't send it, and a host may ignore it.
 
 ## PWR
 
 ### Push-to-talk
 
-Holding PWR for more than 0.4 s streams an utterance until it is let go: no wake word, and a pause doesn't end it. A shorter press does what it always did (sleep, wake, close). `utterance_start` then has `trigger` `button`, and the words go to Yoru as after the wake word. 0.9.0 to 0.11.4 also sent `to`, a coding agent's session or project; 0.11.5 sends none.
+Holding PWR for more than 0.4 s streams an utterance until it is let go: no wake word, and a pause doesn't end it. A shorter press does what it always did (sleep, wake, close). `utterance_start` then has `trigger` `button`, and the words go to Yoru as after the wake word.
 
 The stream lasts only while PWR is held: it ends when PWR is let go (`utterance_end` `reason` `released`) or after 60 s (`max_length`). `speech` is the VAD's opinion; a host transcribes a `button` utterance of 0.3 s or more anyway, and the board shows `thinking` after one. The wake word's chime plays when the board starts listening. The AXP2101's power-off on a long press of PWR is turned off, so a long press can't switch the board off mid-sentence; Battery → Power off in the menu does.
 
 ### The dark screen
 
-After a minute asleep the screen goes dark: brightness 0, touch off and, since 0.12.0, the panel asleep. The board stays awake for the host: notifications, timers and the voice all keep working, out of sight. Only PWR lights it again: a tap, or holding it to talk. While dark, BOOT does nothing.
+After a minute asleep the screen goes dark: brightness 0, touch off and the panel asleep. The board stays awake for the host: notifications, timers and the voice all keep working, out of sight. Only PWR lights it again: a tap, or holding it to talk. While dark, BOOT does nothing.
 
-### Power (0.12.0)
+### Power
 
-On USB (or without a battery) the board runs as before: the `desk` profile. On battery it's `balanced`, or `saver` with the setting `power_saver`; `get_state`'s `battery.profile` says which.
+On USB (or without a battery) the board runs at its best: the `desk` profile. On battery it's `balanced`, or `saver` with the setting `power_saver`; `get_state`'s `battery.profile` says which.
 
 - On battery the WiFi uses modem sleep (`WIFI_PS_MIN_MODEM`): a message from the host may take up to a beacon interval (about 100 ms) longer to arrive. During a conversation (voice not `idle`, or PWR held) it's `WIFI_PS_NONE`, as on USB. In `saver` with the screen dark it's `WIFI_PS_MAX_MODEM`, listening to every third beacon (about 300 ms).
 - The screen's brightness is capped: 60% in `balanced`, 40% in `saver`. `brightness` keeps the value set.
 - In `saver`, while Yoru sleeps the mics are off: no wake word, no `utterance_start` from it. PWR held and `voice/listen` turn them on again.
 - **Hibernate:** on battery, after `hibernate` minutes of dark screen (0 never; 30 by default) with no timer running, no errand and no card up, the board stops the WiFi and light-sleeps. The host's connection drops and nothing reaches the board until it wakes: moved (the IMU's wake on motion), PWR or BOOT pressed, or USB plugged in. It then joins the WiFi again and lights the screen; a host reconnects as after any drop.
-- **The battery record** (0.20.3): `get_state`'s `battery.run` covers the last stretch on battery, from unplugging USB to plugging it in again; it then stays as it was until the next unplug, and it is kept in the flash (saved every 10 minutes and when hibernating starts or ends), so a restart or a flat battery doesn't lose it. `running` (on battery now), `battery_s`; of it `dark_s`, and of that `hibernated_s`; `held_s`, the dark seconds kept from hibernating, by cause: `never` (`hibernate` is 0), `timer`, `errand`, `voice`, `screen` (a card, the menu or a view); `offline_s`, on battery and not hibernating with the WiFi not joined; `hibernations`; `woke` (`moved`, `key`: PWR or BOOT, `usb`); `restarts` (the board started again during it); `motion_wake_off` (the IMU's pin was stuck high, so only the keys woke it); `start_percent`, `percent` and `mv` (the last reading).
+- **The battery record**: `get_state`'s `battery.run` covers the last stretch on battery, from unplugging USB to plugging it in again; it then stays as it was until the next unplug, and it is kept in the flash (saved every 10 minutes and when hibernating starts or ends), so a restart or a flat battery doesn't lose it. `running` (on battery now), `battery_s`; of it `dark_s`, and of that `hibernated_s`; `held_s`, the dark seconds kept from hibernating, by cause: `never` (`hibernate` is 0), `timer`, `errand`, `voice`, `screen` (a card, the menu or a view); `offline_s`, on battery and not hibernating with the WiFi not joined; `hibernations`; `woke` (`moved`, `key`: PWR or BOOT, `usb`); `restarts` (the board started again during it); `motion_wake_off` (the IMU's pin was stuck high, so only the keys woke it); `start_percent`, `percent` and `mv` (the last reading).
 
 ## Inbox
 
-Since 0.10.0, with the `inbox` capability. The host watches the user's services (mail, calendar, issues...) and tells Yoru what is worth knowing. The board keeps an inbox of the latest 30, newest first; the host stays the source of truth (there is no `get_notifications`): it sends what is new, takes away what is done, and can send its whole inbox again on connect.
+With the `inbox` capability. The host watches the user's services (mail, calendar, issues...) and tells Yoru what is worth knowing. The board keeps an inbox of the latest 30, newest first; the host stays the source of truth (there is no `get_notifications`): it sends what is new, takes away what is done, and can send its whole inbox again on connect.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
@@ -197,7 +192,7 @@ How it arrives depends on `urgency`:
 
 Do not disturb on the board (setting `focus`) makes every notification but `urgent` arrive as `low`; the host's quiet hours are the host's to apply (it sends `low`). While the screen is dark only `urgent` shows; the rest wait in the inbox. Turned face down, nothing shows. A banner doesn't come over the menu or the views.
 
-The inbox view opens from the banner, from the menu (Inbox), and from BOOT. It lists every notification with its source, title and age on the board ("now", "5 min", "2 h"), the unread ones marked. A tap opens one: the whole text, the `actions` and Open, then the user's verdict (0.20.20): Useful and Enough («Utile», «Basta»), which take it away. Dismiss was replaced by them: Enough is how a notification goes without being useful. Swipe right or down, or tap the title, to go back.
+The inbox view opens from the banner, from the menu (Inbox), and from BOOT. It lists every notification with its source, title and age on the board ("now", "5 min", "2 h"), the unread ones marked. A tap opens one: the whole text, the `actions` and Open, then the user's verdict: Useful and Enough («Utile», «Basta»), which take it away: Enough is how a notification goes without being useful. Swipe right or down, or tap the title, to go back.
 
 What the user does comes back as `notification_action`:
 
@@ -208,9 +203,8 @@ What the user does comes back as `notification_action`:
 | `action` | When | On the board |
 |---|---|---|
 | `read` | The notification was opened, the first time | It is read |
-| `dismiss` | Dismiss (before 0.20.20) | It leaves the inbox |
-| `useful` | Useful (0.20.20): the user was glad to be told | It leaves the inbox. The host keeps the verdict and tells more like it |
-| `enough` | Enough (0.20.20): don't tell me things like this | It leaves the inbox. The host keeps it in the memory's "Don't tell me about", tells less like it, and after a few, more «Enough» than «Useful», brings what comes from that source in a step quieter (high to normal, normal to low; urgent still comes through) |
+| `useful` | Useful: the user was glad to be told | It leaves the inbox. The host keeps the verdict and tells more like it |
+| `enough` | Enough: don't tell me things like this | It leaves the inbox. The host keeps it in the memory's "Don't tell me about", tells less like it, and after a few, more «Enough» than «Useful», brings what comes from that source in a step quieter (high to normal, normal to low; urgent still comes through) |
 | `open` | Open: show it on the computer (the mail in the browser, the issue on GitHub) | It stays, read; the view closes |
 | `"0"`, `"1"` | One of `actions`, by its index, as a string | It stays, read |
 
@@ -218,7 +212,7 @@ The host does what it means and may then `hide_notification` it.
 
 ## Timers
 
-Since 0.11.0, with the `timers` capability. The host keeps the timers, the pomodoro and the reminders and sends the whole list whenever it changes (one is set, paused, resumed, cancelled, rings, is dismissed) and on connect. The board counts each one down from when the list came; the menu's Timers app shows them, the one that ends first first, and the ringing ones before all.
+With the `timers` capability. The host keeps the timers, the pomodoro and the reminders and sends the whole list whenever it changes (one is set, paused, resumed, cancelled, rings, is dismissed) and on connect. The board counts each one down from when the list came; the menu's Timers app shows them, the one that ends first first, and the ringing ones before all.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
@@ -228,7 +222,7 @@ Since 0.11.0, with the `timers` capability. The host keeps the timers, the pomod
 {"timers":[{"id":3,"kind":"timer","state":"run","left_s":272,"total_s":600,"label":"Pasta"},{"id":4,"kind":"reminder","state":"run","left_s":2520,"total_s":3600,"label":"Call Anna","at":"17:30"}]}
 ```
 
-A timer that goes to `ring` (and wasn't ringing in the last list) makes Yoru jump like an alarm clock, with the alarm earcon and a line over the bottom rim with its label; the host still says it aloud. A host that never sends `set_timers` still has its snapshot's `timer` (Metrics): the Timers app shows that one alone, without its actions, and it rings the same way. Yoru Hub keeps its timers in `core/src/timers.rs` and sends the list from each board's session (`core/src/bridge/session.rs`), the snapshot's `timer` too for older firmware.
+A timer that goes to `ring` (and wasn't ringing in the last list) makes Yoru jump like an alarm clock, with the alarm earcon and a line over the bottom rim with its label; the host still says it aloud. Yoru Hub keeps its timers in `core/src/timers.rs` and sends the list from each board's session (`core/src/bridge/session.rs`).
 
 What the user does comes back as `timer_action`:
 
@@ -244,17 +238,17 @@ What the user does comes back as `timer_action`:
 
 `id` comes back as a string. The board shows the change at once; the host's next `set_timers` has the last word.
 
-**The board's own timers (0.13.0).** The Timers app has round buttons for a new timer (1, 3, 5, 10, 15, 25, 30 or 60 minutes, or a pomodoro of 25 + 5 minutes four times), and spoken commands start them too without a host (Offline commands). The board keeps them (ids starting with `b`), rings them itself and, while it's ringing, a pomodoro goes on to its next phase. Without a host the board also rings the host's timers when they're up, and drops a ringing one after a minute. A host that is there is offered each of the board's own, once per connection and again after a pause, a resume or a new phase:
+**The board's own timers.** The Timers app has round buttons for a new timer (1, 3, 5, 10, 15, 25, 30 or 60 minutes, or a pomodoro of 25 + 5 minutes four times), and spoken commands start them too without a host (Offline commands). The board keeps them (ids starting with `b`), rings them itself and, while it's ringing, a pomodoro goes on to its next phase. Without a host the board also rings the host's timers when they're up, and drops a ringing one after a minute. A host that is there is offered each of the board's own, once per connection and again after a pause, a resume or a new phase:
 
 ```json
 {"jsonrpc":"2.0","method":"timer_new","params":{"id":"b3f09a1c2","kind":"work","state":"run","left_s":1412.5,"total_s":1500,"language":"it","pomodoro":{"work_s":1500,"break_s":300,"round":1,"rounds":4}}}
 ```
 
-`label` comes when it has one, `pomodoro` only for a `work` or `break` phase, `language` is the board's (`it` or `en`), for what the host says when it rings. A host that takes it over puts it in its list with `was` set to the board's id, and the board drops its own copy then; offered again, the host updates the one it has instead of adding another. A host that doesn't know `timer_new` ignores it, and the timer stays the board's. Yoru Hub: `Timers::adopt` in `core/src/timers.rs`. Hibernation waits while any timer is there; the board's own don't survive a restart.
+`label` comes when it has one, `pomodoro` only for a `work` or `break` phase, `language` is the board's (`it` or `en`), for what the host says when it rings. A host that takes it over puts it in its list with `was` set to the board's id, and the board drops its own copy then; offered again, the host updates the one it has instead of adding another. Yoru Hub: `Timers::adopt` in `core/src/timers.rs`. Hibernation waits while any timer is there; the board's own don't survive a restart.
 
 ## Tasks
 
-Since 0.16.0, with the `tasks` capability; it replaced the Habits app (0.11.0 to 0.15.1: `set_habits`, `habit_check`, the `habits` capability, gone). Yoru Hub keeps them in `core/src/assistant/tasks.rs`: jobs the user gave its assistant, in words, once or on a schedule, which the host does on its own when their time comes. The host sends the whole list whenever one changes (a run starting or ending included), every ten minutes, and on connect; the board only shows them.
+With the `tasks` capability. Yoru Hub keeps them in `core/src/assistant/tasks.rs`: jobs the user gave its assistant, in words, once or on a schedule, which the host does on its own when their time comes. The host sends the whole list whenever one changes (a run starting or ending included), every ten minutes, and on connect; the board only shows them.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
@@ -274,7 +268,7 @@ The row shows it as running until the host's next list. The board keeps the last
 
 ## Offline commands
 
-Since 0.13.0. When no host has sent a snapshot for 3 s, what is said after the wake word (or with PWR held) is heard on the board, by ESP-SR's MultiNet 7 (`mn7_en`, English only: there is no Italian model), and nothing goes on `audio_up`. It listens for up to 6 s, the ring showing the voice's level, and does one of these (`commands.c`), with a line over the bottom rim saying what it did:
+When no host has sent a snapshot for 3 s, what is said after the wake word (or with PWR held) is heard on the board, by ESP-SR's MultiNet 7 (`mn7_en`, English only: there is no Italian model), and nothing goes on `audio_up`. It listens for up to 6 s, the ring showing the voice's level, and does one of these (`commands.c`), with a line over the bottom rim saying what it did:
 
 | Phrase | What it does |
 |---|---|
@@ -289,11 +283,11 @@ Since 0.13.0. When no host has sent a snapshot for 3 s, what is said after the w
 | "volume up", "louder"; "volume down", "quieter" | The volume by 15 |
 | "hello there", "how are you" | Yoru waves |
 
-Since 0.14.0 these phrases are only the fallback: with the services of the Cloud voice set and the WiFi up, what is said goes to them instead. Anything else gets a puzzled "hm?" and a line saying that without the Mac it knows only a few words. MultiNet takes about 13 KB of internal RAM and stays unloaded if less than 64 KB would be left. With a host there, everything goes to it as before.
+These phrases are only the fallback: with the services of the Cloud voice set and the WiFi up, what is said goes to them instead. Anything else gets a puzzled "hm?" and a line saying that without the Mac it knows only a few words. MultiNet takes about 13 KB of internal RAM and stays unloaded if less than 64 KB would be left. With a host there, everything goes to it.
 
 ## Cloud voice
 
-Since 0.14.0, with the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/bridge/cloud.rs`). When no host has sent a snapshot for 3 s and the WiFi is up, the board talks to online services itself, with the keys a host handed over: what is said after the wake word (or with PWR held) is recorded in PSRAM, 15 s at most (the ring along the rim runs it down while it listens; past it the utterance ends with `max_length`, whatever started it), and sent to a speech-to-text service; the text goes with who Yoru is (an AI assistant on the desk, male, clear and concise), what it knows of the user and what the board knows now (date and time, timers, tasks, battery) to the brain; the answer is said by a voice, streamed to the speaker as it arrives. Then it listens for a follow-up without the wake word, as with a host. Since 0.14.1 a WiFi on its way back counts as up: woken from hibernating, what is said is recorded at once and sent when the WiFi has joined, waiting up to 10 s (then the error line says there's no internet). Only a network that isn't there or a wrong password leave it to the offline phrases. The last eight messages are kept for the next question, for ten minutes.
+With the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/bridge/cloud.rs`). When no host has sent a snapshot for 3 s and the WiFi is up, the board talks to online services itself, with the keys a host handed over: what is said after the wake word (or with PWR held) is recorded in PSRAM, 15 s at most (the ring along the rim runs it down while it listens; past it the utterance ends with `max_length`, whatever started it), and sent to a speech-to-text service; the text goes with who Yoru is (an AI assistant on the desk, male, clear and concise), what it knows of the user and what the board knows now (date and time, timers, tasks, battery) to the brain; the answer is said by a voice, streamed to the speaker as it arrives. Then it listens for a follow-up without the wake word, as with a host. A WiFi on its way back counts as up: woken from hibernating, what is said is recorded at once and sent when the WiFi has joined, waiting up to 10 s (then the error line says there's no internet). Only a network that isn't there or a wrong password leave it to the offline phrases. The last eight messages are kept for the next question, for ten minutes.
 
 `cloud/set` is a method of its own, not a tool, so a model calling the board's tools never sees it. A host sends it on every handshake and whenever the services change; the board keeps them in NVS (namespace `cloud`) and writes the flash only when they differ. `{"clear": true}` forgets them. The answer is `cloud/get`'s.
 
@@ -310,35 +304,31 @@ Since 0.14.0, with the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/b
 | `stt` | An OpenAI-style `/audio/transcriptions` endpoint (Groq, OpenAI): the full `url`, `model`, `language` (optional) |
 | `llm` | `api`: `openai` (Chat Completions at `url`, with `params` merged into each request) or `anthropic` (Messages at `url`, `max_tokens` 400) |
 | `tts` | `api`: `elevenlabs` (`url` is the base; `voice` the voice id; PCM at 16 kHz) or `openai` (`url` the base, `/audio/speech`; `voice`; `format` `pcm` at `rate`, 24000 by default, or `wav`; `max_chars` per request, the text cut at sentences) |
-| `search` | Optional (0.17.0 and later): web search through Tavily's `/search` (`url`, `key`). With it the brain may ask for a search (see below); without it the board says it can't search the web |
-| `name`, `memory` | Optional: Yoru's name and what it knows of the user (a host sends 1,200 characters at most). A `character` sent by an older host is ignored since 0.21.0 |
+| `search` | Optional: web search through Tavily's `/search` (`url`, `key`). With it the brain may ask for a search (see below); without it the board says it can't search the web |
+| `name`, `memory` | Optional: Yoru's name and what it knows of the user (a host sends 1,200 characters at most) |
 
 The whole object must fit in 3,900 bytes. Every URL must be `https`; the certificates are ESP-IDF's bundle plus GlobalSign Root CA (`main/certs/extra_roots.pem`), which Groq's, Anthropic's and ElevenLabs' chains end in.
 
-`cloud/get` (no params): `{"set":true,"stt":"whisper-large-v3-turbo","llm":"gpt-6-luna","tts":"eleven_v4_turbo","search":true,"ready":true}`, the models, whether a web search is set (0.17.0 and later) and whether it would answer now (services, WiFi); never the keys.
+`cloud/get` (no params): `{"set":true,"stt":"whisper-large-v3-turbo","llm":"gpt-6-luna","tts":"eleven_v4_turbo","search":true,"ready":true}`, the models, whether a web search is set and whether it would answer now (services, WiFi); never the keys.
 
-The brain's answer may carry tags, which are taken out before it is said and act on the board (`commands_tag()`): `[timer SECONDS]`, `[pomodoro]`, `[stop]`, `[pause]`, `[resume]`, `[volume up]`, `[volume down]`, `[open games|timers|tasks|inbox]` (`[habit NUMBER]` and `habits` until 0.15.1), and `[sleep]` (`[face NAME]` until 0.20.20).
+The brain's answer may carry tags, which are taken out before it is said and act on the board (`commands_tag()`): `[timer SECONDS]`, `[pomodoro]`, `[stop]`, `[pause]`, `[resume]`, `[volume up]`, `[volume down]`, `[open games|timers|tasks|inbox]` and `[sleep]`.
 
-- **Web search (0.17.0).** With `search` set, the prompt tells the brain it may reply with only `[search QUERY]` for anything recent or unknown. The board then calls Tavily (`include_answer`, three results), and asks the brain again with the results, as data, in the same turn; the brain's answer is said. The results are not kept in the history (only the question and the answer), a second search in the same turn is ignored, and the search connection is closed once it has answered, to spare internal RAM. A failed search is told to the brain, which says so kindly.
+- **Web search.** With `search` set, the prompt tells the brain it may reply with only `[search QUERY]` for anything recent or unknown. The board then calls Tavily (`include_answer`, three results), and asks the brain again with the results, as data, in the same turn; the brain's answer is said. The results are not kept in the history (only the question and the answer), a second search in the same turn is ignored, and the search connection is closed once it has answered, to spare internal RAM. A failed search is told to the brain, which says so kindly.
 - **Speed.** Each service keeps one connection open between requests, and its TLS session to resume a new one; all three are opened (a `HEAD`) while the user is still talking. A fresh connection takes the board 1 to 4 s; a kept one a few milliseconds.
 - **Failures** show in a line over the bottom rim (no internet, a key refused, too many requests) with the red ring; nothing is said.
-- **Not while a host is there:** with one, everything goes to it as before. Without the services or the WiFi, the offline phrases above.
+- **Not while a host is there:** with one, everything goes to it. Without the services or the WiFi, the offline phrases above.
 - `debug/cloud` `{"text": "..."}` answers a text as if it had been heard, for tests.
-- `debug/clip` `{"name": "sneeze", "mirror"?: bool, "source"?: string}` (since 0.20.7) plays one of the clips in `docs/animations.md` now, left for right with `mirror`, and answers `{"playing": name}`; an unknown name is an invalid params error. Since 0.20.9 `source` (a service, as `show_fetch` takes it) puts its effects in that service's colour and glyph, and `{"stop": true}` stops the clip playing (a `_loop` one plays until then), answering `{"stopped": true}`.
-- `debug/clips` (since 0.20.9) lists the clips this firmware has: `{"clips": [{"name", "seconds", "loop"}], "playing": name or null}`; `playing` (since 0.20.14) is the clip playing now.
-- `debug/perf` (since 0.20.11), with `{"reset": true}` optionally, answers how hard the board works, measured every 5 s: `idle_pct` and `idle_min_pct` per core, `wake` (since 0.20.18, Yoru's own wake word: `peak`, the last second's highest probability of 255, and `step_us`, one step of the model; zeros with an ESP-SR word), `lvgl` (`busy_pct`, `longest_us` and their peaks), each task above 0.5% (`name`, `core`, `pct` of one core in the last window, `peak_pct`), the free internal RAM and PSRAM, and `audio`: `speaker_gaps` (I2S buffers the speaker played with nothing new, while something was playing: heard as a click or a hole), `mic_lost` (mic buffers not read in time), `speech_underruns` and `speech_frames_lost` (speech that ran out or never arrived from the host or the network), `voice_frames_dropped` (what was said that the link had no room for). Peaks and counts are since boot or the last `reset`. Since 0.20.12 `draw` says where the face's frames went since the last `reset`: `fps`, `draws_per_s` (areas redrawn), `kpx_per_s` (pixels redrawn) and `ms_per_s`, the milliseconds per second spent on each step (`logic`, `ball_render` and `eye_render` for sprites rendered on the fly, then each layer drawn: `halo`, `glow`, `rings`, `hands`, `body`, `tint`, `badge`, `eyes`, `prop`, `overlays`, `sparks`, `rest`). Since 0.20.13 `draw.sprites` splits the sprite draws into plain ones (drawn as they are) and scaled ones (stretched or turned): `plain_ms_per_s`, `plain_kpx_per_s`, `plain_per_s` and the same three for `scaled`; `lvgl` also has `panel_fps` (frames that reached the panel), `send_ms_per_s` and `kpx_sent_per_s` (time and pixels spent sending them), since the last `reset`.
-
-## Friends (removed)
-
-From 0.18.0 to 0.20.9 boards talked to each other over ESP-NOW (`debug/friends`, `get_state`'s `friends`, and an utterance ending with `reason` `yielded` when another Yoru answered the wake word). All of it went in 0.20.10: `debug/friends` is an unknown command and `yielded` no longer comes.
+- `debug/clip` `{"name": "sneeze", "mirror"?: bool, "source"?: string}` plays one of the clips in `docs/animations.md` now, left for right with `mirror`, and answers `{"playing": name}`; an unknown name is an invalid params error. `source` (a service, as `show_fetch` takes it) puts its effects in that service's colour and glyph, and `{"stop": true}` stops the clip playing (a `_loop` one plays until then), answering `{"stopped": true}`.
+- `debug/clips` lists the clips this firmware has: `{"clips": [{"name", "seconds", "loop"}], "playing": name or null}`; `playing` is the clip playing now.
+- `debug/perf`, with `{"reset": true}` optionally, answers how hard the board works, measured every 5 s: `idle_pct` and `idle_min_pct` per core, `wake` (Yoru's own wake word: `peak`, the last second's highest probability of 255, and `step_us`, one step of the model; zeros with an ESP-SR word), `lvgl` (`busy_pct`, `longest_us` and their peaks), each task above 0.5% (`name`, `core`, `pct` of one core in the last window, `peak_pct`), the free internal RAM and PSRAM, and `audio`: `speaker_gaps` (I2S buffers the speaker played with nothing new, while something was playing: heard as a click or a hole), `mic_lost` (mic buffers not read in time), `speech_underruns` and `speech_frames_lost` (speech that ran out or never arrived from the host or the network), `voice_frames_dropped` (what was said that the link had no room for). Peaks and counts are since boot or the last `reset`. `draw` says where the face's frames went since the last `reset`: `fps`, `draws_per_s` (areas redrawn), `kpx_per_s` (pixels redrawn) and `ms_per_s`, the milliseconds per second spent on each step (`logic`, `ball_render` and `eye_render` for sprites rendered on the fly, then each layer drawn: `halo`, `glow`, `rings`, `hands`, `body`, `tint`, `badge`, `eyes`, `prop`, `overlays`, `sparks`, `rest`). `draw.sprites` splits the sprite draws into plain ones (drawn as they are) and scaled ones (stretched or turned): `plain_ms_per_s`, `plain_kpx_per_s`, `plain_per_s` and the same three for `scaled`; `lvgl` also has `panel_fps` (frames that reached the panel), `send_ms_per_s` and `kpx_sent_per_s` (time and pixels spent sending them), since the last `reset`.
 
 ## Fetch
 
-Since 0.11.0, with the `fetch` capability (Yoru Hub: `core/src/bridge/errands.rs`). While the host's assistant calls one of its connectors (an MCP tool: Gmail, Calendar, GitHub...), Yoru runs an errand: a portal in the connector's colour opens on the rim, Yoru dives in, and comes back with a parcel when the call is done.
+With the `fetch` capability (Yoru Hub: `core/src/bridge/errands.rs`). While the host's assistant calls one of its connectors (an MCP tool: Gmail, Calendar, GitHub...), Yoru runs an errand: a portal in the connector's colour opens on the rim, Yoru dives in, and comes back with a parcel when the call is done.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
-| `show_fetch` | `state`: `start` · `done` · `failed`, `source`?: the connector's name (at most 24 bytes), `id`?: at most 23 bytes, `kind`? (0.20.9): `fetch` · `send` · `search` · `remember` · `forget` · `note` | `start`: Yoru goes; `done` or `failed` with the same `id`: that call ended. Without an `id` an end ends the oldest call out |
+| `show_fetch` | `state`: `start` · `done` · `failed`, `source`?: the connector's name (at most 24 bytes), `id`?: at most 23 bytes, `kind`?: `fetch` · `send` · `search` · `remember` · `forget` · `note` | `start`: Yoru goes; `done` or `failed` with the same `id`: that call ended. Without an `id` an end ends the oldest call out |
 
 ```json
 {"state":"start","id":"t1","source":"Gmail"}
@@ -349,11 +339,11 @@ Since 0.11.0, with the `fetch` capability (Yoru Hub: `core/src/bridge/errands.rs
 - `source` picks the portal's colour and what is drawn in it (mail, calendar, drive, GitHub, Slack, Spotify, web and others by name; anything else its initial) and where on the upper rim it opens.
 - `done` for at least one call: Yoru comes back with a parcel and opens it in sparkles. Only `failed`: empty-handed and sad. Nothing after 20 s: it just comes back.
 - Opening the menu, a view or a card, or talking to it, calls Yoru back at once.
-- `kind` (since 0.20.9; none is `fetch`) is how Yoru shows the call, with the clips of `docs/animations.md` in the service's colour and glyph: `fetch` the portal above; `send` (a tool that acts: sends, creates, deletes) writes on the service's card and throws it, and a `failed` end shows the card sputtering and dropping; `search` holds the card and scans until the end with the same `id` (a `Web` search, or one with no source, spins a globe on a finger instead, since 0.20.14), then lifts it up in sparkles (`done`) or drops it (`failed`). Since 0.20.14 searches at once are juggled: a second `search` start before the first has ended switches to juggling, each end takes out its `id`, and the ending plays once, when the last is back: found if any found something, dropped if all failed; `remember` and `forget` (Yoru's memory) and `note` (a task, a timer, a notification) are over at once and shown on `start`, their end ignored. They follow the same rules for when a start shows. Yoru Hub sends `remember` and `forget` for its memory tools, `note` for a change to the tasks or the timers, `search` for each web search (source `Web`, one `start` and one end per search, with its own `id`) and `send` for a connector's tool that acts. A board before 0.20.9 shows every kind as `fetch`.
+- `kind` (none is `fetch`) is how Yoru shows the call, with the clips of `docs/animations.md` in the service's colour and glyph: `fetch` the portal above; `send` (a tool that acts: sends, creates, deletes) writes on the service's card and throws it, and a `failed` end shows the card sputtering and dropping; `search` holds the card and scans until the end with the same `id` (a `Web` search, or one with no source, spins a globe on a finger instead), then lifts it up in sparkles (`done`) or drops it (`failed`). Searches at once are juggled: a second `search` start before the first has ended switches to juggling, each end takes out its `id`, and the ending plays once, when the last is back: found if any found something, dropped if all failed; `remember` and `forget` (Yoru's memory) and `note` (a task, a timer, a notification) are over at once and shown on `start`, their end ignored. They follow the same rules for when a start shows. Yoru Hub sends `remember` and `forget` for its memory tools, `note` for a change to the tasks or the timers, `search` for each web search (source `Web`, one `start` and one end per search, with its own `id`) and `send` for a connector's tool that acts.
 
 ## Icons
 
-Since 0.20.15, with the `icons` capability (Yoru Hub: `core/src/icons.rs`). The host sends the icon of a service or an app, and Yoru draws it on the card of a search or a sent note, in the errand's portal and on the recording mark of a meeting, instead of its glyph. Without one Yoru draws the glyph and the colour, as before.
+With the `icons` capability (Yoru Hub: `core/src/icons.rs`). The host sends the icon of a service or an app, and Yoru draws it on the card of a search or a sent note, in the errand's portal and on the recording mark of a meeting, instead of its glyph. Without one Yoru draws the glyph and the colour.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|
@@ -365,7 +355,7 @@ Since 0.20.15, with the `icons` capability (Yoru Hub: `core/src/icons.rs`). The 
 
 ## Meetings
 
-Since 0.20.15, with the `meetings` capability (Yoru Hub: `core/src/meetings.rs`, `BoardMeeting`). While the host records a meeting Yoru shows it, and it shows the transcript and the summary being made.
+With the `meetings` capability (Yoru Hub: `core/src/meetings.rs`, `BoardMeeting`). While the host records a meeting Yoru shows it, and it shows the transcript and the summary being made.
 
 | Tool | Arguments | Effect |
 |------|-----------|--------|

@@ -15,6 +15,6 @@ void metrics_io_handle(uint8_t *payload, size_t len)
         return;
     }
     metrics_model_set(&snap);
-    clock_from_host(snap.ts, snap.host.valid ? snap.host.minute : -1, snap.host.valid ? snap.host.tz : NULL);
-    ESP_LOGD(TAG, "host %s, plan %s", snap.host.valid ? "yes" : "no", snap.claude.valid ? "yes" : "no");
+    clock_from_host(snap.ts, snap.host.minute, snap.host.tz); // a snapshot always has it
+    ESP_LOGD(TAG, "host at minute %d, idle %d s", snap.host.minute, snap.host.idle_s);
 }

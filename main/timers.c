@@ -47,14 +47,10 @@ EXT_RAM_BSS_ATTR static char s_was[TIMERS_MAX][TIMERS_ID_MAX + 1];
 static struct {
     int n;
     int nl;
-    /* The host has sent a list: the snapshot's timer is no longer needed. */
-    bool hosted;
     uint32_t version;
     /* The one that started ringing, until behaviour.c takes it. */
     bool ring;
     char ring_label[TIMERS_LABEL_CHARS + 1];
-    /* The snapshot's timer was ringing last time we looked. */
-    bool snap_ringing;
     /* The order timers_at() goes in, fixed when the list changes: the host's
      * as entries 0..n-1, the board's as n.. */
     int order[2 * TIMERS_MAX];
@@ -220,36 +216,8 @@ bool timers_set(const cJSON *args, char *err, size_t len)
     }
     memcpy(s_list, s_new, (size_t) n * sizeof(entry_t));
     s.n = n;
-    s.hosted = true;
     changed();
     ESP_LOGI(TAG, "%d timers", n);
-    return true;
-}
-
-/* The snapshot's timer, for a host that doesn't send the list. */
-static bool snapshot_timer(timer_view_t *out)
-{
-    static metrics_snapshot_t snap; // big for the LVGL task's stack
-    metrics_model_get(&snap);
-    const metrics_timer_t *t = &snap.timer;
-    if (snap.state != METRICS_UI_LIVE || !t->valid) {
-        s.snap_ringing = false;
-        return false;
-    }
-    memset(out, 0, sizeof(*out));
-    out->kind = (timer_kind_t) t->kind;
-    out->state = t->ringing ? TIMER_RING : t->paused ? TIMER_PAUSE : TIMER_RUN;
-    out->total_s = t->total_s;
-    out->left_s = t->left_s;
-    if (out->state == TIMER_RUN) {
-        out->left_s = fmaxf(0, t->left_s - (float) (now_ms() - snap.updated_ms) / 1000.0f);
-    }
-    snprintf(out->label, sizeof(out->label), "%s", t->label);
-    if (t->ringing && !s.snap_ringing) {
-        s.ring = true;
-        snprintf(s.ring_label, sizeof(s.ring_label), "%s", t->label);
-    }
-    s.snap_ringing = t->ringing;
     return true;
 }
 
@@ -283,18 +251,11 @@ static void sort_if_changed(void)
 
 int timers_count(void)
 {
-    if (s.hosted || s.nl > 0) {
-        return s.n + s.nl;
-    }
-    timer_view_t v;
-    return snapshot_timer(&v) ? 1 : 0;
+    return s.n + s.nl;
 }
 
 bool timers_at(int i, timer_view_t *out)
 {
-    if (!s.hosted && s.nl == 0) {
-        return i == 0 && snapshot_timer(out);
-    }
     sort_if_changed();
     if (i < 0 || i >= s.count) {
         return false;
@@ -444,10 +405,6 @@ void timers_poll(void)
 
 bool timers_take_ring(char *label, size_t len)
 {
-    if (!s.hosted) {
-        timer_view_t v;
-        snapshot_timer(&v); // notices a ring of the snapshot's timer
-    }
     if (!s.ring) {
         return false;
     }
@@ -486,9 +443,6 @@ void timers_act(const char *id, const char *action)
             apply(e, action);
         }
         return;
-    }
-    if (id[0] == '\0') {
-        return; // the snapshot's: nowhere to send it
     }
     cJSON *params = cJSON_CreateObject();
     cJSON_AddStringToObject(params, "id", id);

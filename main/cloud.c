@@ -22,7 +22,6 @@
 #include "freertos/task.h"
 #include "tasks.h"
 #include "lvgl_port.h"
-#include "metrics_model.h"
 #include "net.h"
 #include "nvs.h"
 #include "playback.h"

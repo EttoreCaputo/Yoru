@@ -171,7 +171,7 @@ static void update_banner(void)
     if (s.banner_until_ms != 0 && (int32_t) (now_ms() - s.banner_until_ms) >= 0) {
         s.banner_until_ms = 0;
     }
-    // Gone from the inbox (hidden by the host, or dismissed): no banner.
+    // Gone from the inbox (hidden by the host, or given a verdict): no banner.
     if (s.banner_until_ms != 0 && inbox_find(s.banner_id) == NULL) {
         s.banner_until_ms = 0;
     }

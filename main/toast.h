@@ -1,9 +1,9 @@
 #pragma once
 
-/* One line over the bottom rim for a few seconds: the host's `show_toast`
- * and Yoru's own short notes (a timer that rang, the mic muted). It keeps
- * out of the way of the menu, the inbox and the confirmation card, and
- * shows again once they go if its time isn't up. All calls with the LVGL lock held. */
+/* One line over the bottom rim for a few seconds: Yoru's own short notes (a
+ * timer that rang, the mic muted). It keeps out of the way of the menu, the
+ * inbox and the confirmation card, and shows again once they go if its time
+ * isn't up. All calls with the LVGL lock held. */
 
 #ifdef __cplusplus
 extern "C" {

@@ -192,7 +192,7 @@ void inbox_act(const char *id, const char *action)
     cJSON_AddStringToObject(params, "action", action);
     rpc_notify("notification_action", params);
     ESP_LOGI(TAG, "%s: %s", id, action);
-    if (strcmp(action, "dismiss") == 0 || strcmp(action, "useful") == 0 || strcmp(action, "enough") == 0) {
+    if (strcmp(action, "useful") == 0 || strcmp(action, "enough") == 0) {
         drop_at(i);
     } else {
         s_items[i].unread = false;

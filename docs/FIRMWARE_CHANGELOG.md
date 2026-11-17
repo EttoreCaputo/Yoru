@@ -1,5 +1,11 @@
 # Firmware changelog
 
+## 0.21.1
+
+- **Tidied up inside.** What was kept only for older boards and older versions of the computer app is gone: the clean-up of stored data from earlier versions, and the ways of talking that Yoru Hub no longer uses. Nothing changes in what Yoru does.
+- **Two settings may be back to their defaults once:** "Yoru's sounds" and "Turns to sounds" (Settings) are stored under new names, so after this update both are on again. Turn them off again if you had.
+- For the host: the snapshot's host block is `host` (was `pet`), and the snapshot's `timer` is no longer read (`set_timers` is the only list); the settings `pet_sounds` and `pet_hear` are now `yoru_sounds` and `turn_to_sounds`; the `show_toast` tool is gone.
+
 ## 0.21.0
 
 - **Yoru is now simply an assistant.** He no longer has moods, needs, a backstory or a character of his own: nothing he does depends any more on how you treated him, how long you left him alone or the hour of the day. Poking, stroking, shaking or ignoring him no longer leaves anything behind.

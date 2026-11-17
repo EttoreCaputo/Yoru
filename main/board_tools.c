@@ -30,7 +30,6 @@
 #include "playback.h"
 #include "power.h"
 #include "timers.h"
-#include "toast.h"
 #include "voice.h"
 
 /* From DualEye's board_tools.c: one screen, no faces, and the settings as
@@ -473,7 +472,7 @@ static bool tool_show_approval(const cJSON *args, char *text, cJSON **structured
         snprintf(text, TEXT_MAX, "seconds must be 1 or more");
         return false;
     }
-    // Hosts from before 0.7.0 send neither: no Always, the whole text.
+    // Both optional: without them, no Always and the whole text.
     const cJSON *always = cJSON_GetObjectItemCaseSensitive(args, "always");
     const cJSON *full = cJSON_GetObjectItemCaseSensitive(args, "full");
     lvgl_port_lock();
@@ -497,40 +496,6 @@ static bool tool_hide_approval(const cJSON *args, char *text, cJSON **structured
     lvgl_port_unlock();
     // Not shown is fine: answered here already, timed out, or replaced.
     snprintf(text, TEXT_MAX, shown ? "hidden" : "not shown");
-    return true;
-}
-
-static bool tool_show_toast(const cJSON *args, char *text, cJSON **structured)
-{
-    static const char *const TONES[] = {"info", "done", "wait", "error"};
-    const cJSON *what = cJSON_GetObjectItemCaseSensitive(args, "text");
-    const cJSON *tone = cJSON_GetObjectItemCaseSensitive(args, "tone");
-    int seconds = 0;
-    if (!cJSON_IsString(what) || what->valuestring[0] == '\0') {
-        snprintf(text, TEXT_MAX, "text must be a string");
-        return false;
-    }
-    if (!get_int(args, "seconds", &seconds, text)) {
-        return false;
-    }
-    toast_tone_t t = TOAST_INFO;
-    if (cJSON_IsString(tone)) {
-        bool known = false;
-        for (int i = 0; i < 4; i++) {
-            if (strcmp(tone->valuestring, TONES[i]) == 0) {
-                t = (toast_tone_t) i;
-                known = true;
-            }
-        }
-        if (!known) {
-            snprintf(text, TEXT_MAX, "tone must be info, done, wait or error");
-            return false;
-        }
-    }
-    lvgl_port_lock();
-    toast_show(what->valuestring, seconds, t);
-    lvgl_port_unlock();
-    snprintf(text, TEXT_MAX, "shown");
     return true;
 }
 
@@ -766,16 +731,6 @@ static const tool_t TOOLS[] = {
         .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},"
                   "\"required\":[\"id\"]}",
         .fn = tool_hide_approval,
-    },
-    {
-        .name = "show_toast",
-        .description = "Show one short line over the bottom of Yoru's screen for a few seconds. A second call "
-                       "replaces it.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\",\"maxLength\":72},"
-                  "\"seconds\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":30},"
-                  "\"tone\":{\"type\":\"string\",\"enum\":[\"info\",\"done\",\"wait\",\"error\"]}},"
-                  "\"required\":[\"text\",\"seconds\"]}",
-        .fn = tool_show_toast,
     },
     {
         .name = "show_notification",

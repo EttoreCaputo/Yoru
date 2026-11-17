@@ -101,8 +101,8 @@ void clock_from_host(uint32_t ts, int minute, const char *tz)
     if (tz != NULL && tz[0] != '\0' && strlen(tz) < TZ_MAX) {
         snprintf(want, sizeof(want), "%s", tz);
     } else if (minute >= 0 && ts > VALID_AFTER && clock_minute() != minute) {
-        // An older host sends no zone: its minute against UTC gives the
-        // offset (to a quarter of an hour), until the next change of time.
+        // A host whose system doesn't say its zone: its minute against UTC
+        // gives the offset (to a quarter of an hour), until the next change of time.
         int off = minute - (int) (ts / 60 % 1440);
         off = off > 840 ? off - 1440 : off < -720 ? off + 1440 : off;
         fixed_tz((off + (off < 0 ? -7 : 7)) / 15 * 15, want, sizeof(want));

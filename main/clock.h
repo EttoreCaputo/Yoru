@@ -2,9 +2,9 @@
 
 /* The board's own clock, so it knows the time of day without the host: from
  * the internet (SNTP) once the WiFi is up, and from the host's snapshots
- * (`ts`, `pet.min`, `pet.tz`; `pet` is the host block's old name, kept for
- * compatibility) whenever it is there. The time zone comes from the host and
- * is kept in NVS; until a host has said it, Central European Time. The RTC keeps counting through light sleep. */
+ * (`ts`, `host.min`, `host.tz`) whenever they come. The time zone comes from
+ * the host and is kept in NVS; until a host has said it, Central European
+ * Time. The RTC keeps counting through light sleep. */
 
 #include <stdbool.h>
 #include <stdint.h>

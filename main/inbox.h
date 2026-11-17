@@ -68,8 +68,8 @@ uint32_t inbox_version(void);
 inbox_urgency_t inbox_take_alert(void);
 
 /** The user did something with it: tell the host. `read` (its detail was
- * opened) marks it read and is sent once; `dismiss`, and the user's verdict
- * `useful` or `enough`, take it away; `open` and an action's index ("0",
+ * opened) marks it read and is sent once; the user's verdict, `useful` or
+ * `enough`, takes it away; `open` and an action's index ("0",
  * "1") leave it as it is, read. */
 void inbox_act(const char *id, const char *action);
 

@@ -64,29 +64,6 @@ static int32_t fast_boots(int32_t set)
     return n;
 }
 
-/* Firmware before 0.21 kept moods ("life") and unlocked milestones
- * ("growth") in NVS. Gone with those features: whatever a board still has
- * there is erased. Only when something is there, so a clean board writes
- * nothing. */
-static void forget_old_namespaces(void)
-{
-    static const char *const OLD[] = {"life", "growth"};
-    for (size_t i = 0; i < sizeof(OLD) / sizeof(OLD[0]); i++) {
-        nvs_iterator_t it = NULL;
-        if (nvs_entry_find(NVS_DEFAULT_PART_NAME, OLD[i], NVS_TYPE_ANY, &it) != ESP_OK) {
-            continue; // ESP_ERR_NVS_NOT_FOUND: nothing left
-        }
-        nvs_release_iterator(it);
-        nvs_handle_t nvs;
-        if (nvs_open(OLD[i], NVS_READWRITE, &nvs) == ESP_OK) {
-            nvs_erase_all(nvs);
-            nvs_commit(nvs);
-            nvs_close(nvs);
-            ESP_LOGI(TAG, "erased old NVS namespace \"%s\"", OLD[i]);
-        }
-    }
-}
-
 static void fast_safe_cb(TimerHandle_t t)
 {
     fast_boots(0); // it ran long enough: the screen works
@@ -187,7 +164,6 @@ void app_main(void)
     ESP_LOGI(TAG, "Yoru %s", esp_app_get_description()->version);
     board_settings_init();
     board_settings_on_change(on_setting);
-    forget_old_namespaces();
     on_setting(SETTING_SPHERE, board_settings_get(SETTING_SPHERE)); // rendered by look_init()
     clock_init();
     tasks_init();
