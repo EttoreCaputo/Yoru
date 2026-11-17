@@ -2245,7 +2245,7 @@ static void frame_cb(lv_timer_t *timer)
     s.frames = (float) s.dt_ms / EYES_FRAME_MS;
     s.t_ms += (uint32_t) s.dt_ms;
     s_prof.frames++;
-    // A new colour for the sphere (growth, the menu): the sphere of before
+    // A new colour for the sphere (the menu, the host): the sphere of before
     // is gone, and Yoru is drawn again whole.
     if (look_apply_palette()) {
         s.ball = NULL;

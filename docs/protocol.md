@@ -14,6 +14,7 @@ Implementations: `main/link.c`, `main/link_frame.c`, `main/link_crypto.c`, `main
 
 - `board` is `yoru-amoled-1.75c`; a host tells Yoru from DualEye by it.
 - `agents` and `remote` (0.7.0 to 0.11.4): the coding agents' tools and notifications and the remote for them. 0.11.5 removed them, with the agents' questions, drafts, chats and `shortcut` (`show_approval` stays, for Yoru's own confirmations): a host must not send those tools to a board without the capabilities.
+- `growth` (0.20.20 only): removed in 0.21.0 with the `set_growth` tool, and with `set_feeling` (0.20.17 to 0.20.20) and `debug/life` (0.15.0 to 0.20.20): a board of 0.21.0 or later answers them as unknown, so a host must not send them to a board without the capability.
 - `inbox` (0.10.0 and later): the inbox (see Inbox): the `show_notification`, `hide_notification` and `clear_notifications` tools and the `notification_action` notification.
 - `timers` (0.11.0 and later): the menu's Timers app (see Timers): the `set_timers` tool and the `timer_action` notification.
 - `tasks` (0.16.0 and later): the menu's Tasks app (see Tasks): the `set_tasks` tool and the `task_run` notification. `habits` (0.11.0 to 0.15.1) was the Habits app, with `set_habits` and `habit_check`.
@@ -60,7 +61,7 @@ Since 0.19.0 the flash has two app slots, `ota_0` (where `factory` was, at 0x100
 
 ## Metrics
 
-The same snapshot. Since 0.10.0 a snapshot needs only `pet` (the host's time and idle time): `cpu` and `gpu` are optional, and one with none of the three is still ignored. Since 0.8.0 Yoru reads only the host's time and idle time (night brightness, and the sleep times count from your last input on the computer); it shows none of the rest. A timer's `screen` is ignored.
+The same snapshot. Since 0.10.0 a snapshot needs only `pet` (the host's time and idle time; the key's name is historical, kept for compatibility): `cpu` and `gpu` are optional, and one with none of the three is still ignored. Since 0.8.0 Yoru reads only the host's time and idle time (night brightness, and the sleep times count from your last input on the computer); it shows none of the rest. A timer's `screen` is ignored.
 
 **The board's clock (0.13.0).** The board keeps the time of day itself (`clock.c`): from the internet (SNTP, `pool.ntp.org`) once its WiFi is up, and from each snapshot: `ts` (UTC seconds) sets it when it is more than 2 s off, and `pet.tz`, the host's time zone as POSIX writes it (`"CET-1CEST,M3.5.0,M10.5.0/3"`, at most 47 characters), sets the zone, kept in NVS. A host without `tz` gives its offset from `pet.min` against `ts`, to a quarter of an hour. Until a host has said a zone, the board uses Central European Time. Night brightness, the tasks' times and "what time is it" use this clock, with or without a host. A host whose snapshots stopped more than 3 s ago is taken as gone: its idle time no longer counts, the board rings its timers and hears spoken commands itself (Offline commands).
 
@@ -79,10 +80,10 @@ Settings are kept in NVS and survive a reboot.
 | `set_wake_word` | `word`: one of `voice.wake_words` (`heyyoru`, `alexa`, `hiesp`) | Since 0.20.18 `heyyoru` is Yoru's own word, «Hey Yoru», heard by a microWakeWord model ([wakeword.md](wakeword.md)); the others are ESP-SR's. `alexa` is the default |
 | `set_volume` | `percent`: 0–100 | Speaker volume, with the `volume` sound at the new level |
 | `react` | `name`: `happy` · `excited` · `wink` · `proud` · `relieved` · `charged` · `plugged` (0.12.1) · `dance` · `love` · `curious` · `thinking` · `focus` · `angry` · `hot` · `sleepy` · `yawn` · `tired` · `sigh` · `sad` · `surprised` · `scared` · `bored` · `look_around` · `blink` · `wave` · `point` · `shy` · `clap` · `stretch` · `dizzy` · `annoyed` · `falling` · `drowsy` · `lifted` | The eyes react for a few seconds, with Yoru's sound for it. DualEye's `play_eyes` names, those these eyes can show. Since 0.20.6 `proud` and `stretch`, since 0.20.7 `yawn`, `surprised` and `thinking`, and since 0.20.8 `dance`, `curious`, `sad`, `dizzy`, `shy`, `lifted` and `point`, play hand-keyed clips (`docs/animations.md`, 1 to 3 s). Refused during a conversation |
-| `play_sound` | `name` | As on DualEye: the same sounds, plus Yoru's own: `unplug` and, an earcon played with pet sounds off too, `battery_low` (0.12.1) |
-| `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds`, `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it), `power_saver` (on battery, the Saver profile instead of Balanced; 0.12.0, see Power), `hibernate` (on battery, minutes of dark screen before hibernating, 0 never; 0.12.0), `sphere` (the sphere's colour, 0.20.20: 0 pearl, 1 dawn, 2 mint, 3 lilac, 4 night, 5 gold, 6 rose; one not unlocked yet shows pearl, see Growth). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
+| `play_sound` | `name` | As on DualEye: the same sounds, plus Yoru's own: `unplug` and, an earcon played with Yoru's sounds off too, `battery_low` (0.12.1) |
+| `get_settings` | none | Every setting as `{"value":n,"min":n,"max":n}` under its name, plus `wake_word`: `brightness`, `night_bright`, `night_from`, `night_to`, `auto_dim`, `rotation`, `volume`, `pet_sounds` (Yoru's own sounds; the name is kept for compatibility), `mic_muted`, `sleepy_after`, `asleep_after`, `focus`, `touch_react`, `motion_react`, `pet_hear` (turns to sudden sounds; the name is kept for compatibility), `eye_color`, `eye_style`, `wake_on`, `language`, `wake_sound`, `lcd_80mhz` (the screen's bus at 80 MHz instead of 40, a test; three restarts in a row within 20 s each turn it off), `boot_key` (BOOT opens the inbox; on by default), `color_24bit` (24-bit colour instead of 16; Yoru restarts to apply it), `power_saver` (on battery, the Saver profile instead of Balanced; 0.12.0, see Power), `hibernate` (on battery, minutes of dark screen before hibernating, 0 never; 0.12.0), `sphere` (the sphere's colour, 0.20.20: 0 pearl, 1 dawn, 2 mint, 3 lilac, 4 night, 5 gold, 6 rose; all available since 0.21.0). `rotation` is 0–3 quarter turns or 4 to follow how the badge stands. `sleepy_after` and `asleep_after` count from the last sign of someone around (a touch, a voice, input on the host), 300 and 600 s by default since 0.6.0. The menu on the board shows the same |
 | `set_setting` | `name`, `value`: integer | Change one setting within its range (switches are 0 or 1); it applies at once |
-| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' mood now), `brightness`, voice, `activity` (what Yoru does: `lounge`, `call`, `nap`, `sleep`, `come`; it replaced `pet` in 0.8.0; since 0.15.0 also its state, `watch`, `explore`, `play`, `dream`, `bored`, `seek`, `sulk`, `drowsy`, and `greet`), `cheer` (0..1), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`; since 0.20.3 `run`, the last stretch on battery, see Power) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`; replaced in 0.16.0 by `tasks`: `count`, `failed`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time); since 0.20.15 `meeting` (`idle`, `recording`, `transcribing`, `summarizing`) and `icons` (how many icons it keeps); since 0.15.0 `life`: `activity`, `state`, `act`, `since_s`, `left_s` and `emotions` (`happy`, `energy`, `social`, `stim`, `trust`, -1..1), see `docs/life.md`. `eyes` may also be `delighted`, `smitten`, `starry` or `dreamy` since 0.15.0; `friends` (the other Yorus in range, 0.18.0 to 0.20.9) is gone since 0.20.10 |
+| `get_state` | none | Firmware, uptime, metrics state, `eyes` (the eyes' expression now), `brightness`, voice, `activity` (what Yoru does: since 0.21.0 `idle`, `drowsy`, `call`, `nap`, `sleep`, `come` or `greet`, see `docs/idle.md`), audio, UI load, memory, link counters, the WiFi, `battery` (`present`, `percent`, `mv`, `usb`, `charging` and, since 0.12.0, `profile`: `desk`, `balanced` or `saver`; since 0.20.3 `run`, the last stretch on battery, see Power) and `motion` (gravity `g` and turn rate `dps` on the screen's axes, `lean_x`/`lean_y`, `upright`: the quarter turn it stands at, or -1 lying flat) and, since 0.10.0, `inbox` (`count`, `unread`, `view`); since 0.11.0 `timers` (how many), `habits` (`count`, `done`; replaced in 0.16.0 by `tasks`: `count`, `failed`) and `errand` (Yoru is on one); since 0.13.0 `minute`, the board's clock (local minutes since midnight, -1 while it doesn't know the time); since 0.20.15 `meeting` (`idle`, `recording`, `transcribing`, `summarizing`) and `icons` (how many icons it keeps); `cheer` and `life` are gone since 0.21.0. `eyes` may also be `delighted`, `smitten`, `starry` or `dreamy` since 0.15.0; `friends` (the other Yorus in range, 0.18.0 to 0.20.9) is gone since 0.20.10 |
 | `show_menu` | `open`: boolean, `page`: `home` · `inbox` · `timers` · `tasks` (0.16.0 and later; `habits` before) · `games` (0.11.8 and later) · `settings` · `yoru` (0.20.20) · `display` · `sound` · `behaviour` · `voice` · `connection` · `battery` · `about` | Open the menu on its home (the apps around Yoru), on an app (`inbox` opens the inbox view), on Settings or on one of its pages, or close it. Since 0.11.0; before, the menu was a ring and `inbox` one of its pages |
 | `show_approval` | `id`: string, `tool`: string, `text`: string, `project`?: string, `seconds`: integer | Yoru asks before it acts for you, over the eyes, with Allow and Deny (see Confirmations). A second call replaces it |
 | `hide_approval` | `id`: string | Take that card away: it was answered in the app, or gave up. An `id` that isn't shown is fine |
@@ -95,10 +96,8 @@ Settings are kept in NVS and survive a reboot.
 | `show_fetch` | `state`, `source`?, `id`? | Since 0.11.0. A connector call starts or ends: Yoru's errand (see Fetch) |
 | `set_icon` | `name`, `at`?, `data`? | Since 0.20.15. An app's icon, in parts (see Icons) |
 | `set_meeting` | `state`, `source`? | Since 0.20.15. A meeting is recorded, transcribed, summarized (see Meetings) |
-| `set_feeling` | `face`?, `feel`? | Since 0.20.17. How Yoru feels about what was just said to him (see Feelings) |
-| `set_growth` | `days`, `facts`, `people`, `useful`: integers | Since 0.20.20. What the host counted from its memory; milestones unlock colours and rare acts (see Growth) |
 
-The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `show_fetch`, and since 0.16.0 `set_tasks`, and since 0.20.15 `set_icon` and `set_meeting`, and since 0.20.17 `set_feeling`, and since 0.20.20 `set_growth`) are for the host only: Yoru Hub keeps them out of its MCP server.
+The host's tools (`show_approval`, `hide_approval`, `show_toast`, since 0.10.0 `show_notification`, `hide_notification`, `clear_notifications`, and since 0.11.0 `set_timers`, `show_fetch`, and since 0.16.0 `set_tasks`, and since 0.20.15 `set_icon` and `set_meeting`) are for the host only: Yoru Hub keeps them out of its MCP server.
 
 ## Confirmations
 
@@ -132,7 +131,7 @@ Before Yoru Hub's assistant does something with one of your services that change
 - `wait_ms`: how long the board waits for speech before giving up (`utterance_end` `reason` `no_speech`), 1500 to 15000; 4000 without it.
 - `pause_ms`: how long a pause ends what's being said, 200 to 3000 (2000 in 0.11.6); 400 without it (the wake word's). The VAD's own 500 ms come on top.
 - Without the wake word only speech near the board counts: 350 ms of it, each frame at -50 dBFS or louder, gaps under 300 ms. Quieter or shorter speech leaves `speech` false.
-- The board plays a soft tick (`listen`) and shows a ring around Yoru running out over `wait_ms`; the ring goes once speech starts. Giving up without speech plays a soft falling note (`listen_end`). Both are earcons, played with pet sounds off too.
+- The board plays a soft tick (`listen`) and shows a ring around Yoru running out over `wait_ms`; the ring goes once speech starts. Giving up without speech plays a soft falling note (`listen_end`). Both are earcons, played with Yoru's sounds off too.
 - Older boards ignore the two numbers and wait 4 s.
 
 ## Finished sentences
@@ -210,7 +209,7 @@ What the user does comes back as `notification_action`:
 |---|---|---|
 | `read` | The notification was opened, the first time | It is read |
 | `dismiss` | Dismiss (before 0.20.20) | It leaves the inbox |
-| `useful` | Useful (0.20.20): the user was glad to be told | It leaves the inbox. The host keeps the verdict, tells more like it, and counts it towards growth |
+| `useful` | Useful (0.20.20): the user was glad to be told | It leaves the inbox. The host keeps the verdict and tells more like it |
 | `enough` | Enough (0.20.20): don't tell me things like this | It leaves the inbox. The host keeps it in the memory's "Don't tell me about", tells less like it, and after a few, more «Enough» than «Useful», brings what comes from that source in a step quieter (high to normal, normal to low; urgent still comes through) |
 | `open` | Open: show it on the computer (the mail in the browser, the issue on GitHub) | It stays, read; the view closes |
 | `"0"`, `"1"` | One of `actions`, by its index, as a string | It stays, read |
@@ -271,7 +270,7 @@ The menu's Tasks app has a row for each, with a dot (green: went well, red: fail
 {"jsonrpc":"2.0","method":"task_run","params":{"id":"weekly-issues"}}
 ```
 
-The row shows it as running until the host's next list. A run that ends well since the last list cheers Yoru up (`task` in `docs/life.md`). The board keeps the last list in NVS, so it shows after a restart and without a host; the Cloud voice's prompt lists them, to be done once the computer is back.
+The row shows it as running until the host's next list. The board keeps the last list in NVS, so it shows after a restart and without a host; the Cloud voice's prompt lists them, to be done once the computer is back.
 
 ## Offline commands
 
@@ -294,12 +293,12 @@ Since 0.14.0 these phrases are only the fallback: with the services of the Cloud
 
 ## Cloud voice
 
-Since 0.14.0, with the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/bridge/cloud.rs`). When no host has sent a snapshot for 3 s and the WiFi is up, the board talks to online services itself, with the keys a host handed over: what is said after the wake word (or with PWR held) is recorded in PSRAM, 15 s at most (the ring along the rim runs it down while it listens; past it the utterance ends with `max_length`, whatever started it), and sent to a speech-to-text service; the text goes with Yoru's character, what it knows of the user and what the board knows now (date and time, timers, tasks, battery) to the brain; the answer is said by a voice, streamed to the speaker as it arrives. Then it listens for a follow-up without the wake word, as with a host. Since 0.14.1 a WiFi on its way back counts as up: woken from hibernating, what is said is recorded at once and sent when the WiFi has joined, waiting up to 10 s (then the error line says there's no internet). Only a network that isn't there or a wrong password leave it to the offline phrases. The last eight messages are kept for the next question, for ten minutes.
+Since 0.14.0, with the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/bridge/cloud.rs`). When no host has sent a snapshot for 3 s and the WiFi is up, the board talks to online services itself, with the keys a host handed over: what is said after the wake word (or with PWR held) is recorded in PSRAM, 15 s at most (the ring along the rim runs it down while it listens; past it the utterance ends with `max_length`, whatever started it), and sent to a speech-to-text service; the text goes with who Yoru is (an AI assistant on the desk, male, clear and concise), what it knows of the user and what the board knows now (date and time, timers, tasks, battery) to the brain; the answer is said by a voice, streamed to the speaker as it arrives. Then it listens for a follow-up without the wake word, as with a host. Since 0.14.1 a WiFi on its way back counts as up: woken from hibernating, what is said is recorded at once and sent when the WiFi has joined, waiting up to 10 s (then the error line says there's no internet). Only a network that isn't there or a wrong password leave it to the offline phrases. The last eight messages are kept for the next question, for ten minutes.
 
 `cloud/set` is a method of its own, not a tool, so a model calling the board's tools never sees it. A host sends it on every handshake and whenever the services change; the board keeps them in NVS (namespace `cloud`) and writes the flash only when they differ. `{"clear": true}` forgets them. The answer is `cloud/get`'s.
 
 ```json
-{"name":"Yoru","character":"You are friendly and to the point...","memory":"# What Yoru knows about you ...",
+{"name":"Yoru","memory":"# What Yoru knows about you ...",
  "stt":{"url":"https://api.groq.com/openai/v1/audio/transcriptions","key":"gsk_...","model":"whisper-large-v3-turbo","language":"it"},
  "llm":{"api":"openai","url":"https://api.openai.com/v1/chat/completions","key":"sk-...","model":"gpt-6-luna","params":{"reasoning_effort":"none"}},
  "tts":{"api":"elevenlabs","url":"https://api.elevenlabs.io","key":"...","model":"eleven_v4_turbo","voice":"<voice_id>"},
@@ -312,13 +311,13 @@ Since 0.14.0, with the `cloud` capability (`main/cloud.c`; Yoru Hub: `core/src/b
 | `llm` | `api`: `openai` (Chat Completions at `url`, with `params` merged into each request) or `anthropic` (Messages at `url`, `max_tokens` 400) |
 | `tts` | `api`: `elevenlabs` (`url` is the base; `voice` the voice id; PCM at 16 kHz) or `openai` (`url` the base, `/audio/speech`; `voice`; `format` `pcm` at `rate`, 24000 by default, or `wav`; `max_chars` per request, the text cut at sentences) |
 | `search` | Optional (0.17.0 and later): web search through Tavily's `/search` (`url`, `key`). With it the brain may ask for a search (see below); without it the board says it can't search the web |
-| `name`, `character`, `memory` | Optional: Yoru's name, a line on how it talks, what it knows of the user (a host sends 1,200 characters at most) |
+| `name`, `memory` | Optional: Yoru's name and what it knows of the user (a host sends 1,200 characters at most). A `character` sent by an older host is ignored since 0.21.0 |
 
 The whole object must fit in 3,900 bytes. Every URL must be `https`; the certificates are ESP-IDF's bundle plus GlobalSign Root CA (`main/certs/extra_roots.pem`), which Groq's, Anthropic's and ElevenLabs' chains end in.
 
 `cloud/get` (no params): `{"set":true,"stt":"whisper-large-v3-turbo","llm":"gpt-6-luna","tts":"eleven_v4_turbo","search":true,"ready":true}`, the models, whether a web search is set (0.17.0 and later) and whether it would answer now (services, WiFi); never the keys.
 
-The brain's answer may carry tags, which are taken out before it is said and act on the board (`commands_tag()`): `[timer SECONDS]`, `[pomodoro]`, `[stop]`, `[pause]`, `[resume]`, `[volume up]`, `[volume down]`, `[open games|timers|tasks|inbox]` (`[habit NUMBER]` and `habits` until 0.15.1), `[sleep]` and `[face NAME]` (happy, excited, love, curious, proud, wink, surprised, sad, shy, sleepy, dance, wave, thinking).
+The brain's answer may carry tags, which are taken out before it is said and act on the board (`commands_tag()`): `[timer SECONDS]`, `[pomodoro]`, `[stop]`, `[pause]`, `[resume]`, `[volume up]`, `[volume down]`, `[open games|timers|tasks|inbox]` (`[habit NUMBER]` and `habits` until 0.15.1), and `[sleep]` (`[face NAME]` until 0.20.20).
 
 - **Web search (0.17.0).** With `search` set, the prompt tells the brain it may reply with only `[search QUERY]` for anything recent or unknown. The board then calls Tavily (`include_answer`, three results), and asks the brain again with the results, as data, in the same turn; the brain's answer is said. The results are not kept in the history (only the question and the answer), a second search in the same turn is ignored, and the search connection is closed once it has answered, to spare internal RAM. A failed search is told to the brain, which says so kindly.
 - **Speed.** Each service keeps one connection open between requests, and its TLS session to resume a new one; all three are opened (a `HEAD`) while the user is still talking. A fresh connection takes the board 1 to 4 s; a kept one a few milliseconds.
@@ -328,40 +327,6 @@ The brain's answer may carry tags, which are taken out before it is said and act
 - `debug/clip` `{"name": "sneeze", "mirror"?: bool, "source"?: string}` (since 0.20.7) plays one of the clips in `docs/animations.md` now, left for right with `mirror`, and answers `{"playing": name}`; an unknown name is an invalid params error. Since 0.20.9 `source` (a service, as `show_fetch` takes it) puts its effects in that service's colour and glyph, and `{"stop": true}` stops the clip playing (a `_loop` one plays until then), answering `{"stopped": true}`.
 - `debug/clips` (since 0.20.9) lists the clips this firmware has: `{"clips": [{"name", "seconds", "loop"}], "playing": name or null}`; `playing` (since 0.20.14) is the clip playing now.
 - `debug/perf` (since 0.20.11), with `{"reset": true}` optionally, answers how hard the board works, measured every 5 s: `idle_pct` and `idle_min_pct` per core, `wake` (since 0.20.18, Yoru's own wake word: `peak`, the last second's highest probability of 255, and `step_us`, one step of the model; zeros with an ESP-SR word), `lvgl` (`busy_pct`, `longest_us` and their peaks), each task above 0.5% (`name`, `core`, `pct` of one core in the last window, `peak_pct`), the free internal RAM and PSRAM, and `audio`: `speaker_gaps` (I2S buffers the speaker played with nothing new, while something was playing: heard as a click or a hole), `mic_lost` (mic buffers not read in time), `speech_underruns` and `speech_frames_lost` (speech that ran out or never arrived from the host or the network), `voice_frames_dropped` (what was said that the link had no room for). Peaks and counts are since boot or the last `reset`. Since 0.20.12 `draw` says where the face's frames went since the last `reset`: `fps`, `draws_per_s` (areas redrawn), `kpx_per_s` (pixels redrawn) and `ms_per_s`, the milliseconds per second spent on each step (`logic`, `ball_render` and `eye_render` for sprites rendered on the fly, then each layer drawn: `halo`, `glow`, `rings`, `hands`, `body`, `tint`, `badge`, `eyes`, `prop`, `overlays`, `sparks`, `rest`). Since 0.20.13 `draw.sprites` splits the sprite draws into plain ones (drawn as they are) and scaled ones (stretched or turned): `plain_ms_per_s`, `plain_kpx_per_s`, `plain_per_s` and the same three for `scaled`; `lvgl` also has `panel_fps` (frames that reached the panel), `send_ms_per_s` and `kpx_sent_per_s` (time and pixels spent sending them), since the last `reset`.
-
-## Debugging Yoru's life
-
-Since 0.15.0 (`docs/life.md`). `debug/life` takes any of:
-
-- `state`: one of `lounge`, `watch`, `explore`, `play`, `dream`, `bored`, `seek`, `sulk`, `drowsy`, entered now, its cooldown ignored;
-- `act`: an act's name (`firefly`, `dance`, `gaze`, `rest`...), played next;
-- `feel`: an event's name (`stroke`, `drop`, `ignored`, since 0.20.17 `praised`, `scolded`, `amused`...), applied to the emotions;
-- `speed`: how much faster the life clock runs (1 to 300; dwell times, cooldowns and the emotions' fading; the animations stay at their pace). A restart sets it back to 1.
-
-It answers with `get_state`'s `life`, or `-32602` for an unknown name.
-
-## Feelings
-
-Since 0.20.17 (Yoru Hub: `core/src/assistant/memory/feelings.rs` and the face tag in `core/src/assistant/mod.rs`). The host's assistant tells Yoru how he takes what he was just told, so his face and his mood follow the conversation.
-
-| Tool | Arguments | Effect |
-|------|-----------|--------|
-| `set_feeling` | `face`?: one of `react`'s names (`love`, `giggle`, `sad`...), `feel`?: an event's name (`praised`, `scolded`, `amused`, or any of `debug/life`'s) | `face` plays the scene silently (his voice is the sound) while Yoru is awake; `feel` moves his emotions. An unknown `feel` answers an error; an unknown `face` is ignored |
-
-- The host sends `face` as soon as the reply's face tag is read, before the voice starts, and `feel` once the reply is done.
-- `praised` cheers him up and warms him to the person, `scolded` saddens and tenses him, `amused` cheers and wakes him a little.
-
-## Growth
-
-Since 0.20.20 (capability `growth`; Yoru Hub: `core/src/assistant/memory/growth.rs`, sent with the other lists in `core/src/bridge/session.rs`). Yoru grows with real use (docs/CONCEPT.md, Growing up): the host counts, the board unlocks.
-
-| Tool | Arguments | Effect |
-|------|-----------|--------|
-| `set_growth` | `days`: days the user talked with Yoru (by voice or in the app), `facts`: what Yoru knows about the user, still true, `people`: the people it knows by name, `useful`: notifications called useful | The board keeps the counts and the milestones reached in NVS. Answers `structuredContent` `{"reached": [...], "new": [...]}` with ids such as `sphere:dawn` or `act:wave` |
-
-- The milestones, in `growth.c`: days 2 (act `wave`), 7 (sphere `mint`), 21 (`night`), 60 (act `love`); facts 10 (`dawn`), 30 (`lilac`), 75 (`gold`); people 1 (act `shy`), 3 (act `giggle`), 6 (`rose`); useful 3 (act `hop`), 10 (act `cheer`).
-- A milestone reached stays reached when a count goes down (a fact forgotten). A new one is celebrated once Yoru is awake and free: `proud` and a line on the screen.
-- The host sends the counts when it connects and whenever they change, looking at most once a minute.
 
 ## Friends (removed)
 

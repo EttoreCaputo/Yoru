@@ -1,6 +1,6 @@
 # Yoru
 
-Desk companion on the Waveshare ESP32-S3-Touch-AMOLED-1.75C. Character: `docs/CONCEPT.md`. Plan and pins: `docs/ROADMAP.md`. Sister project: `../esp32s3-dualeye-pcmonitor` (DualEye), where the voice, link and mood code come from. When copying from there, adapt the code; don't carry over DualEye's two-screen assumptions.
+Desk assistant on the Waveshare ESP32-S3-Touch-AMOLED-1.75C. Concept: `docs/CONCEPT.md`. Plan and pins: `docs/ROADMAP.md`. Sister project: `../esp32s3-dualeye-pcmonitor` (DualEye), where the voice and link code come from. When copying from there, adapt the code; don't carry over DualEye's two-screen assumptions.
 
 Host program: `../yoru-hub` (formerly Companion Hub), Yoru's personal assistant (Yoru only, no DualEye); the plan is its `docs/assistant.md`. It is the only host and ships the firmware: the Yoru app (`../yoru-app`, a fork of coucou) was retired on 2026-10-19. A protocol change is made here (`docs/protocol.md`) and in Yoru Hub's `core/src/`.
 

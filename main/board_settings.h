@@ -30,20 +30,22 @@ typedef enum {
     SETTING_ROTATION,
     /* Sound. Percent. */
     SETTING_VOLUME,
-    SETTING_PET_SOUNDS,
+    /* Yoru's own sounds in its animations. The NVS key is still
+     * "pet_sounds", for boards already in use and the host. */
+    SETTING_YORU_SOUNDS,
     /* The privacy switch: the mic isn't read. */
     SETTING_MIC_MUTED,
     /* Behaviour. Seconds without touch before sleepy and asleep. */
     SETTING_SLEEPY_AFTER_S,
     SETTING_ASLEEP_AFTER_S,
-    /* Do not disturb: no whims, no reactions, no sounds. */
+    /* Do not disturb: no lively idle animations, no reactions, no sounds. */
     SETTING_FOCUS,
     SETTING_TOUCH_REACTIONS,
     /* The case as an input: lift, shake, knocks, lean (motion.c). */
     SETTING_MOTION_REACTIONS,
     /* It turns to a sudden sound (ears_dir.c). The NVS key is still
-     * "pet_hear". */
-    SETTING_PET_HEARING,
+     * "pet_hear", for boards already in use and the host. */
+    SETTING_TURN_TO_SOUNDS,
     /* Look: the resting eyes' colour as 0xRRGGBB, and the style (M5). */
     SETTING_EYE_COLOR,
     SETTING_EYE_STYLE,
@@ -67,8 +69,7 @@ typedef enum {
     /* On battery, minutes of dark screen before it hibernates (power.c);
      * 0 never. */
     SETTING_HIBERNATE_MIN,
-    /* The sphere's colours (look.c): 0 pearl, the others once unlocked
-     * (growth.c). */
+    /* The sphere's colours (look.c): 0 pearl. */
     SETTING_SPHERE,
     SETTING_COUNT,
 } setting_t;
@@ -87,7 +88,7 @@ static inline bool board_settings_on(setting_t id)
 esp_err_t board_settings_set(setting_t id, int32_t value);
 
 /** Called after a setting changed, from the task that changed it, so the
- * modules that keep their own copy (voice, playback, pet, ears) follow. */
+ * modules that keep their own copy (voice, playback, ears) follow. */
 typedef void (*board_settings_cb_t)(setting_t id, int32_t value);
 void board_settings_on_change(board_settings_cb_t cb);
 

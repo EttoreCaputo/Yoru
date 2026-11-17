@@ -15,7 +15,7 @@ extern "C" {
 void commands_start(void);
 /** A tag from the brain in the cloud (cloud.c), without its brackets:
  * "timer 300", "pomodoro", "stop", "pause", "resume", "volume up",
- * "open games", "sleep", "face happy". False for one it doesn't know. Takes
+ * "open games", "sleep". False for one it doesn't know. Takes
  * the LVGL lock. */
 bool commands_tag(const char *tag);
 

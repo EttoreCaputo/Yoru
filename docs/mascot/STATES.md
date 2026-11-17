@@ -2,7 +2,7 @@
 
 `yoru.riv` follows the board's eye engine. Firmware 0.5.0 added moods (dizzy, scared, peek), gestures (hold, shoo, flail), knocks and leaning, so the file has them too. The values are the ones in `main/eyes.c` and `main/behaviour.c`, so a host can send the board and the app the same numbers.
 
-The list of behaviours (follow the pointer, slap, annoyed after three slaps, dizzy, status tints, greeting) and the way they chain were taken from Novra's Grok Bot case study. Only the behaviours came from there. The character and the drawings are Yoru's own (`docs/CONCEPT.md`).
+The list of behaviours (follow the pointer, slap, annoyed after three slaps, dizzy, status tints, greeting) and the way they chain were taken from Novra's Grok Bot case study. Only the behaviours came from there. The drawings are Yoru's own (`docs/CONCEPT.md`).
 
 ## New inputs on the `Yoru` view model
 

@@ -41,10 +41,10 @@ void playback_barge_in(void);
  * to the host. Safe from any task. */
 void playback_sound(sound_t sound);
 
-/** The pet's sounds (from SOUND_FIRST_PET on: the eyes' scenes, hello...) are
+/** Yoru's own sounds (from SOUND_FIRST_YORU on: the eyes' scenes, hello...) are
  * played, or quietly dropped. On by default. */
-void playback_set_pet_sounds(bool on);
-bool playback_pet_sounds(void);
+void playback_set_yoru_sounds(bool on);
+bool playback_yoru_sounds(void);
 
 /** A stream is playing (or buffering to start). */
 bool playback_active(void);

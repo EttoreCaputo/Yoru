@@ -715,7 +715,7 @@ esp_err_t metrics_parse_line(const char *line, metrics_snapshot_t *out)
             ok = parse_timer_object(&j, &out->timer);
         } else if (strcmp(key, "music") == 0) {
             ok = parse_music_object(&j, &out->music);
-        } else if (strcmp(key, "pet") == 0) {
+        } else if (strcmp(key, "pet") == 0) { // the host block; the name kept for compatibility
             ok = parse_host_object(&j, &out->host);
         } else if (strcmp(key, "ts") == 0) {
             double value = 0.0;

@@ -15,7 +15,6 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_system.h"
-#include "growth.h"
 #include "tasks.h"
 #include "tasks_ui.h"
 #include "inbox.h"
@@ -152,12 +151,6 @@ static void info_memory(char *out, size_t len);
 static void info_flash(char *out, size_t len);
 static void info_load(char *out, size_t len);
 static void info_hold(char *out, size_t len);
-static void info_days(char *out, size_t len);
-static void info_facts(char *out, size_t len);
-static void info_people(char *out, size_t len);
-static void info_useful(char *out, size_t len);
-static void info_unlocked(char *out, size_t len);
-static void info_next(char *out, size_t len);
 static void act_power_off(void);
 static void act_restart(void);
 static void act_factory_reset(void);
@@ -167,15 +160,9 @@ static void act_factory_reset(void);
 #define ACT(en, it, kind, fn, info) {en, it, kind, SETTING_COUNT, F_NONE, info, fn}
 
 /* Italian without accents: the built-in fonts only have ASCII. */
-/* Yoru himself: his colour, and how far he has grown with you (growth.c). */
+/* Yoru himself: his colour. */
 static const item_t YORU_ITEMS[] = {
     SET("Colour", "Colore", K_CHOICE, SETTING_SPHERE, F_SPHERE),
-    INFO("Next to unlock", "Prossima novita'", info_next),
-    INFO("Days together", "Giorni insieme", info_days),
-    INFO("Learnt about you", "Cose che sa di te", info_facts),
-    INFO("People he knows", "Persone che conosce", info_people),
-    INFO("Useful notices", "Avvisi utili", info_useful),
-    INFO("Unlocked", "Sbloccati", info_unlocked),
 };
 static const item_t DISPLAY_ITEMS[] = {
     SET("Brightness", "Luce", K_ARC, SETTING_BRIGHTNESS, F_PCT),
@@ -188,7 +175,7 @@ static const item_t DISPLAY_ITEMS[] = {
 };
 static const item_t SOUND_ITEMS[] = {
     SET("Volume", "Volume", K_ARC, SETTING_VOLUME, F_PCT),
-    SET("Yoru's sounds", "Suoni di Yoru", K_SWITCH, SETTING_PET_SOUNDS, F_NONE),
+    SET("Yoru's sounds", "Suoni di Yoru", K_SWITCH, SETTING_YORU_SOUNDS, F_NONE),
     SET("Mic off", "Microfono spento", K_SWITCH, SETTING_MIC_MUTED, F_NONE),
     SET("Listening chime", "Suono d'ascolto", K_SWITCH, SETTING_WAKE_SOUND, F_NONE),
 };
@@ -198,7 +185,7 @@ static const item_t BEHAVIOUR_ITEMS[] = {
     SET("Do not disturb", "Non disturbare", K_SWITCH, SETTING_FOCUS, F_NONE),
     SET("Touch reactions", "Reazioni al tocco", K_SWITCH, SETTING_TOUCH_REACTIONS, F_NONE),
     SET("Motion reactions", "Reazioni al moto", K_SWITCH, SETTING_MOTION_REACTIONS, F_NONE),
-    SET("Turns to sounds", "Si gira ai suoni", K_SWITCH, SETTING_PET_HEARING, F_NONE),
+    SET("Turns to sounds", "Si gira ai suoni", K_SWITCH, SETTING_TURN_TO_SOUNDS, F_NONE),
     SET("BOOT button", "Tasto BOOT", K_SWITCH, SETTING_BOOT_KEY, F_NONE),
 };
 static const item_t VOICE_ITEMS[] = {
@@ -513,61 +500,6 @@ static void info_paired(char *out, size_t len)
     wifi_field("paired", out, len);
 }
 
-/* ---- Growing up (growth.c) ---- */
-
-static void info_measure(growth_measure_t m, char *out, size_t len)
-{
-    const int32_t next = growth_next(m);
-    if (next < 0) {
-        snprintf(out, len, "%ld", (long) growth_count(m));
-    } else {
-        snprintf(out, len, "%ld  (%s %ld)", (long) growth_count(m), tr("next at", "prossima a"), (long) next);
-    }
-}
-
-static void info_days(char *out, size_t len)
-{
-    info_measure(GROWTH_DAYS, out, len);
-}
-
-static void info_facts(char *out, size_t len)
-{
-    info_measure(GROWTH_FACTS, out, len);
-}
-
-static void info_people(char *out, size_t len)
-{
-    info_measure(GROWTH_PEOPLE, out, len);
-}
-
-static void info_useful(char *out, size_t len)
-{
-    info_measure(GROWTH_USEFUL, out, len);
-}
-
-static void info_unlocked(char *out, size_t len)
-{
-    snprintf(out, len, tr("%d of %d", "%d di %d"), growth_reached_count(), growth_milestones());
-}
-
-/* The milestone nearest to being reached, by how much of it is done. */
-static void info_next(char *out, size_t len)
-{
-    int best = -1;
-    float done = -1;
-    for (int i = 0; i < growth_milestones(); i++) {
-        if (growth_reached(i)) {
-            continue;
-        }
-        const float d = (float) growth_count(growth_milestone_measure(i)) / (float) growth_milestone_need(i);
-        if (d > done) {
-            done = d;
-            best = i;
-        }
-    }
-    snprintf(out, len, "%s", best < 0 ? tr("All unlocked", "Tutto sbloccato") : growth_milestone_reward(best, italian()));
-}
-
 static void info_version(char *out, size_t len)
 {
     snprintf(out, len, "%s", esp_app_get_description()->version);
@@ -619,7 +551,7 @@ static void act_power_off(void)
 static void act_factory_reset(void)
 {
     ESP_LOGW(TAG, "factory reset");
-    // Settings, mood, WiFi and pairing all live in NVS.
+    // Settings, WiFi and pairing all live in NVS.
     nvs_flash_erase();
     act_restart();
 }
@@ -873,11 +805,8 @@ static void row_cb(lv_event_t *e)
         break;
     case K_CHOICE: {
         if (it->fmt == F_SPHERE) {
-            // The next colour already unlocked, round to pearl.
-            int v = (int) board_settings_get(it->setting);
-            do {
-                v = (v + 1) % LOOK_PALETTES;
-            } while (!growth_palette_ok(v));
+            // The next colour, round to pearl.
+            const int v = ((int) board_settings_get(it->setting) + 1) % LOOK_PALETTES;
             board_settings_set(it->setting, v);
             refresh_values();
             break;

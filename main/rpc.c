@@ -15,7 +15,6 @@
 #include "esp_log.h"
 #include "errand.h"
 #include "eyes.h"
-#include "life.h"
 #include "link.h"
 #include "lvgl_port.h"
 #include "net.h"
@@ -126,8 +125,6 @@ static cJSON *identity(void)
     // The apps' icons and the meeting being recorded (docs/protocol.md, Icons, Meetings).
     cJSON_AddItemToArray(caps, cJSON_CreateString("icons"));
     cJSON_AddItemToArray(caps, cJSON_CreateString("meetings"));
-    // Growing up: set_growth (docs/protocol.md, Growth).
-    cJSON_AddItemToArray(caps, cJSON_CreateString("growth"));
     if (ota_available()) {
         // Updates over the link: ota/begin, ota/write, ota/end.
         cJSON_AddItemToArray(caps, cJSON_CreateString("ota"));
@@ -348,18 +345,6 @@ void rpc_handle(uint8_t *payload, size_t len)
             lvgl_port_unlock();
             result = cJSON_CreateObject();
             cJSON_AddStringToObject(result, "playing", clip->valuestring);
-        }
-    } else if (strcmp(name, "debug/life") == 0) {
-        // Push Yoru's own life about (tests): a state, an act, a feeling,
-        // the life clock's speed.
-        static char why[64];
-        if (!cJSON_IsObject(params) || !life_debug(params, why, sizeof(why))) {
-            code = RPC_INVALID_PARAMS;
-            message = cJSON_IsObject(params) ? why : "expected {\"state\"|\"act\"|\"feel\"|\"speed\"}";
-        } else {
-            lvgl_port_lock();
-            result = life_status();
-            lvgl_port_unlock();
         }
     } else if (strcmp(name, "debug/perf") == 0) {
         // How hard the board works and the audio's gaps; {"reset": true}

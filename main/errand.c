@@ -127,7 +127,7 @@ static void go(phase_t phase)
 }
 
 /* A point in Yoru's space at distance `z` that shows at (sx, sy) from the
- * middle (as life.c's at()). */
+ * middle (as idle.c's idle_at()). */
 static eyes_pos_t at(float sx, float sy, float z)
 {
     return (eyes_pos_t) {sx * z, sy * z, z};

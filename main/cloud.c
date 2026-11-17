@@ -34,7 +34,7 @@ static const char *TAG = "cloud";
 
 #define NVS_NS "cloud"
 #define NVS_KEY "cfg"
-/* The host's JSON, keys and character included. */
+/* The host's JSON, keys and memory included. */
 #define CFG_MAX 3900
 #define RATE 16000
 #define REC_SAMPLES (CLOUD_REC_MAX_MS / 1000 * RATE)
@@ -660,7 +660,7 @@ static int context(char *out, size_t len)
 
 static const char RULES[] =
     "Right now the user's computer is off or away, so you talk to them straight from the desk, out loud "
-    "through your small speaker. Answer in one or two short sentences, warm and natural, as yourself: no lists, "
+    "through your small speaker. Answer in one or two short sentences, clear and natural: no lists, "
     "markdown, emoji or stage directions. Reply in the language the user speaks (usually %s).\n"
     "Without the computer you can't read e-mail, calendars or the user's apps: if asked, say so kindly, "
     "and that you'll manage once the computer is back.\n"
@@ -672,10 +672,7 @@ static const char RULES[] =
     "[volume up] and [volume down]\n"
     "[open games], [open timers], [open tasks], [open inbox] open an app on your screen\n"
     "[sleep] you go to sleep, when the user says good night or asks you to rest\n"
-    "[face NAME] shows a feeling: happy, excited, love, curious, proud, wink, surprised, sad, shy, sleepy, dance, "
-    "wave or thinking\n"
-    "Use a tag only when the user asks for what it does, except [face], which you may use freely. Never say you did "
-    "something without its tag.\n";
+    "Use a tag only when the user asks for what it does. Never say you did something without its tag.\n";
 
 static const char NO_SEARCH[] = "You can't search the web from the desk: if asked, say so kindly.\n";
 static const char SEARCH_RULE[] =
@@ -688,10 +685,11 @@ static void build_prompt(const cJSON *cfg)
 {
     const char *name = str(cfg, "name")[0] ? str(cfg, "name") : "Yoru";
     int n = snprintf(s_prompt, PROMPT_MAX,
-                     "You are %s, a small round creature who came from somewhere far out in the dark and now lives "
-                     "in a round glass screen on the user's desk, with big eyes and two little hands. Everything "
-                     "human is new to you, and you are curious about it.\n%s\n",
-                     name, str(cfg, "character"));
+                     "You are %s, an AI assistant on a small round screen on the user's desk. You are male: in "
+                     "languages with grammatical gender, speak of yourself in the masculine. Be clear, concise and "
+                     "courteous. You have no backstory and no feelings to talk about, and you don't make small "
+                     "talk.\n",
+                     name);
     if (str(cfg, "memory")[0] != '\0') {
         n += snprintf(s_prompt + n, PROMPT_MAX - (size_t) n, "What you know about the user:\n%s\n",
                       str(cfg, "memory"));

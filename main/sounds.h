@@ -4,7 +4,7 @@
  * sines, a warmer buzz and filtered noise, gliding from one pitch to another,
  * with vibrato, a tremolo (a purr, a snore) and a pluck or swell. The earcons
  * (wake, error, alarm), feedback to what the host does (volume, mute, hello)
- * and the voice of the pet: what it says during the eyes' scenes. */
+ * and Yoru's own sounds: what it says during the eyes' scenes. */
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -24,7 +24,7 @@ typedef enum {
     SOUND_LISTEN_END,
     /* The battery is nearly empty: plug Yoru in. */
     SOUND_BATTERY_LOW,
-    /* The pet's: only while pet sounds are on (playback_set_pet_sounds). */
+    /* Yoru's own: only while its sounds are on (playback_set_yoru_sounds). */
     SOUND_BOOT,
     SOUND_HELLO,
     SOUND_MUTE,
@@ -75,8 +75,8 @@ typedef enum {
     SOUND_COUNT,
 } sound_t;
 
-/** The first of the pet's sounds. */
-#define SOUND_FIRST_PET SOUND_BOOT
+/** The first of Yoru's own sounds. */
+#define SOUND_FIRST_YORU SOUND_BOOT
 
 /** As play_sound (board_tools.c) takes it. */
 const char *sound_name(sound_t sound);

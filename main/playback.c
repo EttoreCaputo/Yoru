@@ -97,7 +97,7 @@ static bool s_available;
 static QueueHandle_t s_sounds;
 static synth_t s_synth;
 static bool s_synth_on;
-static volatile bool s_pet_sounds = true;
+static volatile bool s_yoru_sounds = true;
 
 bool playback_available(void)
 {
@@ -243,13 +243,13 @@ void playback_barge_in(void)
 
 void playback_sound(sound_t sound)
 {
-    if (!s_available || sound >= SOUND_COUNT || (sound >= SOUND_FIRST_PET && !s_pet_sounds)) {
+    if (!s_available || sound >= SOUND_COUNT || (sound >= SOUND_FIRST_YORU && !s_yoru_sounds)) {
         return;
     }
     uint8_t id = (uint8_t) sound;
-    if (sound < SOUND_FIRST_PET) {
+    if (sound < SOUND_FIRST_YORU) {
         // An earcon says something now (the wake chime must be over before
-        // the command): the pet's chatter makes way.
+        // the command): Yoru's chatter makes way.
         xSemaphoreTake(s_lock, portMAX_DELAY);
         if (s_stream.active && s_stream.local) {
             xQueueReset(s_sounds);
@@ -263,21 +263,21 @@ void playback_sound(sound_t sound)
     }
 }
 
-void playback_set_pet_sounds(bool on)
+void playback_set_yoru_sounds(bool on)
 {
-    s_pet_sounds = on;
+    s_yoru_sounds = on;
 }
 
-bool playback_pet_sounds(void)
+bool playback_yoru_sounds(void)
 {
-    return s_pet_sounds;
+    return s_yoru_sounds;
 }
 
 /** Yoru's sounds give or take 3%, so they're never quite the same twice. The
  * earcons as written. */
 static float pitch_of(uint8_t id)
 {
-    if (id < SOUND_FIRST_PET) {
+    if (id < SOUND_FIRST_YORU) {
         return 1.0f;
     }
     return (0.97f + 0.06f * (float) (esp_random() % 1000u) / 1000.0f);

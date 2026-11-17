@@ -19,11 +19,10 @@
 #include "esp_random.h"
 #include "errand.h"
 #include "eyes.h"
-#include "growth.h"
 #include "icons.h"
+#include "idle.h"
 #include "inbox.h"
 #include "inbox_ui.h"
-#include "life.h"
 #include "lvgl_port.h"
 #include "menu.h"
 #include "motion.h"
@@ -35,7 +34,7 @@
 #include "toast.h"
 #include "voice.h"
 
-/* Often enough for life.c's moves. */
+/* Often enough for idle.c's moves. */
 #define TICK_MS 100
 #define BRIGHTNESS_ASLEEP 12
 /* Asleep this long, the screen goes dark; only PWR lights it again. The
@@ -313,7 +312,7 @@ static void fall_asleep(void)
     s.until_ms = 0;
     eyes_set_mood(EYES_MOOD_ASLEEP);
     set_brightness(asleep_brightness());
-    life_slept();
+    idle_slept();
 }
 
 /* Woken, it says hello. */
@@ -325,7 +324,7 @@ static void wake_up(void)
     set_brightness(awake_brightness());
     eyes_play(CLIP_WAKE_UP, esp_random() & 1); // eyes open, hello again
     react(EYES_MOOD_CURIOUS, 3000);
-    life_woke();
+    idle_woke();
 }
 
 /* Something needs Yoru here: back to the middle, whatever it was doing,
@@ -333,7 +332,7 @@ static void wake_up(void)
 static void come_home(void)
 {
     errand_abort();
-    life_attend();
+    idle_attend();
     eyes_move_to(0, 0, 1, HOME_MS, EYES_PATH_GLIDE);
 }
 
@@ -362,8 +361,7 @@ static void hold_finger(uint32_t now, lv_point_t p)
     s.hold_ms = now;
     s.hold_loved = false;
     s.hold_home = eyes_where();
-    life_attend();
-    life_feel(LIFE_FEEL_HOLD);
+    idle_attend();
     playback_sound(SOUND_CHIRP);
     react(EYES_MOOD_HAPPY, 1000); // the tick keeps it going
     hold_follow(p);
@@ -414,8 +412,7 @@ static void watch_finger(lv_indev_t *indev)
     if (!s.stroked && !s.asleep && s.voice == VOICE_IDLE && s.stroke > STROKE_PX && !s.from_top
         && lv_tick_elaps(s.press_ms) >= STROKE_MIN_MS && board_settings_on(SETTING_TOUCH_REACTIONS)) {
         s.stroked = true;
-        life_attend();
-        life_feel(LIFE_FEEL_STROKE);
+        idle_attend();
         playback_sound(SOUND_PURR);
         eyes_play(CLIP_MELT, false); // melts into the hand
         react(EYES_MOOD_HAPPY, 3000);
@@ -426,17 +423,16 @@ static void watch_finger(lv_indev_t *indev)
  * annoys it. */
 static void poke(uint32_t now, clip_id_t clip)
 {
-    if (life_calling() && s.inbox_call && inbox_unread(NULL) > 0) {
+    if (idle_calling() && s.inbox_call && inbox_unread(NULL) > 0) {
         // It knocked for a notification: here it is.
         s.inbox_call = false;
-        life_attend();
+        idle_attend();
         inbox_ui_open(NULL);
         return;
     }
     s.pokes = (now - s.last_poke_ms < POKE_WINDOW_MS) ? s.pokes + 1 : 1;
     s.last_poke_ms = now;
-    life_attend();
-    life_feel(LIFE_FEEL_POKE);
+    idle_attend();
     if (s.pokes >= 3) {
         play("annoyed");
     } else {
@@ -452,8 +448,7 @@ static void slap(uint32_t now, int32_t dx, int32_t dy)
 {
     s.slaps = (now - s.last_slap_ms < SLAP_WINDOW_MS) ? s.slaps + 1 : 1;
     s.last_slap_ms = now;
-    life_attend();
-    life_feel(LIFE_FEEL_SLAP);
+    idle_attend();
     if (s.slaps >= 3) {
         s.slaps = 0;
         play("annoyed");
@@ -546,10 +541,10 @@ static void touch_cb(lv_event_t *e)
     }
 }
 
-/* What life.c needs to know this tick. Someone is around if they touched,
+/* What idle.c needs to know this tick. Someone is around if they touched,
  * talked or moved the case lately, or use the computer (the host's idle
  * time). */
-static life_ctx_t life_context(uint32_t now, bool playing)
+static idle_ctx_t idle_context(uint32_t now, bool playing)
 {
     int minute;
     uint32_t host_idle_ms;
@@ -557,15 +552,15 @@ static life_ctx_t life_context(uint32_t now, bool playing)
     uint32_t alone_ms = now - s.last_touch_ms;
     alone_ms = host_idle_ms < alone_ms ? host_idle_ms : alone_ms;
     const uint32_t awake_ms = now - s.woke_ms;
-    const uint32_t lonely_ms = alone_ms < awake_ms ? alone_ms : awake_ms;
-    return (life_ctx_t) {
+    const uint32_t nobody_ms = alone_ms < awake_ms ? alone_ms : awake_ms;
+    return (idle_ctx_t) {
         .free = !s.pressed && s.voice == VOICE_IDLE && !s.menu && !s.view && !card_up() && !s.face_down && !playing
                 && !errand_busy(),
         .asleep = s.asleep,
         .focus = board_settings_on(SETTING_FOCUS),
         // Low on battery it's tired whoever is around: sleepy eyes, slower.
-        .drowsy = lonely_ms >= (uint32_t) board_settings_get(SETTING_SLEEPY_AFTER_S) * 1000 || battery_low(),
-        .lonely = lonely_ms >= (uint32_t) board_settings_get(SETTING_ASLEEP_AFTER_S) * 1000,
+        .drowsy = nobody_ms >= (uint32_t) board_settings_get(SETTING_SLEEPY_AFTER_S) * 1000 || battery_low(),
+        .away = nobody_ms >= (uint32_t) board_settings_get(SETTING_ASLEEP_AFTER_S) * 1000,
         .alone_ms = alone_ms,
         .minute = minute,
         .day = clock_valid() ? clock_day() : -1,
@@ -626,7 +621,7 @@ static void inbox_tick(uint32_t now)
         playback_sound(SOUND_CHIRP);
     }
     const bool busy = card_up() || s.menu || s.view || s.voice != VOICE_IDLE;
-    if (u >= INBOX_HIGH && !busy && !s.asleep && life_call()) {
+    if (u >= INBOX_HIGH && !busy && !s.asleep && idle_call()) {
         s.inbox_call = true;
     }
 }
@@ -656,7 +651,6 @@ static void timers_tick(void)
         snprintf(text, sizeof(text), "%s", card_tr("Time's up! " LV_SYMBOL_BELL, "Tempo scaduto! " LV_SYMBOL_BELL));
     }
     toast_show(text, 6, TOAST_WAIT);
-    life_feel(LIFE_FEEL_TIMER);
     if (card_up() || s.menu || s.view || s.voice != VOICE_IDLE) {
         return;
     }
@@ -697,11 +691,10 @@ static void battery_tick(uint32_t now)
             s.asleep_ms = now; // dark again a minute from now
         }
         eyes_zap();
-        life_feel(LIFE_FEEL_PLUGGED);
         battery_toast("Charging", "In carica", 3, TOAST_INFO);
         if (free) {
             s.last_touch_ms = now;
-            life_attend();
+            idle_attend();
             // Wide eyes down at the bolt coming up, the jolt with the
             // sound's "bip!", then a happy clap.
             playback_sound(SOUND_CHARGE);
@@ -717,7 +710,7 @@ static void battery_tick(uint32_t now)
         battery_toast("On battery", "A batteria", 3, TOAST_INFO);
         if (free) {
             s.last_touch_ms = now;
-            life_attend();
+            idle_attend();
             playback_sound(SOUND_UNPLUG);
             eyes_play(CLIP_JOLT, false); // the support gone from under it
             react(EYES_MOOD_CURIOUS, 1800);
@@ -731,7 +724,7 @@ static void battery_tick(uint32_t now)
         toast_show(card_tr("Fully charged", "Carica completa"), 4, TOAST_DONE);
         if (free) {
             s.last_touch_ms = now;
-            life_attend();
+            idle_attend();
             play("proud");
             show_status(EYES_STATUS_DONE, STATUS_DONE_MS);
         }
@@ -742,7 +735,7 @@ static void battery_tick(uint32_t now)
         }
         battery_toast("Battery low", "Batteria scarica", 5, TOAST_WAIT);
         if (free) {
-            life_attend();
+            idle_attend();
             play("tired");
         }
         break;
@@ -754,7 +747,7 @@ static void battery_tick(uint32_t now)
         battery_toast("Plug me in", "Mettimi in carica", 8, TOAST_ERROR);
         playback_sound(SOUND_BATTERY_LOW);
         if (free) {
-            life_attend();
+            idle_attend();
             eyes_blink();
             react(EYES_MOOD_SAD, 3500);
             hold_gaze(0, 0.9f, 2500);
@@ -825,20 +818,11 @@ static void tick_cb(lv_timer_t *timer)
         if (!s.dark && s.voice == VOICE_IDLE && now - s.asleep_ms >= DARK_AFTER_MS) {
             go_dark();
         }
-        const life_ctx_t ctx = life_context(now, false);
-        life_step(&ctx);
+        const idle_ctx_t ctx = idle_context(now, false);
+        idle_step(&ctx);
         return;
     }
     set_brightness(awake_brightness());
-    // A milestone reached (growth.c), told when Yoru is awake and free, so
-    // that a count at night doesn't wake it.
-    if (!s.pressed && !s.face_down && s.voice == VOICE_IDLE) {
-        const char *news = growth_take_news();
-        if (news != NULL) {
-            play("proud");
-            toast_show(news, 5, TOAST_DONE);
-        }
-    }
     if (s.gaze_ms != 0 && now - s.gaze_ms >= GAZE_HOLD_MS) {
         s.gaze_ms = 0;
         if (!s.pressed && s.voice == VOICE_IDLE) {
@@ -859,8 +843,8 @@ static void tick_cb(lv_timer_t *timer)
         s.until_ms = 0;
     }
     meeting_tick(now);
-    const life_ctx_t ctx = life_context(now, playing);
-    if (life_step(&ctx) == LIFE_SLEEP) {
+    const idle_ctx_t ctx = idle_context(now, playing);
+    if (idle_step(&ctx) == IDLE_SLEEP) {
         fall_asleep();
     }
 }
@@ -974,7 +958,7 @@ static void on_motion(motion_event_t ev)
             wake_up();
         }
         if (reactions) {
-            life_attend();
+            idle_attend();
             play("curious");
         }
         return;
@@ -983,11 +967,7 @@ static void on_motion(motion_event_t ev)
         return;
     }
     s.last_touch_ms = now;
-    life_attend();
-    life_feel(ev == MOTION_SHAKEN || ev == MOTION_SPUN || ev == MOTION_SHAKEN_LONG ? LIFE_FEEL_SHAKE
-              : ev == MOTION_DROPPED                                            ? LIFE_FEEL_DROP
-              : ev == MOTION_LIFTED                                             ? LIFE_FEEL_LIFT
-                                                                                : LIFE_FEEL_POKE);
+    idle_attend();
     switch (ev) {
     case MOTION_LIFTED:
         play("lifted");
@@ -1075,7 +1055,7 @@ void behaviour_voice(voice_state_t state)
     s.voice = state;
     s.last_touch_ms = lv_tick_get();
     if (state == VOICE_IDLE) {
-        // Back to its own life; the next tick sets the resting mood. An
+        // Back to idle; the next tick sets the resting face. An
         // answer that was spoken to the end shows "done" for a moment.
         s.until_ms = 0;
         if (was == VOICE_SPEAKING) {
@@ -1092,7 +1072,6 @@ void behaviour_voice(voice_state_t state)
         light_up(); // called by name: the screen comes back to listen
     }
     if (was == VOICE_IDLE) {
-        life_feel(LIFE_FEEL_TALK);
     }
     if (s.asleep) {
         // The wake word wakes it.
@@ -1121,31 +1100,6 @@ bool behaviour_play(const char *name)
         wake_up();
     }
     return play(name);
-}
-
-bool behaviour_face(const char *name)
-{
-    if (s.asleep) {
-        return false;
-    }
-    for (size_t i = 0; i < sizeof(SCENES) / sizeof(SCENES[0]); i++) {
-        const scene_t *sc = &SCENES[i];
-        if (strcmp(name, sc->name) != 0) {
-            continue;
-        }
-        // Silent: it is talking, and its voice is the sound.
-        uint32_t clip_ms = 0;
-        const clip_t *c = clips_get(sc->clip);
-        if (c != NULL) {
-            eyes_play_fx(sc->clip, sc->either_side && (esp_random() & 1), sc->rgb ? sc->rgb : SCENE_RGB, NULL);
-            clip_ms = (uint32_t) c->n * 1000 / 30;
-        }
-        if (sc->ms > 0) {
-            react(sc->mood, clip_ms + sc->ms);
-        }
-        return true;
-    }
-    return false;
 }
 
 int behaviour_scenes(const char **names, int max)
@@ -1181,7 +1135,7 @@ void behaviour_heard_from(float x)
 {
     lvgl_port_lock();
     if (!s.asleep && !s.pressed && !s.menu && !s.view && !card_up() && s.voice == VOICE_IDLE
-        && board_settings_on(SETTING_PET_HEARING)) {
+        && board_settings_on(SETTING_TURN_TO_SOUNDS)) {
         // The gaze turns to the noise, and drifts back on its own. A clear one
         // off to a side, now and then, gets pointed at.
         static uint32_t pointed_ms;
@@ -1191,7 +1145,6 @@ void behaviour_heard_from(float x)
             eyes_play(CLIP_POINT_SOUND, x < 0);
         }
         hold_gaze(x * 0.9f, 0, HEARD_LOOK_MS);
-        life_feel(LIFE_FEEL_SOUND);
     }
     lvgl_port_unlock();
 }
@@ -1384,7 +1337,7 @@ void behaviour_boot_key(bool long_press)
 }
 
 /* An errand ended: its happy (or sad) face stays a moment, then back to
- * the conversation's, or to its own life. */
+ * the conversation's, or to idle. */
 static void on_errand(bool busy)
 {
     const uint32_t now = lv_tick_get();
@@ -1675,7 +1628,7 @@ void behaviour_start(lv_obj_t *face)
     s.woke_ms = now;
     s.brightness = -1;
     set_brightness(awake_brightness());
-    life_init();
+    idle_init();
 
     lv_obj_add_event_cb(face, touch_cb, LV_EVENT_PRESSED, NULL);
     lv_obj_add_event_cb(face, touch_cb, LV_EVENT_PRESSING, NULL);

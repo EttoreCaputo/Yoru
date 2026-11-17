@@ -33,8 +33,8 @@ typedef enum {
     METRICS_CLAUDE_IDLE,
 } metrics_claude_state_t;
 
-/* Claude Code usage for the pet; the has_* flags mark the
- * optional fields the host sent. */
+/* Claude Code usage; the has_* flags mark the optional fields the host
+ * sent. */
 typedef struct {
     bool valid;
     float tokens;

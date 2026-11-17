@@ -11,7 +11,7 @@
 #include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#include "life.h"
+#include "idle.h"
 #include "lvgl_port.h"
 #include "playback.h"
 #include "voice.h"
@@ -147,7 +147,7 @@ static void perf_task(void *arg)
         ESP_LOGI(TAG,
                  "lvgl %.1f%% busy, longest %lu us, idle %.0f%%/%.0f%%, eyes %s, %s; audio gaps tx %lu rx %lu; "
                  "PSRAM %u KB free, %u KB largest",
-                 s_lvgl.busy_pct, (unsigned long) s_lvgl.max_us, s_idle[0], s_idle[1], eyes, life_activity(),
+                 s_lvgl.busy_pct, (unsigned long) s_lvgl.max_us, s_idle[0], s_idle[1], eyes, idle_activity(),
                  (unsigned long) (g.tx_gaps - s_base.tx_gaps), (unsigned long) (g.rx_lost - s_base.rx_lost),
                  (unsigned) (heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024),
                  (unsigned) (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) / 1024));

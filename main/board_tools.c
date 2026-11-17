@@ -17,10 +17,9 @@
 #include "eyes.h"
 #include "icons.h"
 #include "tasks.h"
-#include "growth.h"
 #include "inbox.h"
 #include "inbox_ui.h"
-#include "life.h"
+#include "idle.h"
 #include "link.h"
 #include "lvgl_port.h"
 #include "mbedtls/base64.h"
@@ -235,8 +234,8 @@ static bool tool_play_sound(const cJSON *args, char *text, cJSON **structured)
         snprintf(text, TEXT_MAX, "the speaker is not available on this board");
         return false;
     }
-    if (sound >= SOUND_FIRST_PET && !playback_pet_sounds()) {
-        snprintf(text, TEXT_MAX, "pet sounds are off");
+    if (sound >= SOUND_FIRST_YORU && !playback_yoru_sounds()) {
+        snprintf(text, TEXT_MAX, "Yoru's sounds are off");
         return false;
     }
     playback_sound(sound);
@@ -339,9 +338,7 @@ static bool tool_get_state(const cJSON *args, char *text, cJSON **structured)
         cJSON_AddStringToObject(voice, "state", voice_state_name(voice_state()));
     }
     lvgl_port_lock();
-    cJSON_AddStringToObject(st, "activity", life_activity());
-    cJSON_AddNumberToObject(st, "cheer", (int) (life_cheer() * 100 + 0.5f) / 100.0);
-    cJSON_AddItemToObject(st, "life", life_status());
+    cJSON_AddStringToObject(st, "activity", idle_activity());
     lvgl_port_unlock();
     cJSON *audio = cJSON_AddObjectToObject(st, "audio");
     cJSON_AddBoolToObject(audio, "speaker", playback_available());
@@ -741,53 +738,6 @@ static bool tool_set_meeting(const cJSON *args, char *text, cJSON **structured)
     return true;
 }
 
-static bool tool_set_feeling(const cJSON *args, char *text, cJSON **structured)
-{
-    const char *face, *feel;
-    if (!get_str(args, "face", false, 24, &face, text) || !get_str(args, "feel", false, 24, &feel, text)) {
-        return false;
-    }
-    lvgl_port_lock();
-    const bool felt = feel[0] == '\0' || life_feel_named(feel);
-    const bool shown = face[0] != '\0' && felt && behaviour_face(face);
-    lvgl_port_unlock();
-    if (!felt) {
-        snprintf(text, TEXT_MAX, "no feeling \"%s\"", feel);
-        return false;
-    }
-    snprintf(text, TEXT_MAX, shown ? "Yoru shows it" : "noted");
-    return true;
-}
-
-static bool tool_set_growth(const cJSON *args, char *text, cJSON **structured)
-{
-    static const char *const KEYS[GROWTH_MEASURES] = {"days", "facts", "people", "useful"};
-    int32_t counts[GROWTH_MEASURES];
-    for (int i = 0; i < GROWTH_MEASURES; i++) {
-        const cJSON *v = cJSON_GetObjectItemCaseSensitive(args, KEYS[i]);
-        if (!cJSON_IsNumber(v) || v->valuedouble < 0) {
-            snprintf(text, TEXT_MAX, "%s must be a count, 0 or more", KEYS[i]);
-            return false;
-        }
-        counts[i] = v->valuedouble > INT32_MAX ? INT32_MAX : (int32_t) v->valuedouble;
-    }
-    const uint32_t fresh = growth_update(counts);
-    *structured = cJSON_CreateObject();
-    cJSON *reached = cJSON_AddArrayToObject(*structured, "reached");
-    cJSON *news = cJSON_AddArrayToObject(*structured, "new");
-    for (int i = 0; i < growth_milestones(); i++) {
-        if (growth_reached(i)) {
-            cJSON_AddItemToArray(reached, cJSON_CreateString(growth_milestone_id(i)));
-        }
-        if (fresh & (1u << i)) {
-            cJSON_AddItemToArray(news, cJSON_CreateString(growth_milestone_id(i)));
-        }
-    }
-    snprintf(text, TEXT_MAX, "%d of %d milestones reached, %d new", growth_reached_count(), growth_milestones(),
-             __builtin_popcount(fresh));
-    return true;
-}
-
 static const tool_t TOOLS[] = {
     {
         .name = "show_menu",
@@ -848,18 +798,6 @@ static const tool_t TOOLS[] = {
         .schema = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},"
                   "\"required\":[\"id\"]}",
         .fn = tool_hide_notification,
-    },
-    {
-        .name = "set_growth",
-        .description = "What Yoru Hub counted from its memory: days talked together, things learnt about the user, "
-                       "people known, notifications called useful. Each milestone reached unlocks something on the "
-                       "board for good (a colour, a gesture of its own) and Yoru celebrates it. The host sends these "
-                       "itself.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"days\":{\"type\":\"integer\",\"minimum\":0},"
-                  "\"facts\":{\"type\":\"integer\",\"minimum\":0},\"people\":{\"type\":\"integer\",\"minimum\":0},"
-                  "\"useful\":{\"type\":\"integer\",\"minimum\":0}},"
-                  "\"required\":[\"days\",\"facts\",\"people\",\"useful\"]}",
-        .fn = tool_set_growth,
     },
     {
         .name = "clear_notifications",
@@ -939,15 +877,6 @@ static const tool_t TOOLS[] = {
         .fn = tool_set_meeting,
     },
     {
-        .name = "set_feeling",
-        .description = "How Yoru feels about what was just said in a conversation: `face`, a scene Yoru shows "
-                       "while it answers (silent, even while it talks), and `feel`, what it does to its moods "
-                       "(praised, scolded, amused, or any other of its feelings). The host sends it itself.",
-        .schema = "{\"type\":\"object\",\"properties\":{\"face\":{\"type\":\"string\",\"maxLength\":24},"
-                  "\"feel\":{\"type\":\"string\",\"maxLength\":24}}}",
-        .fn = tool_set_feeling,
-    },
-    {
         .name = "set_brightness",
         .description = "Set how bright Yoru's eyes glow while it's awake. Asleep it dims by itself. "
                        "The board remembers it.",
@@ -1009,7 +938,7 @@ static const tool_t TOOLS[] = {
     },
     {
         .name = "get_state",
-        .description = "Read the board's state: firmware, uptime, whether metrics are live, the eyes' mood, the "
+        .description = "Read the board's state: firmware, uptime, whether metrics are live, the eyes' expression, the "
                        "voice (wake word, muted, listening), the speaker, what Yoru is doing, how busy the UI is, "
                        "memory, the link and the WiFi.",
         .schema = "{\"type\":\"object\",\"properties\":{}}",

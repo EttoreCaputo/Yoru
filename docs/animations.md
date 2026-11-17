@@ -6,7 +6,7 @@ Why: the procedural engine moves Yoru well, but it can't act. A wake-up stretch,
 
 ## Motion identity
 
-One personality for every clip, so they feel like the same creature:
+One motion style for every clip, so they feel like the same Yoru:
 
 - **Playful, light, a little clumsy.** Yoru is small and soft: snappy timing, 10–20% overshoot on arrivals, squash on every landing. Never heavy, never mechanical.
 - **Signature easing:** ease-out-back `(0.175, 0.885, 0.32, 1.275)` for arrivals and pops; sine ease-in-out for breathing, bobbing and loops; ease-in for falls and the snap after a held pose. Never linear for anything that moves through space.
@@ -25,7 +25,7 @@ Every clip starts and ends here, so the switch between the engine and a clip can
 - hands tucked behind the body;
 - no tint (the tint is added by the player, see Production).
 
-A clip may end in a **mood pose** instead (sleepy lids, sulking gaze) when the engine takes over in that mood; the clip lists it.
+A clip may end in an **expression pose** instead (sleepy lids, a lowered body) when the engine takes over with that expression; the clip lists it.
 
 ## Units
 
@@ -127,7 +127,7 @@ Focus. 95 frames (3.2 s), once. **Animated**; played by `react` `thinking`. Not 
 The right hand comes under the "chin", eyes up-left with lids a little low, the right eye smaller; a 4 px bob; the hand taps the chin twice; the eyes drift up-right and back; a blink at frame 55; then the hand tucks and the face comes back.
 
 ### 10. `sulk_turn` — sulking
-Pique. 119 frames (4 s), once, either way round. **Animated**; played by the sulk once Yoru is by its edge, turning towards it, with a "pfft" when it snaps away.
+Pique. 119 frames (4 s), once, either way round. **Animated**; kept in the library and played by `debug/clip` only: nothing schedules it since 0.21.0.
 
 Huff: stretch 0.95 / 1.05 and out. A turn away (the face slides to the far side, narrowing to 0.55), the body drifts 30 px towards the edge, lids sloping cross, both hands crossed low in front, on the side it faces. Hold. Glances back, half way, and snaps away again when it meets your eyes. Hold, then a sigh and back to the rest pose.
 
@@ -172,9 +172,9 @@ Curiosity. 69 frames (2.3 s), once, either way round. **Animated**; played by th
 A tilt to 16 that settles at 14, leaning nearer (1.08); the left eye bigger, the right one smaller with its lid a little low; a blink; a "hm?" bob; back.
 
 ### 19. `sad_droop` — sad
-Sadness. 101 frames (3.4 s), once. **Animated**; played by the sad mood Yoru falls into and `react` `sad`. Ends 26 lower than it started, and Yoru stays there.
+Sadness. 101 frames (3.4 s), once. **Animated**; played by `react` `sad`. Ends 26 lower than it started, and Yoru stays there.
 
-Sinks slowly, heavier (1.05 / 0.95) and a little smaller; the lids slope down outside; looks down and away; the hands hang low. A sniffle, a sigh (rising and sinking again), and the face back to the mood's.
+Sinks slowly, heavier (1.05 / 0.95) and a little smaller; the lids slope down outside; looks down and away; the hands hang low. A sniffle, a sigh (rising and sinking again), and the face back to the sad expression.
 
 ### 20. `shy_peek` — shy
 Bashfulness. 97 frames (3.2 s), once. **Animated**; played by `react` `shy`.
@@ -282,4 +282,4 @@ Frames are still the way for a clip that draws what the rig can't (a prop, a squ
 
 **Budget:** the `assets` partition has about 3.9 MB. A clip cropped to the sphere and the hands' reach (about 300 × 300) should stay under 300 KB, so about a dozen fit; the 32 MB flash of some boards would hold many more.
 
-**On the board, frames** (to do, for such clips): a clip player that waits for the engine to reach the rest pose, hides the engine's drawing for the clip's length, plays the clip at Yoru's position, and hands back the pose or mood the clip ends in. `behaviour.c` and `life.c` pick clips; the eye engine never does.
+**On the board, frames** (to do, for such clips): a clip player that waits for the engine to reach the rest pose, hides the engine's drawing for the clip's length, plays the clip at Yoru's position, and hands back the pose or expression the clip ends in. `behaviour.c` and `idle.c` pick clips; the eye engine never does.

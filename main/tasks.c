@@ -7,7 +7,6 @@
 #include "card.h"
 #include "esp_attr.h"
 #include "esp_log.h"
-#include "life.h"
 #include "metrics_model.h"
 #include "nvs.h"
 #include "rpc.h"
@@ -154,14 +153,6 @@ bool tasks_set(const cJSON *args, char *err, size_t len)
             return false;
         }
         n++;
-    }
-    // One of his done since the last list, and it went well: he's pleased.
-    for (int i = 0; i < n; i++) {
-        for (int k = 0; k < s_saved.n; k++) {
-            if (strcmp(s_saved.list[k].id, s_new[i].id) == 0 && s_new[i].last > s_saved.list[k].last && !s_new[i].failed) {
-                life_feel(LIFE_FEEL_TASK);
-            }
-        }
     }
     memcpy(s_saved.list, s_new, (size_t) n * sizeof(task_t));
     s_saved.n = n;

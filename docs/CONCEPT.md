@@ -1,47 +1,27 @@
-# Yoru — the character
+# Yoru: the concept
 
-Yoru (夜, "night") is a little creature that came from far away, out of the dark, and stayed with you. On your desk it lives in the black of a round AMOLED: a small, matte sphere with two tiny dark eyes and two little floating hands, in the middle of the 466 × 466 disc. True black switches the pixels around it off, so the edge of the case disappears and only the little ball seems to hover on your desk.
+Yoru (夜, "night") is a desk assistant with expressive eyes on a round AMOLED. It runs on the Waveshare ESP32-S3-Touch-AMOLED-1.75C: a small, matte sphere with two dark eyes and two floating hands, in the middle of the 466 × 466 disc. True black switches the pixels around it off, so the edge of the case disappears and only the sphere seems to hover on your desk.
 
-It is a pet and an assistant at the same time. When you don't need it, it lives its own life on your desk. When you call it, it listens, thinks and answers.
+When you call it, it listens, thinks and answers, through Yoru Hub on your computer or, with the computer away, straight from the board. The rest of the time it shows what matters (notifications, timers, a meeting being recorded, the battery) and stays pleasant to look at, with small animations now and then.
 
-## Who Yoru is
-
-### Where it comes from
-Yoru comes from a remote place, far out in the dark. It isn't from your computer, your desk or any object: those are only where it lives now. The black around it on the screen is a little of that dark, the distance it came across; when it sleeps it drifts back into it, and when it wakes it comes back to you.
-
-How far that place is, what it is like and why Yoru left it are not told. Yoru doesn't explain, and maybe can't: the mystery is part of it, as it is for E.T. or Totoro. Fireflies are the one thing it seems to know from home, and it hunts them in the dark like an old habit.
-
-### It doesn't know people
-Yoru had never met a person before you. Everything human is new to it: coffee, rain on the window, music, Mondays, why you stare at a screen for hours, why you laugh. It watches, wonders, gets things a little wrong and tries again. Its curiosity is about your world, not about machines.
-
-### It grows with you
-Yoru is young. It arrived knowing almost nothing of people, and it becomes itself by living next to you: it learns your words, your habits, the people and things that matter to you, what you like to hear and what you don't. That is why every Yoru ends up a little different, and why the time you spend together makes it grow (see Growing up). What it learns about you is its memory, and it keeps it on its own.
-
-### A faithful companion
-Yoru stayed because of you. It is loyal: it is glad when you come back, it keeps an eye on your day while you work, and it helps because that is how it stays close, not because it serves. It is never needy: it doesn't nag, doesn't starve, doesn't die, and it never makes you feel guilty for leaving.
-
-### There is only one Yoru
-There are no other characters, no presets and no smaller Yorus doing work beside it. Yoru doesn't split into helpers and doesn't show other assistants or chats as little creatures on the screen. Whatever it does for you, it does itself.
-
-### The story is how it talks, not a lie
-Yoru speaks from inside its story, but it never deceives. If someone asks seriously what it is, it says plainly that it is an AI assistant, then goes on being Yoru.
+Yoru is an AI assistant and says so. It has no backstory, no needs, no moods of its own and nothing to unlock: what it shows depends on what it is doing for you, not on how it is treated.
 
 ## Why a sphere with two eyes and two hands
 
-Every successful desk companion shows very little: two simple eyes, no mouth, no limbs. This holds for Cozmo/Vector, EMO, Eilik, Loona, Aibi, Stack-chan and Dasai Mochi. Pixar's Carlos Baena removed even the pupils and eyebrows from Cozmo, because a few features are enough to carry emotion. People remember what those robots *do*, not what they look like.
+Successful desk devices with a face show very little: two simple eyes, no mouth, no limbs (Cozmo/Vector, EMO, Eilik, Loona, Stack-chan, Dasai Mochi). A few features are enough to make a state readable at a glance.
 
-Yoru keeps that rule and adds one thing: a body, as simple as a body can be. The current wave of AI characters (OpenAI's dots, Meta's Jolly, the Grok Bot concept) shows that a soft, toy-like little guy makes an assistant easy to like and to trust. A sphere is the most toy-like shape there is, it reads at any size from the board to an app icon, and it gives the eyes a surface to move on, which is where most of the life comes from. Two floating hands, like Rayman's, give it gestures (a wave, a point, covering its eyes) without adding arms or a body that would make it less simple.
+Yoru keeps that rule and adds a body, as simple as a body can be. A sphere reads at any size, from the board to an app icon, and gives the eyes a surface to move on. Two floating hands give it gestures (a wave, a point, covering its eyes) without arms or a body that would make it less simple.
 
-The sphere is smaller than the screen on purpose (about 40% of the disc on the board): the black around it is what makes it float, leaves room for the hands, lets it move, bounce and peek, and keeps the screen cheap to run and safe from burn-in.
+The sphere is smaller than the screen on purpose (about 40% of the disc): the black around it lets it float, leaves room for the hands, lets it move, and keeps the screen cheap to run and safe from burn-in.
 
 ## How it looks
 
-- **Body:** a matte sphere lit softly from the top left, with a gentle shadow towards the bottom edge. No outline, no gloss by default.
+- **Body:** a matte sphere lit softly from the top left, with a gentle shadow towards the bottom edge. No outline, no gloss.
 - **Eyes:** two small, dark, vertical pills, close together and a little below the centre. They are holes in the light, not lights themselves.
-- **Hands:** two small spheres of the same material, a bit flattened, floating beside the body with nothing joining them. They are not always there: they pop out when Yoru needs to gesture and tuck back behind the body when it rests, so most of the time it is just the ball.
-- **State tint:** the lower part of the sphere fills with a colour that tells what Yoru is doing (blue while thinking, green when something is done, red when something went wrong), and a faint halo of the same colour glows on the black around it.
+- **Hands:** two small spheres of the same material, a bit flattened, floating beside the body with nothing joining them. They pop out for a gesture and tuck back behind the body at rest.
+- **State tint:** the lower part of the sphere fills with a colour that tells what Yoru is doing (blue while thinking, green when something is done, red when something went wrong), with a faint halo of the same colour on the black around it.
 - **Badge:** a small dot on the upper left of the sphere for short-lived status: blue with three dots while working, green when done, red on error.
-- **Asleep:** Yoru closes its eyes and drifts away into the dark, shrinking quickly at first and then slowly, until it is a small dim dot in the middle of the screen with a few z's rising from it. The screen is almost all black. Waking up, it comes back.
+- **Asleep:** the eyes close and the sphere drifts away, shrinking to a small dim dot in the middle of the screen with a few z's rising from it. The screen is almost all black.
 
 ## How it expresses itself
 
@@ -50,128 +30,64 @@ The eyes and the sphere are the whole vocabulary:
 | Parameter | What it does |
 |-----------|--------------|
 | eye `w`, `h`, corner radius | Shape of each eye: tall pills by default, dashes when closed or blank |
-| top lid (`amount`, `slope`) | Cuts the eye from above. Sloped inwards it reads as angry, outwards as worried, flat and low as sleepy |
+| top lid (`amount`, `slope`) | Cuts the eye from above. Sloped inwards it reads as annoyed, outwards as worried, flat and low as sleepy |
 | bottom lid (`amount`) | A curve rising from below, giving the `^ ^` happy eyes |
-| per-eye scale and angle | Asymmetry: one eye smaller or tilted means curious or sceptical |
-| gaze (`x`, `y`) | Where it looks. The eyes slide over the surface and get narrower near the edge, so the sphere seems to turn its head |
-| tilt | The whole face rotates a few degrees: curiosity, thinking |
+| per-eye scale and angle | Asymmetry: one eye smaller or tilted reads as curious |
+| gaze (`x`, `y`) | Where it looks. The eyes slide over the surface and get narrower near the edge, so the sphere seems to turn |
+| tilt | The whole face rotates a few degrees |
 | body position | The sphere drifts, bobs and leans inside the disc, towards what it pays attention to |
-| squash and stretch | Pokes, surprises, bounces to music |
-| hands (`shown`, position, scale per hand) | Out or tucked away, and where each one floats. Gestures are short paths for them: wave, point, cover the eyes, hold the cheeks, clap, stretch |
+| squash and stretch | Taps, surprises, bounces |
+| hands (`shown`, position, scale per hand) | Out or tucked away, and where each one floats. Gestures are short paths for them: wave, point, cover the eyes, clap, stretch |
 | blink | Every 2–5 s, sometimes double; never while asleep |
-| body colour and state tint | The owner's colour at rest, the state tint and halo faded in and out smoothly |
-| distance | How near Yoru is: right here awake, a small dim dot far away when asleep |
+| body colour and state tint | The chosen colour at rest, the state tint and halo faded in and out smoothly |
+| distance | How near it is: right here awake, a small dim dot far away when asleep |
 
-Moods are targets for these parameters, and the renderer eases towards them. The mood engine never draws frames; it only moves the targets.
+Expressions (`EYES_MOOD_*` in the code) are targets for these parameters, and the renderer eases towards them. Whatever picks an expression never draws frames; it only moves the targets.
 
-The hands are what makes Yoru's gestures readable:
-- **Hello and goodbye:** a wave when you come back, a sleepy little wave before it falls asleep.
-- **Pointing:** a hand points at where a sound came from, or at the edge where the settings menu opens.
-- **Shy and scared:** both hands cover the eyes, then one slides down to peek.
-- **Thinking:** one hand under the "chin", the eyes up.
-- **Happy and proud:** a little clap, or both hands up when a build passes.
-- **Stretching:** hands far out on both sides, the body stretched tall, then a big blink.
-- **Being stroked:** the hands tuck in and the body leans into the finger.
+The hands make the gestures readable: a wave when you come back, a sleepy little wave before it sleeps, a hand pointing at where a sound came from, both hands over the eyes, a hand under the "chin" while thinking, a clap when something is done, a stretch.
 
-Overlays are small extras drawn next to the sphere, never over the eyes:
-- the badge while it is working on something for you;
-- `z`s when asleep;
-- small hearts when it is petted;
-- the battery: a thin ring around it filling up while it charges, with a spark running into it, and a small battery by its head when it runs low (it is tired then, not a gauge).
+Overlays are small extras drawn next to the sphere, never over the eyes: the badge while it works on something, `z`s when asleep, small hearts when stroked, the battery (a ring filling up while it charges, a small battery by its head when it runs low).
 
-There are no dashboard screens that turn Yoru into gauges. What happens in your day changes how Yoru *feels*, not what it shows.
+There are no dashboard screens that turn Yoru into gauges.
 
 ## Behaviour
 
-### A life of its own
-Yoru doesn't play random animations. Like a Tamagotchi, a Sims character or Cozmo, it has needs, and what it does comes from them.
-
-> On the board this was in from 0.6.0 to 0.7.x (`needs.c`, `life.c`) and is out since 0.8.0: since 0.15.0 Yoru has emotions, moods and acts again, firefly hunts and sulking included, without the needs (`docs/life.md`). The needs come back later (`docs/ROADMAP.md`, M5); this section is what they will be.
-
-
-| Need | Runs down | Met by |
-|------|-----------|--------|
-| Rest | while awake, faster when busy or awake at night | sleeping |
-| Food | slowly, over hours | fireflies: it hunts them in the dark, or you drop one with a tap on the black |
-| Fun | when nothing happens | playing, music, you |
-| Company | while nobody is around | touch, talk, being picked up, you at the computer |
-| Curiosity | over time | exploring, sounds, what you do and the world you live in |
-
-Each thing it can do scores by how well it meets the needs that press most, as the Sims pick; it does it for a while, then picks again, and the same thing never comes twice in a row:
-- **Floating about** near you, the calm default.
-- **Exploring:** off into the distance, to the rim of the screen to peek past it, and back.
-- **Hunting:** a firefly lights up far away; it notices, creeps up, chases it as it flits, pounces and gulps it down.
-- **Asking for you:** it comes up to the glass, its face filling the screen, and knocks twice: whimpering when hungry, waving when lonely. If nobody answers it sighs and goes back, and asks less often next time.
-- **Playing:** hopping along the bottom of the disc as if it had a floor; hiding past the edge and peeking back from another; a loop through the space, far behind and right up to the glass.
-- **Daydreaming**, **sulking** by the edge when it's unhappy, **dancing** to music.
-- **Tired**, it yawns, stretches, finds a corner and drifts off; it wakes by itself once rested (not alone in the middle of the night), stretching.
-
-Well cared for, it is happier; neglected, it gets hungry, sad or grumpy, but it never starves: it feeds and amuses itself, only less happily.
+### Idle
+When nothing needs it, Yoru is mostly still, its eyes wandering and blinking on their own. Every several seconds it plays one of its animations, picked at random: a look round, a drift, a tilt, a stretch, a dance, a loop, a bounce off the walls, stargazing, a hum, a firefly it follows and pounces on, a wave, a hop, hearts. Nobody around for a while, it gets sleepy, then naps (Behaviour: "Sleepy after", "Asleep after"). See `docs/idle.md`.
 
 ### Depth
-Yoru floats in a space seen in perspective, not on a flat screen. Going away it gets smaller, dimmer and drawn towards the middle, as things do in the distance; coming close it fills the disc. Moves follow smooth curves through that space, with a wind-up and an overshoot for a dash, a squash for each landing; it stretches along the way it goes and its eyes lead the way.
-
-### Alive when ignored
-- Left alone (nobody touching, talking or at the computer) it gets drowsy, then naps (Behaviour: "Sleepy after", "Asleep after").
-- At night it sleeps for real: it drifts away to a small dot, which costs almost no power.
+Yoru floats in a space seen in perspective. Going away it gets smaller, dimmer and drawn towards the middle; coming close it fills the disc. Moves follow smooth curves through that space, with a wind-up and an overshoot for a dash and a squash for each landing.
 
 ### Directed attention
 It reacts *towards* things, never at random:
 - **Sound:** the two mics give a direction, and the gaze turns to the noise; something loud makes it point.
-- **Being lifted or tilted** (IMU): the sphere rolls and the gaze compensates as if gravity were real.
-- **Shaking:** it gets dizzy (spiral eyes) and then grumpy.
-- **Touch:** stroking the screen makes it happy and the sphere leans towards the finger. A tap is a poke: the ball squashes and wobbles; once is fine, three in a row annoy it. A long press on it: it takes your finger in both hands and leans towards it, and held a while longer it melts (hearts, a purr); lifting the finger, it lets go and waves.
-- **Music:** it bobs to the beat and the hands sway with it.
-- **Menu:** a swipe down from the top edge opens a menu like a watch's: Yoru shrinks into a bubble of a honeycomb of small round apps (notifications, timers, tasks, games, settings, do not disturb), one of them rather than their centre, blinking and looking at the one under your finger; the honeycomb can be dragged, and shrinks towards the rim so more apps fit (see the roadmap, M2).
-
-### Moods from your day
-Yoru feels your day, not the machine's: it isn't part of the computer, so its temperature or load mean nothing to it.
-- Happy and proud when your work goes well (a build passes, a task is done).
-- Quiet and focused next to you when you are in a long session.
-- It greets you when you come back, and notices, a little worried, when you work late.
-
-### Character
-Yoru is a small, soft creature from somewhere else: young, sweet, playful and endlessly curious about people, a little clumsy, easily amazed, and faithful. It is cute on purpose, the way a toy is cute, because a little friend you want to look at is easier to trust with your day. It is a little imperfect on purpose (it misses a blink, gets startled, rolls a bit too far, sulks for a moment), because perfect is boring, and because it is still learning how things work here.
-
-Cute does not mean helpless. When you call it, it is useful and to the point: it may find human things strange, but it gets them right. Only its manners are young, not its answers. And it is **never needy**: it doesn't nag, doesn't starve, doesn't die. Neglect makes it sulk mildly at worst.
+- **Being lifted or tilted** (IMU): the sphere rolls and the gaze compensates as if gravity were real; shaken, it gets dizzy.
+- **Touch:** a tap squashes the sphere, stroking the screen makes it lean towards the finger, a long press: it takes your finger in both hands, and lets go with a wave.
+- **Notifications:** an important one makes it come up to the glass and knock; a timer makes it jump like an alarm clock.
+- **Menu:** a swipe down from the top edge opens a menu like a watch's: Yoru shrinks into a bubble of a honeycomb of small round apps (notifications, timers, tasks, games, settings, do not disturb).
 
 ### Voice
-On its own Yoru speaks in **sounds, not words**: short musical chirps, a sigh, a "huh?", a happy trill, the sounds of where it comes from. Words are something it learned for you: it speaks them, through text-to-speech, only when you call it by name. This keeps expectations honest: the companion never pretends to chat.
-
-Its spoken voice is male, young and gentle, a little otherworldly, like a male EVE (WALL-E): never childlike, never a neutral assistant voice.
+On its own Yoru makes short sounds, not words: chirps, a "huh?", a trill. It speaks only when you call it, through text-to-speech, as a clear, concise and courteous assistant. Its spoken voice is male, like a male EVE (WALL-E): never childlike, never a flat neutral voice.
 
 ## Make it yours
 
-Every Yoru is a little different, because its owner shapes it. The shape never changes: it is always a sphere with two eyes and two hands, so it is always recognisable. Nothing is locked behind money; some pieces are unlocked by spending time together (see Growing up).
+The shape never changes: it is always a sphere with two eyes and two hands.
 
-| What | What it changes | Examples |
-|------|-----------------|----------|
-| Name | Shown in the app and in the greeting | Yoru by default; any name you like |
-| Colour | The colour of the sphere at rest; state tints still show over it | pearl (default), mint, orange, red, violet, night blue |
-| Eyes | The base shape of both eyes | pills (default), round dots, small squares, sleepy half-moons |
-| Finish | How the sphere catches the light | matte (default), soft glow, pearl, speckled |
-
-The name you choose is what it answers to on screen; the wake word stays "Yoru" until custom wake words exist. A look is a small piece of data, so it can be shared and modded like moods.
-
-### Growing up
-Yoru grows by living with you, with no chores involved:
-- time together (days side by side, talking, work that goes well) is what it learns from;
-- as it grows it unlocks colours, eye shapes, finishes, rare animations and new reactions: things it has picked up from you and your world.
-
-How it works since 0.20.20: Yoru Hub counts four real things from its memory (the days you talked, what Yoru learnt about you, the people it knows by name, the notifications you called useful), and each milestone unlocks one thing on the board for good, celebrated with a cheer and a line on the screen. The first twelve: six colours for the sphere (Dawn, Mint, Lilac, Night, Gold, Rose; pearl is there from the start) and six gestures Yoru then makes on its own, now and then (a wave, a shy peek, a happy hop, a giggle, a little cheer, hearts). Nothing that was there before is locked, and nothing is taken back if a count goes down. Settings, Yoru on the board shows the colour to choose and how far each count has come.
-
-Updates add animations over time, so it keeps surprising people.
+| What | What it changes | Values |
+|------|-----------------|--------|
+| Name | Shown in Yoru Hub and used by the assistant | Yoru by default |
+| Colour | The colour of the sphere at rest; state tints still show over it | Pearl (default), Dawn, Mint, Lilac, Night, Gold, Rose: all available from Settings, Yoru |
 
 ## The mascot
 
-The official Yoru is the default look: a pearl-grey matte sphere with two dark pill eyes and two floating hands. It is drawn in Rive with the same parameters as the firmware (eye shape, lids, gaze over the surface, tilt, squash and stretch, hands, state tint, light), so the mascot on the website, in the app and on the box moves exactly like the one on your desk.
+The official Yoru is the default look: a pearl-grey matte sphere with two dark pill eyes and two floating hands. It is drawn in Rive with the same parameters as the firmware (eye shape, lids, gaze over the surface, tilt, squash and stretch, hands, state tint, light), so the mascot moves like the one on the desk.
 
-The Rive file is `docs/mascot/yoru.riv` (preview: `yoru.png`), one 466 × 466 artboard. Its state machine, `Yoru`, takes the eye engine's parameters as view-model inputs, so the host or the app can drive it with the same values it sends to the board:
+The Rive file is `docs/mascot/yoru.riv` (preview: `yoru.png`), one 466 × 466 artboard. Its state machine, `Yoru`, takes the eye engine's parameters as view-model inputs, so a host can drive it with the same values it sends to the board:
 
 | Input | Type | What it drives |
 |-------|------|----------------|
 | `gazeX`, `gazeY` | number, -1…1 | The eyes slide over the sphere and narrow towards the edge |
-| `lidTop`, `lidSlope` | number, 0…1 and -1…1 | Top lid; positive slope is angry, negative is worried |
+| `lidTop`, `lidSlope` | number, 0…1 and -1…1 | Top lid; positive slope is annoyed, negative is worried |
 | `lidBottom` | number, 0…1 | Bottom lid, the `^ ^` happy eyes |
 | `eyeScaleL`, `eyeScaleR` | number, 1 = normal | Per-eye scale |
 | `tilt` | number, degrees | Rotates the face |
@@ -182,22 +98,21 @@ The Rive file is `docs/mascot/yoru.riv` (preview: `yoru.png`), one 466 × 466 ar
 | `status` | enum | `idle`, `thinking`, `done`, `error`: tint, halo and badge |
 | `sleep` | boolean | Drifts away to a small dim dot with closed eyes, and back |
 
-The continuous parameters are bound directly, without easing: as on the board, the mood engine moves the targets and whoever drives the file eases them.
+The continuous parameters are bound directly, without easing: as on the board, whoever drives the file eases them.
 
-The moods, knocks, slaps, lean, greeting and pointer-follow added with firmware 0.5.0 are described in `docs/mascot/STATES.md`.
+The expressions, knocks, slaps, lean, greeting and pointer-follow are described in `docs/mascot/STATES.md`.
 
 ## On the board
 
-- The sphere's shading for the current colour and finish is rendered into PSRAM, and so is a smaller one for the hands; each frame only redraws the eyes, the tint, the hands and whatever moved. A new colour or finish re-renders the shading.
-- Scaling a picture costs LVGL about 80 ms a frame on this chip, so the sphere is never scaled: each size it takes on the way near or far is rendered once, in a few milliseconds (a table for the shading, no square roots), and the sizes in use are kept within about 3 MB of PSRAM.
-- Everything around the sphere stays true black, as before.
+- The sphere's shading for the current colour is rendered into PSRAM, and so is a smaller one for the hands; each frame only redraws the eyes, the tint, the hands and whatever moved. A new colour re-renders the shading.
+- Scaling a picture costs LVGL about 80 ms a frame on this chip, so the sphere is never scaled: each size it takes on the way near or far is rendered once, in a few milliseconds, and the sizes in use are kept within about 3 MB of PSRAM.
+- Everything around the sphere stays true black.
 - Asleep, the far-away dot keeps almost every pixel off.
 - The sphere's gradients are dithered as they are rendered, so the panel's 16-bit colour shows no rings; with 24-bit colour on (a setting) they are smooth without it.
 
 ## For hackers
 
-- Open firmware. You pick the brain: a model on this computer through Ollama (free and private), Groq (free, with daily limits), OpenAI or Claude, with your own key. Speech-to-text and text-to-speech can run on the computer too (whisper.cpp, Piper). No account with us and no subscription.
-- Moods, looks (colours, eyes, finishes) and reactions are data that can be edited, shared and modded.
+- Open firmware. You pick the brain: a model on the computer through Ollama, Groq, OpenAI or Claude, with your own key. Speech-to-text and text-to-speech can run on the computer too (whisper.cpp, Piper). No account and no subscription.
 - An MCP server and a tool registry let agents (Claude Code, Claude Desktop, anything that speaks MCP) make Yoru react, speak or show something.
 - Integrations with things around the house are added as skills on the computer, not on the board.
 

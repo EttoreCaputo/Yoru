@@ -322,10 +322,6 @@ static void handle(int id)
 
 /* ---- Tags from the brain in the cloud (cloud.c) ---------------------------------- */
 
-/* The faces the brain may show: behaviour.c's scenes that suit a word. */
-static const char *const FACES[] = {"happy", "excited", "love", "curious", "proud", "wink", "surprised",
-                                    "sad",   "shy",     "sleepy", "dance", "wave",  "thinking"};
-
 /* A timer the brain asked for, in seconds: up to a day. */
 #define TAG_TIMER_MAX_S (24 * 3600)
 
@@ -348,16 +344,6 @@ bool commands_tag(const char *tag)
         new_timer(secs);
         lvgl_port_unlock();
         return true;
-    } else if (strcmp(word, "face") == 0) {
-        for (size_t i = 0; i < sizeof(FACES) / sizeof(FACES[0]); i++) {
-            if (strcmp(arg, FACES[i]) == 0) {
-                lvgl_port_lock();
-                behaviour_play(arg);
-                lvgl_port_unlock();
-                return true;
-            }
-        }
-        return false;
     } else if (strcmp(word, "open") == 0) {
         id = strcmp(arg, "games") == 0    ? CMD_PLAY
              : strcmp(arg, "timers") == 0 ? CMD_TIMERS

@@ -8,11 +8,10 @@
 #include "game_kit.h"
 #include "playback.h"
 
-/* Tilt ball: Yoru curled up into a ball, rolled home through the dark by
- * tilting the case. Pits are holes into the dark he came from (he hates
- * them), the walls bump him, fireflies on the way are a snack, and the
- * glowing hole is the way home. The levels get harder; the last one reached
- * is kept. */
+/* Tilt ball: Yoru curled up into a ball, rolled to the goal by tilting the
+ * case. Pits send him back to the start, the walls bump him, the fireflies
+ * on the way are collected, and the glowing hole is the goal. The levels get
+ * harder; the last one reached is kept. */
 
 #define CX ((float) KIT_CX)
 #define CY ((float) KIT_CY)

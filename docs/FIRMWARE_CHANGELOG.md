@@ -1,5 +1,14 @@
 # Firmware changelog
 
+## 0.21.0
+
+- **Yoru is now simply an assistant.** He no longer has moods, needs, a backstory or a character of his own: nothing he does depends any more on how you treated him, how long you left him alone or the hour of the day. Poking, stroking, shaking or ignoring him no longer leaves anything behind.
+- **Nothing to unlock.** The milestones are gone, and every sphere colour (Pearl, Dawn, Mint, Lilac, Night, Gold, Rose) can be picked in Settings, Yoru, straight away. The Yoru page now holds only the colour.
+- **He still moves.** When nothing needs him, every so often he plays one of his animations at random (a look round, a stretch, a dance, a loop, a firefly hunt, stargazing, a wave, a hop, hearts...), and stays still with his eyes wandering in between. When nobody has been around for a while he gets sleepy, and then naps as before. He still knocks on the glass for an important notification, says hello when you come back, and reacts to touch, motion and sounds as before.
+- **Talking to him without the computer**, he now answers as a clear, concise and courteous assistant, without small talk about himself.
+- What the board had stored about his moods and milestones is erased the first time this version starts.
+- For the host: the tools `set_feeling` and `set_growth`, the `growth` capability and the `debug/life` method are gone; `get_state` no longer says `cheer` or `life` (`activity` stays: `idle`, `drowsy`, `call`, `nap`, `sleep`, `come`, `greet`); `cloud/set` no longer reads `character`, and the `[face]` tag is gone.
+
 ## 0.20.20
 
 - **Tell Yoru what was worth it.** An opened notification now ends with two buttons in place of Dismiss: **Useful** and **Enough**. One tap and it goes. Yoru Hub learns from it: what you call useful it tells you more of; with Enough it remembers not to tell you things like that again, and a source you keep saying Enough to arrives more quietly (urgent things still come through). Open stays, next to the host's own buttons.

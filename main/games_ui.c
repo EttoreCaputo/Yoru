@@ -10,7 +10,6 @@
 #include "game_sling.h"
 #include "game_stars.h"
 #include "game_tilt.h"
-#include "life.h"
 #include "playback.h"
 
 /* The launcher: Yoru in the middle, the games in a ring of round bubbles
@@ -199,7 +198,6 @@ static void build_launcher(void);
 
 static void quit_game(void)
 {
-    life_feel(LIFE_FEEL_PLAYED);
     if (s.game != NULL) {
         lv_obj_delete(s.game);
         s.game = NULL;

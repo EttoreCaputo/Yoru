@@ -4,9 +4,9 @@
  * host, the WiFi up and the services Yoru Hub handed over (`cloud/set`), what
  * is said after the wake word (or with PWR held) is recorded in PSRAM and
  * sent from the board itself: to a speech-to-text service, to the brain
- * (OpenAI's Chat Completions or Anthropic's Messages, with Yoru's character
- * and what the board knows now), and the answer to a voice that the speaker
- * plays as it arrives. Tags in the answer act on the board (a timer, a face,
+ * (OpenAI's Chat Completions or Anthropic's Messages, with who Yoru is and
+ * what the board knows now), and the answer to a voice that the speaker
+ * plays as it arrives. Tags in the answer act on the board (a timer, an app,
  * the volume...). Then it listens for a follow-up, as with the host. */
 
 #include <stdbool.h>

@@ -23,8 +23,8 @@ typedef struct {
     uint32_t rgb;
 } stop_t;
 
-/* The sphere's colours, light to shadow (docs/CONCEPT.md, Growing up):
- * pearl from the start, the others unlocked by time together (growth.c). */
+/* The sphere's colours, light to shadow, picked in the menu: pearl by
+ * default. */
 #define STOPS 5
 typedef struct {
     const char *en, *it;

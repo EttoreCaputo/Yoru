@@ -1,8 +1,9 @@
 #pragma once
 
-/* The bridge between Yoru's idle life (life.c) and its eyes (eyes.c), and how
- * it answers touch, the senses and what comes for you:
- * - when nothing else has its attention, life.c runs it: it floats about;
+/* The bridge between Yoru's idle animations (idle.c) and its eyes
+ * (eyes.c), and how it answers touch, the senses and what comes for you:
+ * - when nothing else has its attention, idle.c runs it: it floats about
+ *   and now and then plays one of its animations;
  * - left alone (nobody touching, talking or at the computer) it gets
  *   sleepy, then naps and dims the screen (the times and the brightness are
  *   settings);
@@ -50,10 +51,6 @@ void behaviour_voice(voice_state_t state);
 /** Play one of the scenes (names as in DualEye) now, waking it if
  * asleep; false for an unknown one. With the LVGL lock held. */
 bool behaviour_play(const char *name);
-/** The face Yoru makes as it answers (the host's `set_feeling`): the scene's
- * clip and mood, without its sound, even during a conversation; false for
- * an unknown one. With the LVGL lock held. */
-bool behaviour_face(const char *name);
 /** To sleep, as a tap of PWR does, out of the menu or the inbox first.
  * With the LVGL lock held. */
 void behaviour_sleep(void);

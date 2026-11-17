@@ -14,7 +14,7 @@
  * of the screen; near it fills the disc. It moves along smooth paths through
  * that space, or follows a point like a spring, leaning into the motion with
  * its eyes leading the way. The pictures come from look.c; this module only
- * places and moves them. behaviour.c and life.c decide what Yoru does and
+ * places and moves them. behaviour.c and idle.c decide what Yoru does and
  * turn it into calls here. All calls with the LVGL lock held. */
 
 #include <stdbool.h>

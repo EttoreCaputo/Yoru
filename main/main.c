@@ -16,13 +16,11 @@
 #include "esp_log.h"
 #include "eyes.h"
 #include "tasks.h"
-#include "life.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
 #include "link.h"
-#include "growth.h"
 #include "look.h"
 #include "lvgl_port.h"
 #include "metrics_io.h"
@@ -66,6 +64,29 @@ static int32_t fast_boots(int32_t set)
     return n;
 }
 
+/* Firmware before 0.21 kept moods ("life") and unlocked milestones
+ * ("growth") in NVS. Gone with those features: whatever a board still has
+ * there is erased. Only when something is there, so a clean board writes
+ * nothing. */
+static void forget_old_namespaces(void)
+{
+    static const char *const OLD[] = {"life", "growth"};
+    for (size_t i = 0; i < sizeof(OLD) / sizeof(OLD[0]); i++) {
+        nvs_iterator_t it = NULL;
+        if (nvs_entry_find(NVS_DEFAULT_PART_NAME, OLD[i], NVS_TYPE_ANY, &it) != ESP_OK) {
+            continue; // ESP_ERR_NVS_NOT_FOUND: nothing left
+        }
+        nvs_release_iterator(it);
+        nvs_handle_t nvs;
+        if (nvs_open(OLD[i], NVS_READWRITE, &nvs) == ESP_OK) {
+            nvs_erase_all(nvs);
+            nvs_commit(nvs);
+            nvs_close(nvs);
+            ESP_LOGI(TAG, "erased old NVS namespace \"%s\"", OLD[i]);
+        }
+    }
+}
+
 static void fast_safe_cb(TimerHandle_t t)
 {
     fast_boots(0); // it ran long enough: the screen works
@@ -94,10 +115,10 @@ static void restart_cb(TimerHandle_t t)
     esp_restart();
 }
 
-/* Focus mode silences the pet's sounds too; chimes still play. */
-static void apply_pet_sounds(void)
+/* Focus mode silences Yoru's own sounds too; chimes still play. */
+static void apply_yoru_sounds(void)
 {
-    playback_set_pet_sounds(board_settings_on(SETTING_PET_SOUNDS) && !board_settings_on(SETTING_FOCUS));
+    playback_set_yoru_sounds(board_settings_on(SETTING_YORU_SOUNDS) && !board_settings_on(SETTING_FOCUS));
 }
 
 /* Settings that other modules keep a copy of, from the menu or the host. */
@@ -113,9 +134,9 @@ static void on_setting(setting_t id, int32_t value)
     case SETTING_WAKE_WORD_ON:
         voice_set_wake_on(value != 0);
         break;
-    case SETTING_PET_SOUNDS:
+    case SETTING_YORU_SOUNDS:
     case SETTING_FOCUS:
-        apply_pet_sounds();
+        apply_yoru_sounds();
         break;
     case SETTING_LCD_FAST:
         if (s_display == NULL) {
@@ -126,8 +147,7 @@ static void on_setting(setting_t id, int32_t value)
         xTimerStart(xTimerCreate("restart", pdMS_TO_TICKS(400), pdFALSE, NULL, restart_cb), 0);
         break;
     case SETTING_SPHERE:
-        // A colour not unlocked (set from the host) falls back on pearl.
-        look_set_palette(growth_palette_ok((int) value) ? (int) value : 0);
+        look_set_palette((int) value);
         break;
     case SETTING_COLOR_24:
         // The panel's format and the frame buffer are set up at boot too.
@@ -156,7 +176,7 @@ static void start_audio(void)
     voice_start(board_settings_on(SETTING_MIC_MUTED), word);
     commands_start();
     playback_start();
-    apply_pet_sounds();
+    apply_yoru_sounds();
     playback_sound(SOUND_BOOT);
 }
 
@@ -167,7 +187,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Yoru %s", esp_app_get_description()->version);
     board_settings_init();
     board_settings_on_change(on_setting);
-    growth_init();
+    forget_old_namespaces();
     on_setting(SETTING_SPHERE, board_settings_get(SETTING_SPHERE)); // rendered by look_init()
     clock_init();
     tasks_init();
