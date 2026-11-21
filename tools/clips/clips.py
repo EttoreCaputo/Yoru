@@ -4,7 +4,7 @@
 Input: tools/clips/keyframes.json, the keys of each `clip_<name>` timeline as
 the Rive editor's MCP reports them (object id, property, frame at 60 fps,
 value, interpolation and its cubic curve). Output: main/clips.h and
-main/clips.c, one frame every 1/30 s with the rig's values already eased, so
+main/clips.c (and tools/clips/frames.json for Yoru Hub), one frame every 1/30 s with the rig's values already eased, so
 the board only blends two neighbouring frames.
 
 The rig's numbers stay in the Rive file's units (the board scales them by
@@ -30,6 +30,9 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 KEYS = os.path.join(HERE, "keyframes.json")
 OUT_H = os.path.join(ROOT, "main", "clips.h")
 OUT_C = os.path.join(ROOT, "main", "clips.c")
+# The same frames for Yoru Hub, which draws previews of the clips with them
+# (its tools/fetch_firmware.sh copies the file).
+OUT_JSON = os.path.join(HERE, "frames.json")
 
 # Rive timelines run at 60 fps; the board's frames are 1/30 s.
 RIVE_FPS = 60
@@ -224,8 +227,10 @@ def main():
         "#include <string.h>",
         "",
     ]
+    previews = {}
     for n in names:
         frames = sample(clips[n])
+        previews[n] = {"loop": n.endswith("_loop"), "frames": [[int(q) for q in quantize(fr, n)] for fr in frames]}
         src.append(f"static const clip_raw_t {n.upper()}[] = {{")
         for fr in frames:
             src.append("    {{" + ", ".join(quantize(fr, n)) + "}},")
@@ -269,6 +274,8 @@ def main():
     ]
     open(OUT_H, "w").write("\n".join(hdr))
     open(OUT_C, "w").write("\n".join(src))
+    with open(OUT_JSON, "w") as out:
+        json.dump({"fps": CLIP_FPS, "fields": FIELDS, "scale": SCALE, "clips": previews}, out, separators=(",", ":"))
 
 
 if __name__ == "__main__":
